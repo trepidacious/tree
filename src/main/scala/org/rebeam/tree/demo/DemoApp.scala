@@ -1,4 +1,4 @@
-package org.rebeam.boxes.scalajs.demo
+package org.rebeam.tree.demo
 
 import org.scalajs.dom
 import dom.document
@@ -7,7 +7,6 @@ import scala.scalajs.js.annotation.JSExport
 import scala.scalajs.js.JSApp
 
 import scalatags.JsDom.all._
-import org.rebeam.boxes.scalajs._
 
 import monocle._
 import monocle.macros.{GenLens, Lenses, PLenses}
