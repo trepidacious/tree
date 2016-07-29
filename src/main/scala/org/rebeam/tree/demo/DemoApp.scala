@@ -58,13 +58,45 @@ object DemoApp extends JSApp {
 
   def main(): Unit = {
     
+    val a = Address(Street("OLD STREET", 1))
+
+    val StreetView =
+      ReactComponentB[Street]("StreetView")
+        .render_P(s => <.div("Street: " + s.number + ", " + s.name))
+        .build
+
+    class AddressBackend($: BackendScope[Unit, Address]) {
+      def render(a: Address) =
+      <.div(
+        <.h1("Address"),
+        // <.div("Street: " + a.street.number + ", " + a.street.name)
+        StreetView(a.street)
+      )
+    }
+
+    val AddressView = ReactComponentB[Unit]("AddressView")
+      .initialState(a)
+      .renderBackend[AddressBackend]  // ← Use Backend class and backend.render
+      .build
+
+    // class StreetBackend($: BackendScope[Street, Unit]) {
+    //   def render(s: Street) =
+    //   <.div("Street: " + s.number + ", " + s.name)
+    // }
+    // 
+    // val StreetView = ReactComponentB[Unit]("Example")
+    //   .initialState(a)
+    //   .renderBackend[AddressBackend]  // ← Use Backend class and backend.render
+    //   .build
+
+
     val HelloMessage = ReactComponentB[String]("HelloMessage")
       .render($ => <.div("Hello ", $.props))
       .build
 
     val mountNode = dom.document.getElementsByClassName("demo")(0)
     
-    ReactDOM.render(HelloMessage("John"), mountNode)
+    ReactDOM.render(AddressView(), mountNode)
   }
 
 //   def appendPar(targetNode: dom.Node, text: String): Unit = {
