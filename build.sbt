@@ -25,6 +25,8 @@ libraryDependencies += "com.lihaoyi" %%% "upickle" % "0.4.1"
 // core = essentials only. No bells or whistles.
 libraryDependencies += "com.github.japgolly.scalajs-react" %%% "core" % "0.11.1"
 
+libraryDependencies += "com.github.japgolly.scalajs-react" %%% "extra" % "0.11.1"
+
 // React JS itself (Note the filenames, adjust as needed, eg. to remove addons.)
 jsDependencies ++= Seq(
 

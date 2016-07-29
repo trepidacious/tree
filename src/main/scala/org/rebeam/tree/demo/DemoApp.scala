@@ -62,7 +62,12 @@ object DemoApp extends JSApp {
 
     val StreetView =
       ReactComponentB[Street]("StreetView")
-        .render_P(s => <.div("Street: " + s.number + ", " + s.name))
+        .render_P(s => 
+          <.div(
+            <.div("Street: " + s.number + ", " + s.name),
+            <.input(^.`type` := "text", ^.value := s.name)
+          )
+        )
         .build
 
     class AddressBackend($: BackendScope[Unit, Address]) {
