@@ -13,7 +13,7 @@ object DeltaReaders {
     def readDelta(v: Js.Value) = ValueDelta(implicitly[Reader[M]].read(v))
   }
   def deltaReaderFromPF[M](error: String)(pf: PartialFunction[Js.Value, Delta[M]]) = new DeltaReader[M] {
-    def readDelta(v: Js.Value): Delta[M] = pf.applyOrElse(v, (v: Js.Value) => throw new Invalid.Data(v, error))
+    def readDelta(v: Js.Value): Delta[M] = pf.applyOrElse(v, (v: Js.Value) => throw Invalid.Data(v, error))
   }
   implicit val stringDeltaReader = deltaReaderFromReader[String]
   implicit val intDeltaReader = deltaReaderFromReader[Int]
@@ -24,20 +24,20 @@ object DeltaReader {
 }
 
 class DeltaReaderBuilder[M: Reader](fToD: PartialFunction[(String, Js.Value), Delta[M]]) extends DeltaReader[M] {
-  def readDelta(v: Js.Value): Delta[M] = v match {
-    case Js.Obj(field, _ @ _*) => field match {
+  def readDelta(deltaJs: Js.Value): Delta[M] = deltaJs match {
+    case Js.Obj(deltaField, _ @ _*) => deltaField match {
       
-      case ("lens", v) => v match {
+      case ("lens", lensJs) => lensJs match {
         //Use our fieldToDelta - if it can't convert to a delta, invalid data
-        case Js.Obj(field, _ @ _*) => fToD.applyOrElse(field, (field: (String, Js.Value)) => throw new Invalid.Data(v, "Unknown field " + field + " in lens delta object " + v))
-        case _ => throw new Invalid.Data(v, "Invalid delta, empty object for lens delta")
+        case Js.Obj(field, _ @ _*) => fToD.applyOrElse(field, (field: (String, Js.Value)) => throw Invalid.Data(lensJs, "Unknown field " + field + " in lens delta object " + lensJs))
+        case _ => throw Invalid.Data(lensJs, "Invalid delta, empty object for lens delta")
       }
 
-      case ("value", v) => ValueDelta(implicitly[Reader[M]].read(v))
+      case ("value", valueJs) => ValueDelta(implicitly[Reader[M]].read(valueJs))
       
-      case _ => throw new Invalid.Data(v, "Invalid delta, expected object with field lens, set or action")
+      case _ => throw Invalid.Data(deltaJs, "Invalid delta, expected object with field lens, set or action")
     }
-    case _ => throw new Invalid.Data(v, "Invalid delta, expected object")
+    case _ => throw Invalid.Data(deltaJs, "Invalid delta, expected object")
   }
   
   /**
@@ -50,7 +50,7 @@ class DeltaReaderBuilder[M: Reader](fToD: PartialFunction[(String, Js.Value), De
     * Add a lens from M to S
     */
   def lens[S: DeltaReader](fieldName: String, theLens: Lens[M, S]) = fieldToDelta {
-    case (fieldName, v) => LensDelta(theLens, implicitly[DeltaReader[S]].readDelta(v))
+    case (fn, v) if fn == fieldName => LensDelta(theLens, implicitly[DeltaReader[S]].readDelta(v))
   }
   
   def action[A <: Delta[M] : Reader] = new DeltaReaderWithAction(this)
@@ -61,13 +61,13 @@ object DeltaReaderBuilder {
 }
 
 class DeltaReaderWithAction[M, A <: Delta[M] : Reader](delegate: DeltaReader[M]) extends DeltaReader[M] {
-  def readDelta(v: Js.Value): Delta[M] = v match {
+  def readDelta(deltaJs: Js.Value): Delta[M] = deltaJs match {
     case Js.Obj(field, _ @ _*) => field match {
-      case ("action", v) => implicitly[Reader[A]].read(v)
+      case ("action", actionJs) => implicitly[Reader[A]].read(actionJs)
       
-      case _ => delegate.readDelta(v) 
+      case _ => delegate.readDelta(deltaJs)
     }
-    case _ => throw new Invalid.Data(v, "Invalid delta, expected object")
+    case _ => throw Invalid.Data(deltaJs, "Invalid delta, expected object")
   }
 }
 
