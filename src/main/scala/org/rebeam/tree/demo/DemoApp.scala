@@ -1,24 +1,20 @@
 package org.rebeam.tree.demo
 
 import org.scalajs.dom
-import dom.document
-import scala.scalajs.js.annotation.JSExport
 
 import scala.scalajs.js.JSApp
 
 import org.rebeam.tree._
 
-import monocle._
-import monocle.macros.{GenLens, Lenses, PLenses}
+import monocle.macros.Lenses
 
-import upickle.Js
-import upickle.Invalid
 import upickle.default._
 
 import scala.language.higherKinds
 
 import japgolly.scalajs.react.vdom.prefix_<^._
 import japgolly.scalajs.react._
+import japgolly.scalajs.react.extra._
 
 @Lenses case class Street(name: String, number: Int)
 @Lenses case class Address(street: Street)
@@ -65,7 +61,14 @@ object DemoApp extends JSApp {
         .render_P(s => 
           <.div(
             <.div("Street: " + s.number + ", " + s.name),
-            <.input(^.`type` := "text", ^.value := s.name)
+            <.input(^.`type` := "text", ^.value := s.name),
+            new TextInput[String](
+              ReusableFn(
+                o => Callback {
+                  o.foreach(println(_))
+                }
+              )
+            ).create(Some(s.name))
           )
         )
         .build
