@@ -3,18 +3,15 @@ package org.rebeam.tree.demo
 import org.scalajs.dom
 
 import scala.scalajs.js.JSApp
-
 import org.rebeam.tree._
-
 import monocle.macros.Lenses
-
 import upickle.default._
 
 import scala.language.higherKinds
-
 import japgolly.scalajs.react.vdom.prefix_<^._
 import japgolly.scalajs.react._
 import japgolly.scalajs.react.extra._
+import upickle.Js
 
 @Lenses case class Street(name: String, number: Int)
 @Lenses case class Address(street: Street)
@@ -53,37 +50,65 @@ object Employee {
 object DemoApp extends JSApp {
 
   def main(): Unit = {
-    
-    val a = Address(Street("OLD STREET", 1))
+
+    implicit def cursorReuse[A]: Reusability[Cursor[A]] = Reusability.by_==
+
+    val StringView =
+      ReactComponentB[Cursor[String]]("StringView")
+        .render_P(c =>
+          <.input(
+            ^.`type` := "text",
+            ^.value := c.model,
+            ^.onChange ==> ((e: ReactEventI) => c.set(e.target.value))
+          )
+        )
+        .configure(Reusability.shouldComponentUpdateWithOverlay)
+        .build
+
+    val IntView =
+      ReactComponentB[Cursor[Int]]("IntView")
+        .render_P(c =>
+          <.input(
+            ^.`type` := "number",
+            ^.value := c.model.toString,
+            ^.onChange ==> ((e: ReactEventI) => c.set(e.target.value.toInt))
+          )
+        )
+        .configure(Reusability.shouldComponentUpdateWithOverlay)
+        .build
 
     val StreetView =
-      ReactComponentB[Street]("StreetView")
-        .render_P(s => 
-          <.div(
-            <.div("Street: " + s.number + ", " + s.name),
-            <.input(^.`type` := "text", ^.value := s.name),
-            new TextInput[String](
-              ReusableFn(
-                o => Callback {
-                  o.foreach(println(_))
-                }
-              )
-            ).create(Some(s.name))
-          )
+      ReactComponentB[Cursor[Street]]("StreetView")
+        .render_P(c =>
+          {
+            <.div(
+              <.div("Street: " + c.model.number + ", " + c.model.name),
+              IntView(c.zoom("number", Street.number)),
+              StringView(c.zoom("name", Street.name))
+            )
+          }
         )
         .build
 
-    class AddressBackend($: BackendScope[Unit, Address]) {
-      def render(a: Address) =
-      <.div(
-        <.h1("Address"),
-        // <.div("Street: " + a.street.number + ", " + a.street.name)
-        StreetView(a.street)
-      )
+    class AddressBackend(scope: BackendScope[Unit, Address]) {
+
+      val deltaToCallback = (delta: Delta[Address], deltaJs: Js.Value) =>
+        scope.modState(delta.apply) >> Callback(println("Delta >> " + deltaJs.toString))
+
+      val rootParent = RootParent(deltaToCallback)
+
+      def render(a: Address) = {
+        val addressCursor = Cursor(rootParent, a)
+        val streetCursor = addressCursor.zoom("street", Address.street)
+        <.div(
+          <.h1("Address"),
+          StreetView(streetCursor)
+        )
+      }
     }
 
     val AddressView = ReactComponentB[Unit]("AddressView")
-      .initialState(a)
+      .initialState(Address(Street("OLD STREET", 1)))
       .renderBackend[AddressBackend]  // ← Use Backend class and backend.render
       .build
 

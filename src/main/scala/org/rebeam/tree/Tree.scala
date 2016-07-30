@@ -1,12 +1,7 @@
 package org.rebeam.tree
 
-import org.scalajs.dom
-import dom.document
-import scala.scalajs.js.annotation.JSExport
-
+import japgolly.scalajs.react.Callback
 import monocle._
-import monocle.macros.{GenLens, Lenses, PLenses}
-
 import upickle.Js
 import upickle.Invalid
 import upickle.default._
@@ -83,17 +78,17 @@ class DeltaReaderWithAction[M, A <: Delta[M] : Reader](delegate: DeltaReader[M])
  * The child's model itself (of type C) will be passed separately.
  */
 trait Parent[C] {
-  def runDelta(delta: Delta[C], deltaJs: Js.Value): Unit
+  def callback(delta: Delta[C], deltaJs: Js.Value): Callback
 }
 
 /**
  * The parent at the root of a model of type R. This handles deltas by 
- * calling a callback. This can be used by a view of the root of a model
+ * using them to produce a callback. This can be used by a view of the root of a model
  * to produce Parent instances for its children using Parent implementations
  * that expect a Parent themselves.
  */
-case class RootParent[R](callback: (Delta[R], Js.Value) => Unit) extends Parent[R] {
-  def runDelta(delta: Delta[R], deltaJs: Js.Value): Unit = callback(delta, deltaJs)
+case class RootParent[R](deltaToCallback: (Delta[R], Js.Value) => Callback) extends Parent[R] {
+  def callback(delta: Delta[R], deltaJs: Js.Value): Callback = deltaToCallback(delta, deltaJs)
 }
 
 /**
@@ -101,7 +96,7 @@ case class RootParent[R](callback: (Delta[R], Js.Value) => Unit) extends Parent[
  * reach that child's model.
  */ 
 case class LensParent[P, C](parent: Parent[P], fieldName: String, lens: Lens[P, C]) extends Parent[C] {
-  def runDelta(delta: Delta[C], deltaJs: Js.Value): Unit = {
+  def callback(delta: Delta[C], deltaJs: Js.Value): Callback = {
     //Produce a LensDelta from the provided child delta, to make it into a delta
     //of the parent
     val parentDelta = LensDelta(lens, delta)
@@ -110,7 +105,7 @@ case class LensParent[P, C](parent: Parent[P], fieldName: String, lens: Lens[P, 
     val parentDeltaJs = Js.Obj("lens" -> Js.Obj(fieldName -> deltaJs))
     
     //Run using the parent's own parent
-    parent.runDelta(parentDelta, parentDeltaJs)    
+    parent.callback(parentDelta, parentDeltaJs)
   }
 }
 
@@ -122,13 +117,13 @@ case class LensParent[P, C](parent: Parent[P], fieldName: String, lens: Lens[P, 
 case class Cursor[M](parent: Parent[M], model: M) extends Parent[M] {
   
   //Just pass through runDelta to parent for convenience
-  def runDelta(delta: Delta[M], deltaJs: Js.Value): Unit = parent.runDelta(delta, deltaJs)
+  def callback(delta: Delta[M], deltaJs: Js.Value): Callback = parent.callback(delta, deltaJs)
   
-  def act[A <: Delta[M]](actionDelta: A)(implicit writer: Writer[A]): Unit = 
-    runDelta(actionDelta, Js.Obj("action" -> writer.write(actionDelta)))
+  def act[A <: Delta[M]](actionDelta: A)(implicit writer: Writer[A]): Callback =
+    callback(actionDelta, Js.Obj("action" -> writer.write(actionDelta)))
 
-  def set(newModel: M)(implicit writer: Writer[M]): Unit = 
-    runDelta(ValueDelta(newModel), Js.Obj("value" -> writer.write(newModel)))
+  def set(newModel: M)(implicit writer: Writer[M]): Callback =
+    callback(ValueDelta(newModel), Js.Obj("value" -> writer.write(newModel)))
   
   //TODO if we had a FieldLens being a Lens with an added fieldName: String we could use this instead, and
   //use a macro to provide these (and readDelta implementation)
