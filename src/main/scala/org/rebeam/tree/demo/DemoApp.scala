@@ -109,7 +109,7 @@ object DemoApp extends JSApp {
 
     val AddressView = ReactComponentB[Unit]("AddressView")
       .initialState(Address(Street("OLD STREET", 1)))
-      .renderBackend[AddressBackend]  // ← Use Backend class and backend.render
+      .renderBackend[AddressBackend]  // ← Use AddressBackend class and backend.render
       .build
 
     // class StreetBackend($: BackendScope[Street, Unit]) {
