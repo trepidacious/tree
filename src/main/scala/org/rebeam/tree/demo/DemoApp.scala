@@ -75,7 +75,7 @@ object DemoApp extends JSApp {
       )
     }
 
-    val StreetView =view[Street]("StreetView") { c =>
+    val StreetView = view[Street]("StreetView") { c =>
       <.div(
         <.div("Street: " + c.model.number + ", " + c.model.name),
         IntView(c.zoom("number", Street.number)),

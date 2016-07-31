@@ -29,7 +29,7 @@ class DeltaReaderBuilder[M: Reader](fToD: PartialFunction[(String, Js.Value), De
       
       case ("lens", lensJs) => lensJs match {
         //Use our fieldToDelta - if it can't convert to a delta, invalid data
-        case Js.Obj(field, _ @ _*) => fToD.applyOrElse(field, (field: (String, Js.Value)) => throw Invalid.Data(lensJs, "Unknown field " + field + " in lens delta object " + lensJs))
+        case Js.Obj(lensField, _ @ _*) => fToD.applyOrElse(lensField, (f: (String, Js.Value)) => throw Invalid.Data(lensJs, "Unknown field " + f + " in lens delta object " + lensJs))
         case _ => throw Invalid.Data(lensJs, "Invalid delta, empty object for lens delta")
       }
 
