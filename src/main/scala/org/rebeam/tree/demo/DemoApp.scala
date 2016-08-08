@@ -85,9 +85,17 @@ object DemoApp extends JSApp {
 
     class AddressBackend(scope: BackendScope[Unit, Address]) {
 
+      //Apply the delta, and print its Json. In a real implementation this
+      //would still apply the delta, but would also send the Json to a server
+      //to attempt to "commit" the change. The state might actually store a
+      //tentative Address as modified locally, and a last-known authoritative
+      //Address from the server, to allow reverting local modifications if they
+      //are not confirmed, or merging them if the server reports it merged them.
       val deltaToCallback = (delta: Delta[Address], deltaJs: Js.Value) =>
         scope.modState(delta.apply) >> Callback(println("Delta >> " + deltaJs.toString))
 
+      //The parent for this root component - we sit at the root of the data model
+      //(Address), and are responsible for holding it as state and
       val rootParent = RootParent(deltaToCallback)
 
       def render(a: Address) = {
