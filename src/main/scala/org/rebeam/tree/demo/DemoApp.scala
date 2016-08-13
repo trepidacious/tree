@@ -11,6 +11,7 @@ import scala.language.higherKinds
 import japgolly.scalajs.react.vdom.prefix_<^._
 import japgolly.scalajs.react._
 import japgolly.scalajs.react.extra._
+import org.rebeam.tree.demo.StreetAction.NumberMultiple
 import upickle.Js
 
 @Lenses case class Street(name: String, number: Int)
@@ -20,8 +21,14 @@ import upickle.Js
 
 sealed trait StreetAction extends Delta[Street]
 
-case class StreetActionNumberMultiple(multiple: Int) extends StreetAction {
-  def apply(s: Street): Street = Street(s.name, s.name.length * multiple)
+object StreetAction {
+  case class NumberMultiple(multiple: Int) extends StreetAction {
+    def apply(s: Street): Street = s.copy(number = s.name.length * multiple)
+  }
+
+  case object Capitalise extends StreetAction {
+    def apply(s: Street): Street = s.copy(name = s.name.toLowerCase.capitalize)
+  }
 }
 
 object Street {
@@ -49,9 +56,12 @@ object Employee {
 
 object DemoApp extends JSApp {
 
+  def view[A](name: String, overlay: Boolean = false)(render: A => ReactElement) =
+    ReactComponentB[A](name).render_P(render).build
+
   implicit def cursorReuse[A]: Reusability[Cursor[A]] = Reusability.by_==
 
-  def view[A](name: String, overlay: Boolean = true)(render: Cursor[A] => ReactElement) = if (overlay) {
+  def cursorView[A](name: String, overlay: Boolean = false)(render: Cursor[A] => ReactElement) = if (overlay) {
     ReactComponentB[Cursor[A]](name).render_P(render).configure(Reusability.shouldComponentUpdateWithOverlay).build
   } else {
     ReactComponentB[Cursor[A]](name).render_P(render).build
@@ -59,7 +69,7 @@ object DemoApp extends JSApp {
 
   def main(): Unit = {
 
-    val StringView = view[String]("StringView") { c =>
+    val PlainStringView = cursorView[String]("StringView") { c =>
       <.input(
         ^.`type` := "text",
         ^.value := c.model,
@@ -67,7 +77,47 @@ object DemoApp extends JSApp {
       )
     }
 
-    val IntView = view[Int]("IntView"){ c =>
+    val LabelledStringView = view[(String, Cursor[String])]("LabelledStringView") { p =>
+      <.form(
+        <.div(
+          ^.classSet1("mdl-textfield mdl-js-textfield mdl-textfield--floating-label"),
+          <.input(
+            ^.id := "string-view-input",
+            ^.classSet1("mdl-textfield__input"),
+            ^.`type` := "text",
+            ^.value := p._2.model,
+            ^.onChange ==> ((e: ReactEventI) => p._2.set(e.target.value))
+          ),
+          <.label(
+            ^.classSet1("mdl-textfield__label"),
+            ^.`for` := "string-view-input",
+            p._1
+          )
+        )
+      )
+    }
+
+    val StringView = cursorView[String]("StringView") { c =>
+      <.form(
+        <.div(
+          ^.classSet1("mdl-textfield mdl-js-textfield mdl-textfield--floating-label"),
+          <.input(
+            ^.id := "string-view-input",
+            ^.classSet1("mdl-textfield__input"),
+            ^.`type` := "text",
+            ^.value := c.model,
+            ^.onChange ==> ((e: ReactEventI) => c.set(e.target.value))
+          ),
+          <.label(
+            ^.classSet1("mdl-textfield__label"),
+            ^.`for` := "string-view-input",
+            "Label"
+          )
+        )
+      )
+    }
+
+    val IntView = cursorView[Int]("IntView"){ c =>
       <.input(
         ^.`type` := "number",
         ^.value := c.model.toString,
@@ -75,11 +125,20 @@ object DemoApp extends JSApp {
       )
     }
 
-    val StreetView = view[Street]("StreetView") { c =>
+    def ActButton(s: String, c: Callback) =
+      <.button(
+        s,
+        ^.onClick ==> ((e: ReactEventI) => e.preventDefaultCB >> c),
+        ^.classSet1("mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent")
+      )
+
+    val StreetView = cursorView[Street]("StreetView") { c =>
       <.div(
         <.div("Street: " + c.model.number + ", " + c.model.name),
         IntView(c.zoom("number", Street.number)),
-        StringView(c.zoom("name", Street.name))
+        LabelledStringView(("Name", c.zoom("name", Street.name))),
+        ActButton("Number multiple", c.act(StreetAction.NumberMultiple(10))),
+        ActButton("Capitalise", c.act(StreetAction.Capitalise))
       )
     }
 
@@ -117,7 +176,7 @@ object DemoApp extends JSApp {
       .render($ => <.div("Hello ", $.props))
       .build
 
-    val mountNode = dom.document.getElementsByClassName("demo")(0)
+    val mountNode = dom.document.getElementsByClassName("content")(0)
     
     ReactDOM.render(AddressView(), mountNode)
   }
