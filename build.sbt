@@ -23,22 +23,11 @@ scalaVersion := "2.11.8"
 // Can we use monocle via scalajs-react?
 //libraryDependencies += "com.github.japgolly.scalajs-react" %%% "ext-monocle" % "0.11.1"
 
-val monocleVersion = "1.2.2"     // or "1.3.0-SNAPSHOT"
-
-libraryDependencies ++= Seq(
-  "com.github.julien-truffaut"  %%%  "monocle-core"    % monocleVersion,
-  "com.github.julien-truffaut"  %%%  "monocle-generic" % monocleVersion,
-  "com.github.julien-truffaut"  %%%  "monocle-macro"   % monocleVersion,
-  "com.github.julien-truffaut"  %%%  "monocle-state"   % monocleVersion,
-  "com.github.julien-truffaut"  %%%  "monocle-refined" % monocleVersion,
-  "com.github.julien-truffaut"  %%%  "monocle-law"     % monocleVersion % "test"
-)
-
-// for @Lenses macro support
-addCompilerPlugin("org.scalamacros" %% "paradise" % "2.1.0" cross CrossVersion.full)
 
 
-libraryDependencies += "com.lihaoyi" %%% "upickle" % "0.4.1"
+//////////////////////////////////////
+// Client-side                      //
+//////////////////////////////////////
 
 // core = essentials only. No bells or whistles.
 libraryDependencies += "com.github.japgolly.scalajs-react" %%% "core" % "0.11.1"
@@ -69,6 +58,56 @@ jsDependencies ++= Seq(
 
 scalaJSUseRhino in Global := false
 
+
+
+//////////////////////////////////////
+// Server-side                      //
+//////////////////////////////////////
+
+lazy val http4sVersion = "0.12.4"
+//lazy val argonautVersion = "6.1"
+
+libraryDependencies ++= Seq(
+  "org.http4s"  %% "http4s-blaze-server"  % http4sVersion,
+  "org.http4s"  %% "http4s-dsl"           % http4sVersion,
+//  "org.http4s"  %% "http4s-argonaut"      % http4sVersion,
+
+  "org.log4s"   %% "log4s"                % "1.2.1",
+
+  "org.slf4j"   % "slf4j-simple"          % "1.7.21"
+)
+
+//SLF4J simple logger, y u log to System.err by default, even for info?
+javaOptions := Seq("-Dorg.slf4j.simpleLogger.logFile=System.out")
+
+
+
+//////////////////////////////////////
+// Server and client-side           //
+//////////////////////////////////////
+
+val monocleVersion = "1.2.2"     // or "1.3.0-SNAPSHOT"
+
+libraryDependencies ++= Seq(
+  "com.github.julien-truffaut"  %%%  "monocle-core"    % monocleVersion,
+  "com.github.julien-truffaut"  %%%  "monocle-generic" % monocleVersion,
+  "com.github.julien-truffaut"  %%%  "monocle-macro"   % monocleVersion,
+  "com.github.julien-truffaut"  %%%  "monocle-state"   % monocleVersion,
+  "com.github.julien-truffaut"  %%%  "monocle-refined" % monocleVersion,
+  "com.github.julien-truffaut"  %%%  "monocle-law"     % monocleVersion % "test"
+)
+
+// for @Lenses macro support
+addCompilerPlugin("org.scalamacros" %% "paradise" % "2.1.0" cross CrossVersion.full)
+
+libraryDependencies += "com.lihaoyi" %%% "upickle" % "0.4.1"
+
+
+
+//////////////////////////////////////
+// General                          //
+//////////////////////////////////////
+
 scalacOptions ++= Seq(
   "-feature",
   "-deprecation",
@@ -77,3 +116,4 @@ scalacOptions ++= Seq(
   "-Xfatal-warnings",
   "-Xlint"
 )
+
