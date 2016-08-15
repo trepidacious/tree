@@ -55,6 +55,7 @@ jsDependencies ++= Seq(
     dependsOn "react-dom.js"
     commonJSName "ReactDOMServer")
 
+libraryDependencies += "com.payalabs" %%% "scalajs-react-mdl" % "0.2.0-SNAPSHOT"
 
 scalaJSUseRhino in Global := false
 

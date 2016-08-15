@@ -38,4 +38,8 @@ case class Cursor[M](parent: Parent[M], model: M) extends Parent[M] {
   //a data model, etc.
   def zoom[C](fieldName: String, lens: Lens[M, C]): Cursor[C] =
     Cursor(LensParent(parent, fieldName, lens), lens.get(model))
+
+  def label(label: String) = LabelledCursor(label, this)
 }
+
+case class LabelledCursor[A](label: String, cursor: Cursor[A])
