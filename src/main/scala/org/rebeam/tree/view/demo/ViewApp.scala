@@ -1,4 +1,4 @@
-package org.rebeam.tree.demo
+package org.rebeam.tree.view.demo
 
 import org.scalajs.dom
 
@@ -10,7 +10,7 @@ import upickle.default._
 import scala.language.higherKinds
 import japgolly.scalajs.react.vdom.prefix_<^._
 import japgolly.scalajs.react._
-import upickle.Js
+import org.rebeam.tree.view.TreeRootComponent
 
 @Lenses case class Street(name: String, number: Int)
 @Lenses case class Address(street: Street)
@@ -31,7 +31,7 @@ object StreetAction {
 
 object Street {
   import DeltaReaders._
-  implicit val streetDeltaReader = 
+  implicit val streetDeltaReader =
     DeltaReader.build[Street]
       .lens("name", Street.name)
       .lens("number", Street.number)
@@ -40,8 +40,8 @@ object Street {
 
 object Address {
   import Street._
-  
-  implicit val addressDeltaReader = 
+
+  implicit val addressDeltaReader =
     DeltaReader.build[Address]
       .lens("street", Address.street)
 }
@@ -52,7 +52,7 @@ object Company {
 object Employee {
 }
 
-object DemoApp extends JSApp {
+object ViewApp extends JSApp {
 
   import org.rebeam.tree.view.View._
 
@@ -68,7 +68,7 @@ object DemoApp extends JSApp {
       )
     }
 
-    val AddressView2 = TreeRootComponent(Address(Street("OLD STREET", 1))){
+    val AddressView = TreeRootComponent(Address(Street("OLD STREET", 1)), "wss://echo.websocket.org"){
       addressCursor => {
         val streetCursor = addressCursor.zoom("street", Address.street)
         <.div(
@@ -80,7 +80,7 @@ object DemoApp extends JSApp {
 
     val mountNode = dom.document.getElementsByClassName("content")(0)
 
-    ReactDOM.render(AddressView2, mountNode)
+    ReactDOM.render(AddressView, mountNode)
   }
 
 }

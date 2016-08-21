@@ -1,7 +1,8 @@
-package org.rebeam.tree
+package org.rebeam.tree.view
 
 import japgolly.scalajs.react._
 import monocle._
+import org.rebeam.tree._
 import upickle.Js
 import upickle.default._
 
