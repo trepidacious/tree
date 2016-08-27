@@ -7,8 +7,7 @@ import org.http4s.server.websocket._
 import org.http4s.server.ServerApp
 import org.http4s.websocket.WebsocketBits._
 
-import org.http4s.server.staticcontent
-import org.http4s.server.staticcontent.ResourceService.Config
+import org.http4s.server.staticcontent._
 
 import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy, Task}
@@ -25,6 +24,9 @@ object ServerDemoApp extends ServerApp {
 
     case GET -> Root / "hello" =>
       Ok("Hello world.")
+
+    case GET -> Root / "pwd" =>
+      Ok(System.getProperty("user.dir"))
 
     case req@ GET -> Root / "ws" =>
       val src = awakeEvery(1.seconds)(Strategy.DefaultStrategy, DefaultScheduler).map{ d => Text(s"Ping! $d") }
@@ -43,18 +45,24 @@ object ServerDemoApp extends ServerApp {
 
   }
 
-  private def cachedResource(config: Config): HttpService = {
-    val cachedConfig = config.copy(cacheStartegy = staticcontent.MemoryCache())
-    staticcontent.resourceService(cachedConfig)
-  }
+  //This will serve from java resources, so work in a jar
+  //We can also set cacheStartegy = staticcontent.MemoryCache() in the Config
+  //val resources = resourceService(ResourceService.Config("", "/"))
 
-  val resources = cachedResource(Config("/", "/"))
-  // val resources = staticcontent.resourceService(Config("/", "/"))
+  //This serves directly from development resources directory, so will update
+  //when we change original resources files and refresh browser
+  val resources = fileService(FileService.Config("jvm/src/main/resources", "/"))
 
   val resourcesService: HttpService = HttpService {
     case r @ GET -> _ if r.pathInfo.isEmpty => resourcesService(r.withPathInfo("index.html"))
     case r @ GET -> _ if r.pathInfo.endsWith("/") => resourcesService(r.withPathInfo(r.pathInfo + "index.html"))
     case r @ GET -> _ => resources(r)
+  }
+
+  //Serve our scala-js from js project target
+  val scalajs = fileService(FileService.Config("js/target/scala-2.11", "/scalajs"))
+  val scalajsService: HttpService = HttpService {
+    case r @ GET -> _ => scalajs(r)
   }
 
   // val apiCORS = CORS(apiService)
@@ -65,6 +73,7 @@ object ServerDemoApp extends ServerApp {
       .withWebSockets(true)
       .mountService(apiService, "/api")
       .mountService(resourcesService, "/")
+      .mountService(scalajsService, "/")
       // .mountService(apiCORS, "/api")
       // .mountService(polymerCORS, "/")
       .start
