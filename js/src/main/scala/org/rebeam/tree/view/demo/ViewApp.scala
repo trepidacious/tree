@@ -10,7 +10,7 @@ import upickle.default._
 import scala.language.higherKinds
 import japgolly.scalajs.react.vdom.prefix_<^._
 import japgolly.scalajs.react._
-import org.rebeam.tree.view.TreeRootComponent
+import org.rebeam.tree.view._
 
 @Lenses case class Street(name: String, number: Int)
 @Lenses case class Address(street: Street)

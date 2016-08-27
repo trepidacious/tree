@@ -4,6 +4,7 @@ import org.http4s._
 import org.http4s.dsl._
 import org.http4s.server.blaze.BlazeBuilder
 import org.http4s.server.websocket._
+import org.http4s.server.ServerApp
 import org.http4s.websocket.WebsocketBits._
 
 import org.http4s.server.staticcontent
@@ -18,7 +19,7 @@ import scalaz.stream.{DefaultScheduler, Exchange, Process, Sink}
 //import scalaz._
 //import Scalaz._
 
-object ServerApp extends App {
+object ServerDemoApp extends ServerApp {
 
   val apiService = HttpService {
 
@@ -48,7 +49,7 @@ object ServerApp extends App {
   }
 
   val resources = cachedResource(Config("/", "/"))
-  // val polymerDist = staticcontent.resourceService(Config("/polymer/dist", "/"))
+  // val resources = staticcontent.resourceService(Config("/", "/"))
 
   val resourcesService: HttpService = HttpService {
     case r @ GET -> _ if r.pathInfo.isEmpty => resourcesService(r.withPathInfo("index.html"))
@@ -57,15 +58,15 @@ object ServerApp extends App {
   }
 
   // val apiCORS = CORS(apiService)
-  // val polymerCORS = CORS(polymerService)
+  // val polymerCORS = CORS(resourcesService)
 
-  BlazeBuilder.bindHttp(8080, "0.0.0.0")
-    .withWebSockets(true)
-    .mountService(apiService, "/api")
-    .mountService(resourcesService, "/")
-    // .mountService(apiCORS, "/api")
-    // .mountService(polymerCORS, "/")
-    .run
-    .awaitShutdown()
+  def server(args: List[String]) =
+    BlazeBuilder.bindHttp(8080, "0.0.0.0")
+      .withWebSockets(true)
+      .mountService(apiService, "/api")
+      .mountService(resourcesService, "/")
+      // .mountService(apiCORS, "/api")
+      // .mountService(polymerCORS, "/")
+      .start
 
 }
