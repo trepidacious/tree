@@ -1,12 +1,13 @@
 package org.rebeam.tree.server.demo
 
+import java.io.File
+
 import org.http4s._
 import org.http4s.dsl._
 import org.http4s.server.blaze.BlazeBuilder
 import org.http4s.server.websocket._
 import org.http4s.server.ServerApp
 import org.http4s.websocket.WebsocketBits._
-
 import org.http4s.server.staticcontent._
 
 import scala.concurrent.duration._
@@ -48,7 +49,7 @@ object ServerDemoApp extends ServerApp {
 
   //This serves directly from development resources directory, so will update
   //when we change original resources files and refresh browser
-  val resources = fileService(FileService.Config("jvm/src/main/resources", "/"))
+  val resources = fileService(FileService.Config("src/main/resources", "/"))
 
   val resourcesService: HttpService = HttpService {
     case r @ GET -> _ if r.pathInfo.isEmpty => resourcesService(r.withPathInfo("index.html"))
@@ -56,8 +57,8 @@ object ServerDemoApp extends ServerApp {
     case r @ GET -> _ => resources(r)
   }
 
-  //Serve our scala-js from js project target
-  val scalajs = fileService(FileService.Config("js/target/scala-2.11", "/scalajs"))
+  //Serve our scala-js from js project target - kind of messy
+  val scalajs = fileService(FileService.Config(new File(System.getProperty("user.dir")).getParent + "/js/target/scala-2.11", "/scalajs"))
   val scalajsService: HttpService = HttpService {
     case r @ GET -> _ => scalajs(r)
   }
