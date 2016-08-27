@@ -15,15 +15,12 @@ import scalaz.stream.async.unboundedQueue
 import scalaz.stream.time.awakeEvery
 import scalaz.stream.{DefaultScheduler, Exchange, Process, Sink}
 
-//import scalaz._
-//import Scalaz._
-
 object ServerDemoApp extends ServerApp {
 
   val apiService = HttpService {
 
     case GET -> Root / "hello" =>
-      Ok("Hello world.")
+      Ok("Hello world!")
 
     case GET -> Root / "pwd" =>
       Ok(System.getProperty("user.dir"))
@@ -66,7 +63,6 @@ object ServerDemoApp extends ServerApp {
   }
 
   // val apiCORS = CORS(apiService)
-  // val polymerCORS = CORS(resourcesService)
 
   def server(args: List[String]) =
     BlazeBuilder.bindHttp(8080, "0.0.0.0")
@@ -75,7 +71,6 @@ object ServerDemoApp extends ServerApp {
       .mountService(resourcesService, "/")
       .mountService(scalajsService, "/")
       // .mountService(apiCORS, "/api")
-      // .mountService(polymerCORS, "/")
       .start
 
 }
