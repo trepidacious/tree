@@ -68,7 +68,7 @@ object ViewApp extends JSApp {
       )
     }
 
-    val AddressView = TreeRootComponent(Address(Street("OLD STREET", 1)), "wss://echo.websocket.org"){
+    val AddressView = TreeRootComponent(Address(Street("OLD STREET", 1)), "api/wsecho"){
       addressCursor => {
         val streetCursor = addressCursor.zoom("street", Address.street)
         <.div(

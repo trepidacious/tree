@@ -36,7 +36,14 @@ object TreeRootComponent {
     def start: Callback = {
 
       // This will establish the connection and return the WebSocket
-      def connect(url: String) = CallbackTo[WebSocket] {
+      def connect(u: String) = CallbackTo[WebSocket] {
+
+        val url = if (!u.startsWith("ws:")) {
+          "ws://" + document.location.hostname + ":" + document.location.port + "/" + u
+        } else {
+          u
+        }
+
 
         // Get direct access so WebSockets API can modify state directly
         // (for access outside of a normal DOM/React callback).
