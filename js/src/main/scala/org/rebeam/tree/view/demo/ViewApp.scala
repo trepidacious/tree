@@ -30,7 +30,6 @@ object StreetAction {
 }
 
 object Street {
-  import DeltaReaders._
   implicit val streetDeltaReader =
     DeltaReader.build[Street]
       .lens("name", Street.name)
