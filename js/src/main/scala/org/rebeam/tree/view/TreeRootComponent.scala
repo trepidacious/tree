@@ -1,9 +1,10 @@
 package org.rebeam.tree.view
 
 import japgolly.scalajs.react._
-import org.rebeam.tree.Delta
+import org.rebeam.tree.{Delta, ValueDelta}
 import org.scalajs.dom._
-import upickle.Js
+import upickle.{Invalid, Js}
+import upickle.default._
 
 import scala.util.{Failure, Success}
 
@@ -12,7 +13,7 @@ object TreeRootComponent {
   case class Props[R](render: Cursor[R] => ReactElement, wsUrl: String)
   case class State[R](model: R, ws: Option[WebSocket])
 
-  class Backend[R](scope: BackendScope[Props[R], State[R]]) {
+  class Backend[R](scope: BackendScope[Props[R], State[R]])(implicit reader: Reader[R]) {
 
     //Apply the delta, and print its Json. In a real implementation this
     //would still apply the delta, but would also send the Json to a server
@@ -53,7 +54,18 @@ object TreeRootComponent {
 
         def onopen(e: Event): Unit = println("Connected.")
 
-        def onmessage(e: MessageEvent): Unit = println(s"Echo: ${e.data.toString}")
+        def onmessage(e: MessageEvent): Unit = {
+          println(s"Updating with: ${e.data.toString}")
+          val deltaJs = upickle.json.read(e.data.toString)
+          deltaJs match {
+            case Js.Obj(field, _ @ _*) => field match {
+              case ("value", valueJs) => direct.modState(_.copy(model = reader.read(valueJs)))
+              case _ => throw Invalid.Data(deltaJs, "Invalid json for server update, expected object with single field name value")
+            }
+            case _ => throw Invalid.Data(deltaJs, "Invalid json for server update, expected object with single field name value")
+          }
+
+        }
 
         def onerror(e: ErrorEvent): Unit = println(s"Error: ${e.message}")
 
@@ -91,13 +103,13 @@ object TreeRootComponent {
   //empty and get data from WS while displaying a notice that data is loading
   //Make the component itself, by providing a render method to initialise the props
   def apply[R](initialModel: R, wsUrl: String)
-              (render: Cursor[R] => ReactElement) =
-    ctor(initialModel)(Props[R](render, wsUrl))
+              (render: Cursor[R] => ReactElement)(implicit reader: Reader[R]) =
+    ctor(initialModel)(reader)(Props[R](render, wsUrl))
 
   //Just make the component constructor - props to be supplied later to make a component
-  def ctor[R](initialModel: R) = ReactComponentB[Props[R]]("TreeRootComponent")
+  def ctor[R](initialModel: R)(implicit reader: Reader[R]) = ReactComponentB[Props[R]]("TreeRootComponent")
     .initialState(State(initialModel, None))
-    .backend(new Backend[R](_))
+    .backend(new Backend[R](_)(reader))
     .render(s => s.backend.render(s.props, s.state))
     .componentDidMount(_.backend.start)
     .componentWillUnmount(_.backend.end)
