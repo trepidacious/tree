@@ -1,14 +1,15 @@
-package org.rebeam.tree.server.demo
+package org.rebeam.tree.demo
 
 import java.io.File
 
 import org.http4s._
 import org.http4s.dsl._
-import org.http4s.server.blaze.BlazeBuilder
-import org.http4s.server.websocket._
 import org.http4s.server.ServerApp
-import org.http4s.websocket.WebsocketBits._
+import org.http4s.server.blaze.BlazeBuilder
 import org.http4s.server.staticcontent._
+import org.http4s.server.websocket._
+import org.http4s.websocket.WebsocketBits._
+import org.rebeam.tree.server.{TreeStore, TreeStoreValueExchange}
 
 import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy, Task}
@@ -18,6 +19,8 @@ import scalaz.stream.{DefaultScheduler, Exchange, Process, Sink}
 
 object ServerDemoApp extends ServerApp {
 
+  val address = new TreeStore(Address(Street("OLD STREET", 1)))
+
   val apiService = HttpService {
 
     case GET -> Root / "hello" =>
@@ -25,6 +28,9 @@ object ServerDemoApp extends ServerApp {
 
     case GET -> Root / "pwd" =>
       Ok(System.getProperty("user.dir"))
+
+    case GET -> Root / "address" =>
+      WS(TreeStoreValueExchange(address))
 
     case req@ GET -> Root / "ws" =>
       val src = awakeEvery(1.seconds)(Strategy.DefaultStrategy, DefaultScheduler).map{ d => Text(s"Ping! $d") }

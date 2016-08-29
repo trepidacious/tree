@@ -8,17 +8,17 @@ import scala.language.higherKinds
 
 object DeltaReaders {
   def deltaReaderFromReader[M: Reader] = new DeltaReader[M] {
-    def readDelta(v: Js.Value) = ValueDelta(implicitly[Reader[M]].read(v))
+    def readDelta(deltaJs: Js.Value) = deltaJs match {
+      case Js.Obj(field, _ @ _*) => field match {
+        case ("value", valueJs) => ValueDelta(implicitly[Reader[M]].read(valueJs))
+        case _ => throw Invalid.Data(deltaJs, "Invalid json for deltaReaderFromReader, expected object with single field name value")
+      }
+      case _ => throw Invalid.Data(deltaJs, "Invalid json for deltaReaderFromReader, expected object with single field name value")
+    }
+
+
   }
   def deltaReaderFromPF[M](error: String)(pf: PartialFunction[Js.Value, Delta[M]]) = new DeltaReader[M] {
     def readDelta(v: Js.Value): Delta[M] = pf.applyOrElse(v, (v: Js.Value) => throw Invalid.Data(v, error))
   }
-  implicit val stringDeltaReader = deltaReaderFromReader[String]
-  implicit val booleanDeltaReader = deltaReaderFromReader[Boolean]
-  implicit val byteDeltaReader = deltaReaderFromReader[Byte]
-  implicit val shortDeltaReader = deltaReaderFromReader[Short]
-  implicit val intDeltaReader = deltaReaderFromReader[Int]
-  implicit val longDeltaReader = deltaReaderFromReader[Long]
-  implicit val floatDeltaReader = deltaReaderFromReader[Float]
-  implicit val doubleDeltaReader = deltaReaderFromReader[Double]
 }
