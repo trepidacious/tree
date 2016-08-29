@@ -63,17 +63,25 @@ trait Dispatcher[D, I, O]  {
   def msgFromClient(msg: I): Unit
 }
 
-//Uses an OutgoingDispatcher to provide Observer implementation.
-//Values provided to observe are passed on to an OutgoingDispatcher.
-//In addition, a pull method is provided. This accepts a callback, and
-//will provide data to that callback as soon as possible - if the
-//OutgoingDispatcher already has a message then it will be provided
-//immediately, otherwise the callback will be stored and as soon as
-//new data is observed it will be provided to the callback. These operations
-//are synchronised with the lock from the dispatcher.
-//In essence this provides a bridge between a callback to Observer that
-//receives updates to a model, a Process that provides messages to a client,
-//and a msgFromClient method that can accept messages from a client.
+
+/**
+  * Uses an OutgoingDispatcher to provide Observer implementation.
+  * Values provided to observe are passed on to an OutgoingDispatcher.
+  * In addition, a pull method is provided. This accepts a callback, and
+  * will provide data to that callback as soon as possible - if the
+  * OutgoingDispatcher already has a message then it will be provided
+  * immediately, otherwise the callback will be stored and as soon as
+  * new data is observed it will be provided to the callback. These operations
+  * are synchronised with the lock from the dispatcher.
+  * In essence this provides a bridge between a callback to Observer that
+  * receives updates to a model, a Process that provides messages to a client,
+  * and a msgFromClient method that can accept messages from a client.
+  *
+  * @param d The dispatcher
+  * @tparam D The type of delta to the model
+  * @tparam I The type of message from the client
+  * @tparam O The type of message to the client
+  */
 private class DispatchObserver[D, I, O](d: Dispatcher[D, I, O]) extends Observer[D] {
 
   var pendingPull = none[O => Unit]
@@ -122,20 +130,6 @@ private class DispatchObserver[D, I, O](d: Dispatcher[D, I, O]) extends Observer
   }
 
 }
-
-///**
-//  * This just performs outgoing dispatch of revisions, by holding on to the most
-//  * recent one, overwriting any previous values.
-//  */
-//private class RevisionOutgoingDispatcher extends OutgoingDispatcher[Revision] {
-//  var pendingRev = none[Revision]
-//  override def observe(newR: Revision): Unit = pendingRev = Some(newR)
-//  override def toClient(): Option[Revision] = {
-//    val r = pendingRev
-//    pendingRev = None
-//    r
-//  }
-//}
 
 class TreeStore[T](initialModel: T) {
   private var m: T = initialModel
@@ -190,27 +184,7 @@ private class TreeStoreValueDispatcher[T: Writer: DeltaReader](val store: TreeSt
   }
 }
 
-///**
-//  * Easy access to a Process[Task, Revision] using an AsyncObserver
-//  */
-//object BoxProcess {
-//
-//  def observeByProcess[T](obs: => DispatchObserver[T]): BoxScript[Process[Task, T]] = {
-//    val ao = obs
-//    for {
-//      _ <- observe(ao)
-//    } yield ao.process
-//  }
-//
-//  def observeRevisionByProcess: BoxScript[Process[Task, Revision]] =
-//    observeByProcess{new DispatchObserver(new RevisionOutgoingDispatcher())}
-//
-//  def observeTextByProcess[D: Format](document: D): BoxScript[Process[Task, Text]] =
-//    observeByProcess{new DispatchObserver(new BoxTextDispatcher(document))}
-//
-//}
-
-object BoxExchange {
+object TreeStoreValueExchange {
   def apply[M: Reader: Writer: DeltaReader](store: TreeStore[M]): Exchange[WebSocketFrame, WebSocketFrame] = {
 
     val dispatcher = new TreeStoreValueDispatcher(store)
