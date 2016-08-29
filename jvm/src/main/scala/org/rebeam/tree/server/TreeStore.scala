@@ -179,10 +179,8 @@ private class TreeStoreValueDispatcher[T: Writer: DeltaReader](val store: TreeSt
 
   //Read the Js.Value as a delta, and apply it to the store
   override def msgFromClient(msg: Js.Value): Unit = {
-//    println("TSVD got deltaJs " + msg + "...")
     val delta = implicitly[DeltaReader[T]].readDelta(msg)
     store.applyDelta(delta)
-//    println(" applied, yields" + store.model)
   }
 }
 
@@ -191,6 +189,7 @@ object TreeStoreValueExchange {
 
     val dispatcher = new TreeStoreValueDispatcher(store)
     val observer = new DispatchObserver(dispatcher)
+    store.observe(observer)
 
     //Treat received text as deltas to data
     val sink: Sink[Task, WebSocketFrame] = Process.constant {
