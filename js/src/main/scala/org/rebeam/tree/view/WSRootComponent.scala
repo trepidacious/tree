@@ -1,17 +1,17 @@
 package org.rebeam.tree.view
 
 import japgolly.scalajs.react._
-import org.rebeam.tree.{Delta, ValueDelta}
+import org.rebeam.tree._
 import org.scalajs.dom._
 import upickle.{Invalid, Js}
 import upickle.default._
 
 import scala.util.{Failure, Success}
 
-object TreeRootComponent {
+object WSRootComponent {
 
-  case class Props[R](render: Cursor[R] => ReactElement, wsUrl: String)
-  case class State[R](model: R, ws: Option[WebSocket])
+  case class Props[R](render: Cursor[R] => ReactElement, wsUrl: String, noData: ReactElement)
+  case class State[R](model: Option[R], ws: Option[WebSocket])
 
   class Backend[R](scope: BackendScope[Props[R], State[R]])(implicit reader: Reader[R]) {
 
@@ -22,7 +22,7 @@ object TreeRootComponent {
     //model from the server, to allow reverting local modifications if they
     //are not confirmed, or merging them if the server reports it merged them.
     val deltaToCallback = (delta: Delta[R], deltaJs: Js.Value) => {
-      val applyDelta = scope.modState(s => s.copy(model = delta.apply(s.model)))
+      val applyDelta = scope.modState(s => s.copy(model = s.model.map(m => delta.apply(m))))
       val sendDeltaJs = scope.state.flatMap(s => Callback(s.ws.foreach(_.send(deltaJs.toString()))))
       applyDelta >> sendDeltaJs
     }
@@ -30,8 +30,12 @@ object TreeRootComponent {
     val rootParent = RootParent(deltaToCallback)
 
     def render(props: Props[R], state: State[R]) = {
-      val rootCursor = Cursor(rootParent, state.model)
-      props.render(rootCursor)
+      state.model.map { m =>
+        val rootCursor = Cursor(rootParent, m)
+        props.render(rootCursor)
+      }.getOrElse(
+        props.noData
+      )
     }
 
     def start: Callback = {
@@ -59,7 +63,7 @@ object TreeRootComponent {
           val deltaJs = upickle.json.read(e.data.toString)
           deltaJs match {
             case Js.Obj(field, _ @ _*) => field match {
-              case ("value", valueJs) => direct.modState(_.copy(model = reader.read(valueJs)))
+              case ("value", valueJs) => direct.modState(_.copy(model = Some(reader.read(valueJs))))
               case _ => throw Invalid.Data(deltaJs, "Invalid json for server update, expected object with single field name value")
             }
             case _ => throw Invalid.Data(deltaJs, "Invalid json for server update, expected object with single field name value")
@@ -102,13 +106,13 @@ object TreeRootComponent {
   //TODO get rid of the initial model, and make model an Option[R] so we can start
   //empty and get data from WS while displaying a notice that data is loading
   //Make the component itself, by providing a render method to initialise the props
-  def apply[R](initialModel: R, wsUrl: String)
+  def apply[R](noData: ReactElement, wsUrl: String)
               (render: Cursor[R] => ReactElement)(implicit reader: Reader[R]) =
-    ctor(initialModel)(reader)(Props[R](render, wsUrl))
+    ctor(reader)(Props[R](render, wsUrl, noData))
 
   //Just make the component constructor - props to be supplied later to make a component
-  def ctor[R](initialModel: R)(implicit reader: Reader[R]) = ReactComponentB[Props[R]]("TreeRootComponent")
-    .initialState(State(initialModel, None))
+  def ctor[R](implicit reader: Reader[R]) = ReactComponentB[Props[R]]("TreeRootComponent")
+    .initialState(State[R](None: Option[R], None: Option[WebSocket]))
     .backend(new Backend[R](_)(reader))
     .render(s => s.backend.render(s.props, s.state))
     .componentDidMount(_.backend.start)

@@ -25,7 +25,9 @@ object JSDemoApp extends JSApp {
       )
     }
 
-    val AddressView = TreeRootComponent(Address(Street("OLD STREET", 1)), "api/address"){
+    val noData = <.div(<.p("Retrieving data from server..."))
+
+    val AddressView = WSRootComponent[Address](noData, "api/address") {
       addressCursor => {
         val streetCursor = addressCursor.zoom("street", Address.street)
         <.div(
