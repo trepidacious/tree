@@ -26,5 +26,11 @@ object DemoViews {
       )
     }
   }
-  
+
+  val HomeView = staticView(
+    <.div(
+      <.p("Home")
+    )
+  )
+
 }

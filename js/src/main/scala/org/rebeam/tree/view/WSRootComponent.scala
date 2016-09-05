@@ -103,8 +103,6 @@ object WSRootComponent {
 
   }
 
-  //TODO get rid of the initial model, and make model an Option[R] so we can start
-  //empty and get data from WS while displaying a notice that data is loading
   //Make the component itself, by providing a render method to initialise the props
   def apply[R](noData: ReactElement, wsUrl: String)
               (render: Cursor[R] => ReactElement)(implicit reader: Reader[R]) =

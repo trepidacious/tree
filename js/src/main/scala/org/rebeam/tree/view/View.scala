@@ -22,7 +22,11 @@ object View {
   def labelledCursorView[A](name: String)(render: LabelledCursor[A] => ReactElement) =
     ReactComponentB[LabelledCursor[A]](name).render_P(render).build
 
-//  val PlainStringView = cursorView[String]("StringView") { c =>
+  def staticView(e: ReactElement, name: String = "StaticView") = ReactComponentB[Unit](name)
+    .render(_ => e)
+    .build
+
+  //  val PlainStringView = cursorView[String]("StringView") { c =>
 //    <.input(
 //      ^.`type` := "text",
 //      ^.value := c.model,
