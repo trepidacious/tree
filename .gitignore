@@ -21,3 +21,5 @@ project/plugins/project/
 
 .ensime
 .ensime_cache
+
+.DS_Store
