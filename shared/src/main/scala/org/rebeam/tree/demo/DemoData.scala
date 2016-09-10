@@ -11,6 +11,21 @@ import scala.language.higherKinds
 @Lenses case class Company(address: Address)
 @Lenses case class Employee(name: String, company: Company)
 
+@Lenses case class Todo (
+  id: Int,
+  name: String,
+  dateCreated: String,
+  dateCompleted: Option[String],
+  priority: Int
+)
+
+@Lenses case class TodoList (
+  name: String,
+  email: String,
+  color: String,
+  items: List[Todo]
+)
+
 sealed trait StreetAction extends Delta[Street]
 
 object StreetAction {

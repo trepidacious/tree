@@ -4,11 +4,11 @@ import japgolly.scalajs.react._
 import org.scalajs.dom
 
 import scala.scalajs.js.JSApp
-
 import japgolly.scalajs.react.extra._
 import japgolly.scalajs.react.extra.router._
 import japgolly.scalajs.react._
 import japgolly.scalajs.react.vdom.prefix_<^._
+import org.rebeam.tree.view.MaterialSwatch
 
 object JSDemoApp extends JSApp {
 
@@ -61,11 +61,12 @@ object JSDemoApp extends JSApp {
   val baseUrl = BaseUrl.fromWindowOrigin_/
 
   def main(): Unit = {
-    val mountNode = dom.document.body //dom.document.getElementsByClassName("content")(0)
+    val mountNode = dom.document.getElementsByClassName("content")(0)
 
-    val router = Router(baseUrl, routerConfig.logToConsole)
-    router() render mountNode
+//    val router = Router(baseUrl, routerConfig.logToConsole)
+//    router() render mountNode
 
+    MaterialSwatch.AllFamiliesView() render mountNode
 
     //    ReactDOM.render(DemoViews.AddressView, mountNode)
   }
