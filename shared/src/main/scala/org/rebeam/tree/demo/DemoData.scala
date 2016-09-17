@@ -2,6 +2,7 @@ package org.rebeam.tree.demo
 
 import org.rebeam.tree._
 import monocle.macros.Lenses
+import org.rebeam.tree.view.Color
 import upickle.default._
 
 import scala.language.higherKinds
@@ -11,18 +12,25 @@ import scala.language.higherKinds
 @Lenses case class Company(address: Address)
 @Lenses case class Employee(name: String, company: Company)
 
+sealed trait Priority
+object Priority {
+  object Low extends Priority
+  object Medium extends Priority
+  object High extends Priority
+}
+
 @Lenses case class Todo (
   id: Int,
   name: String,
-  dateCreated: String,
-  dateCompleted: Option[String],
-  priority: Int
+  created: Moment,
+  completed: Option[Moment],
+  priority: Priority
 )
 
 @Lenses case class TodoList (
   name: String,
   email: String,
-  color: String,
+  color: Color,
   items: List[Todo]
 )
 

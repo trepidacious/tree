@@ -1,6 +1,5 @@
 package org.rebeam.tree.view
 
-import com.payalabs.scalajs.react.mdl.MaterialAble
 import japgolly.scalajs.react._
 import japgolly.scalajs.react.vdom.prefix_<^._
 
