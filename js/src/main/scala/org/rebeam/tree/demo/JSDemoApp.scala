@@ -63,10 +63,10 @@ object JSDemoApp extends JSApp {
   def main(): Unit = {
     val mountNode = dom.document.getElementsByClassName("content")(0)
 
-//    val router = Router(baseUrl, routerConfig.logToConsole)
-//    router() render mountNode
+    val router = Router(baseUrl, routerConfig.logToConsole)
+    router() render mountNode
 
-    MaterialSwatch.AllFamiliesView() render mountNode
+//    MaterialSwatch.AllFamiliesView() render mountNode
 
     //    ReactDOM.render(DemoViews.AddressView, mountNode)
   }

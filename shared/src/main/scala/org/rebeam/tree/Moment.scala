@@ -1,5 +1,6 @@
 package org.rebeam.tree
 
+//TODO would be nice if this was an AnyVal value class, but this seems to confuse uPickle?
 /**
   * A moment in time. Used as a light-weight "DateTime" that
   * can be implicitly converted to whatever library is needed.
@@ -7,5 +8,5 @@ package org.rebeam.tree
   * as a number of milliseconds from 1970-01-01T00:00Z
   * @param ms number of milliseconds from 1970-01-01T00:00Z
   */
-class Moment(val ms: Long) extends AnyVal
+case class Moment(ms: Long)
 
