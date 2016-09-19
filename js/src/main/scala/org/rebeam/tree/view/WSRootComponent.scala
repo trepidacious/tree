@@ -3,8 +3,9 @@ package org.rebeam.tree.view
 import japgolly.scalajs.react._
 import org.rebeam.tree._
 import org.scalajs.dom._
-import upickle.{Invalid, Js}
-import upickle.default._
+
+import io.circe._
+import io.circe.parser._
 
 import scala.util.{Failure, Success}
 
@@ -13,7 +14,10 @@ object WSRootComponent {
   case class Props[R](render: Cursor[R] => ReactElement, wsUrl: String, noData: ReactElement)
   case class State[R](model: Option[R], ws: Option[WebSocket])
 
-  class Backend[R](scope: BackendScope[Props[R], State[R]])(implicit reader: Reader[R]) {
+  class Backend[R](scope: BackendScope[Props[R], State[R]])(implicit decoder: Decoder[R]) {
+
+    //TODO decode incoming json as delta on R, so we can support non-value deltas
+    private val valueDecoder: Decoder[R] = Decoder.instance(c =>c.downField("value").as[R])
 
     //Apply the delta, and print its Json. In a real implementation this
     //would still apply the delta, but would also send the Json to a server
@@ -21,9 +25,9 @@ object WSRootComponent {
     //tentative model as modified locally, and a last-known authoritative
     //model from the server, to allow reverting local modifications if they
     //are not confirmed, or merging them if the server reports it merged them.
-    val deltaToCallback = (delta: Delta[R], deltaJs: Js.Value) => {
+    val deltaToCallback = (delta: Delta[R], deltaJs: Json) => {
       val applyDelta = scope.modState(s => s.copy(model = s.model.map(m => delta.apply(m))))
-      val sendDeltaJs = scope.state.flatMap(s => Callback(s.ws.foreach(_.send(deltaJs.toString()))))
+      val sendDeltaJs = scope.state.flatMap(s => Callback(s.ws.foreach(_.send(deltaJs.toString))))
       applyDelta >> sendDeltaJs
     }
 
@@ -31,7 +35,7 @@ object WSRootComponent {
 
     def render(props: Props[R], state: State[R]) = {
       state.model.map { m =>
-        val rootCursor = Cursor(rootParent, m)
+        val rootCursor = org.rebeam.tree.view.Cursor(rootParent, m)
         props.render(rootCursor)
       }.getOrElse(
         props.noData
@@ -60,15 +64,9 @@ object WSRootComponent {
 
         def onmessage(e: MessageEvent): Unit = {
           println(s"Updating with: ${e.data.toString}")
-          val deltaJs = upickle.json.read(e.data.toString)
-          deltaJs match {
-            case Js.Obj(field, _ @ _*) => field match {
-              case ("value", valueJs) => direct.modState(_.copy(model = Some(reader.read(valueJs))))
-              case _ => throw Invalid.Data(deltaJs, "Invalid json for server update, expected object with single field name value")
-            }
-            case _ => throw Invalid.Data(deltaJs, "Invalid json for server update, expected object with single field name value")
-          }
-
+//          println(parse(e.data.toString))
+          //TODO respond to failure
+          parse(e.data.toString).toOption.flatMap(valueDecoder.decodeJson(_).toOption).foreach(m => direct.modState(_.copy(model = Some(m))))
         }
 
         def onerror(e: ErrorEvent): Unit = println(s"Error: ${e.message}")
@@ -105,13 +103,13 @@ object WSRootComponent {
 
   //Make the component itself, by providing a render method to initialise the props
   def apply[R](noData: ReactElement, wsUrl: String)
-              (render: Cursor[R] => ReactElement)(implicit reader: Reader[R]) =
-    ctor(reader)(Props[R](render, wsUrl, noData))
+              (render: Cursor[R] => ReactElement)(implicit decoder: Decoder[R]) =
+    ctor(decoder)(Props[R](render, wsUrl, noData))
 
   //Just make the component constructor - props to be supplied later to make a component
-  def ctor[R](implicit reader: Reader[R]) = ReactComponentB[Props[R]]("TreeRootComponent")
+  def ctor[R](implicit decoder: Decoder[R]) = ReactComponentB[Props[R]]("TreeRootComponent")
     .initialState(State[R](None: Option[R], None: Option[WebSocket]))
-    .backend(new Backend[R](_)(reader))
+    .backend(new Backend[R](_)(decoder))
     .render(s => s.backend.render(s.props, s.state))
     .componentDidMount(_.backend.start)
     .componentWillUnmount(_.backend.end)

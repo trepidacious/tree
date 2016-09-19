@@ -3,7 +3,8 @@ package org.rebeam.tree.view
 import japgolly.scalajs.react._
 import monocle._
 import org.rebeam.tree.{Delta, LensDelta}
-import upickle.Js
+
+import io.circe._
 
 /**
   */
@@ -20,7 +21,7 @@ import upickle.Js
   * @tparam C The type of child component in the parent/child relationship.
   */
 trait Parent[C] {
-  def callback(delta: Delta[C], deltaJs: Js.Value): Callback
+  def callback(delta: Delta[C], deltaJs: Json): Callback
 }
 
 /**
@@ -36,8 +37,8 @@ trait Parent[C] {
   * @param deltaToCallback  Returns a callback handling the delta as appropriate for the entire model.
   * @tparam R The type of the root of the model
   */
-case class RootParent[R](deltaToCallback: (Delta[R], Js.Value) => Callback) extends Parent[R] {
-  def callback(delta: Delta[R], deltaJs: Js.Value): Callback = deltaToCallback(delta, deltaJs)
+case class RootParent[R](deltaToCallback: (Delta[R], Json) => Callback) extends Parent[R] {
+  def callback(delta: Delta[R], deltaJs: Json): Callback = deltaToCallback(delta, deltaJs)
 }
 
 /**
@@ -56,13 +57,13 @@ case class RootParent[R](deltaToCallback: (Delta[R], Js.Value) => Callback) exte
   * @tparam C The type of child model
   */
 case class LensParent[P, C](parent: Parent[P], fieldName: String, lens: Lens[P, C]) extends Parent[C] {
-  def callback(delta: Delta[C], deltaJs: Js.Value): Callback = {
+  def callback(delta: Delta[C], deltaJs: Json): Callback = {
     //Produce a LensDelta from the provided child delta, to make it into a delta
     //of the parent
     val parentDelta = LensDelta(lens, delta)
 
     //Add this delta to the JSON
-    val parentDeltaJs = Js.Obj("lens" -> Js.Obj(fieldName -> deltaJs))
+    val parentDeltaJs = Json.obj("lens" -> Json.obj(fieldName -> deltaJs))
 
     //Run using the parent's own parent
     parent.callback(parentDelta, parentDeltaJs)

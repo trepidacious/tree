@@ -18,6 +18,8 @@ lazy val http4sVersion = "0.14.2a"
 
 lazy val monocleVersion = "1.2.2"     // or "1.3.0-SNAPSHOT"
 
+val circeVersion = "0.5.1"
+
 lazy val root = project.in(file(".")).
   aggregate(treeJS, treeJVM).
   settings(
@@ -36,7 +38,9 @@ lazy val tree = crossProject.in(file(".")).
       "com.github.julien-truffaut"  %%%  "monocle-state"   % monocleVersion,
       "com.github.julien-truffaut"  %%%  "monocle-refined" % monocleVersion,
       "com.github.julien-truffaut"  %%%  "monocle-law"     % monocleVersion % "test",
-      "com.lihaoyi" %%% "upickle" % "0.4.1"
+      "io.circe"                    %%%  "circe-core"      % circeVersion,
+      "io.circe"                    %%%  "circe-generic"   % circeVersion,
+      "io.circe"                    %%%  "circe-parser"    % circeVersion
       ),
       addCompilerPlugin("org.scalamacros" %% "paradise" % "2.1.0" cross CrossVersion.full//for @Lenses
     )

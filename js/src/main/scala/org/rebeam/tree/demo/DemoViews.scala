@@ -3,6 +3,7 @@ package org.rebeam.tree.demo
 import japgolly.scalajs.react.vdom.prefix_<^._
 import org.rebeam.tree.view.View._
 import org.rebeam.tree.view.WSRootComponent
+import DemoData._
 
 object DemoViews {
 
@@ -11,8 +12,8 @@ object DemoViews {
       <.div("Street: " + c.model.number + ", " + c.model.name),
       IntView(c.zoom("number", Street.number).label("Number")),
       TextView(c.zoom("name", Street.name).label("Name")),
-      ActButton("Number multiple", c.act(StreetAction.NumberMultiple(10))),
-      ActButton("Capitalise", c.act(StreetAction.Capitalise))
+      ActButton("Number multiple", c.act(StreetAction.NumberMultiple(10): StreetAction)),
+      ActButton("Capitalise", c.act(StreetAction.Capitalise: StreetAction))
     )
   }
 

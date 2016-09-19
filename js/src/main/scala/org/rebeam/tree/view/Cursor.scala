@@ -3,8 +3,8 @@ package org.rebeam.tree.view
 import japgolly.scalajs.react._
 import monocle._
 import org.rebeam.tree._
-import upickle.Js
-import upickle.default._
+
+import io.circe._
 
 /**
   * Cursor giving a "position" in a data model, giving the model at that position
@@ -22,13 +22,13 @@ import upickle.default._
 case class Cursor[M](parent: Parent[M], model: M) extends Parent[M] {
 
   //Just pass through runDelta to parent for convenience
-  def callback(delta: Delta[M], deltaJs: Js.Value): Callback = parent.callback(delta, deltaJs)
+  def callback(delta: Delta[M], deltaJs: Json): Callback = parent.callback(delta, deltaJs)
 
-  def act[A <: Delta[M]](actionDelta: A)(implicit writer: Writer[A]): Callback =
-    callback(actionDelta, Js.Obj("action" -> writer.write(actionDelta)))
+  def act[A <: Delta[M]](actionDelta: A)(implicit encoder: Encoder[A]): Callback =
+    callback(actionDelta, Json.obj("action" -> encoder(actionDelta)))
 
-  def set(newModel: M)(implicit writer: Writer[M]): Callback =
-    callback(ValueDelta(newModel), Js.Obj("value" -> writer.write(newModel)))
+  def set(newModel: M)(implicit encoder: Encoder[M]): Callback =
+    callback(ValueDelta(newModel), Json.obj("value" -> encoder(newModel)))
 
   //TODO if we had a FieldLens being a Lens with an added fieldName: String we could use this instead, and
   //use a macro to provide these (and readDelta implementation)
@@ -38,7 +38,7 @@ case class Cursor[M](parent: Parent[M], model: M) extends Parent[M] {
   //This would then prevent use of invalid fields, and could propagate access control through
   //a data model, etc.
   def zoom[C](fieldName: String, lens: Lens[M, C]): Cursor[C] =
-    Cursor(LensParent(parent, fieldName, lens), lens.get(model))
+    Cursor[C](LensParent(parent, fieldName, lens), lens.get(model))
 
   def label(label: String) = LabelledCursor(label, this)
 }

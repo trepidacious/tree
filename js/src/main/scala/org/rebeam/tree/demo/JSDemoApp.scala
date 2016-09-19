@@ -1,6 +1,5 @@
 package org.rebeam.tree.demo
 
-import japgolly.scalajs.react._
 import org.scalajs.dom
 
 import scala.scalajs.js.JSApp
@@ -8,7 +7,6 @@ import japgolly.scalajs.react.extra._
 import japgolly.scalajs.react.extra.router._
 import japgolly.scalajs.react._
 import japgolly.scalajs.react.vdom.prefix_<^._
-import org.rebeam.tree.view.MaterialSwatch
 
 object JSDemoApp extends JSApp {
 

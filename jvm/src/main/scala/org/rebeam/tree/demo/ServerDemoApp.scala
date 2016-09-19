@@ -9,7 +9,9 @@ import org.http4s.server.blaze.BlazeBuilder
 import org.http4s.server.staticcontent._
 import org.http4s.server.websocket._
 import org.http4s.websocket.WebsocketBits._
+import org.rebeam.tree.Moment
 import org.rebeam.tree.server.{TreeStore, TreeStoreValueExchange}
+import org.rebeam.tree.view.MaterialColor
 
 import scala.concurrent.duration._
 import scalaz.concurrent.{Strategy, Task}
@@ -17,9 +19,24 @@ import scalaz.stream.async.unboundedQueue
 import scalaz.stream.time.awakeEvery
 import scalaz.stream.{DefaultScheduler, Exchange, Process, Sink}
 
+import DemoData._
+
 object ServerDemoApp extends ServerApp {
 
   val address = new TreeStore(Address(Street("OLD STREET", 1)))
+
+//  val todoList = {
+//    val time = System.currentTimeMillis()
+//    TodoList(
+//      "Todo", "trepidacious@gmail.com", MaterialColor.Amber(),
+//      (1 to 10).map(i => {
+//        Todo(i, "Item " + i, Moment(time - 60000 * (10 - i)))
+//      }).toList,
+//      11
+//    )
+//  }
+//
+//  val todoListStore = new TreeStore(todoList)
 
   val apiService = HttpService {
 
@@ -28,6 +45,9 @@ object ServerDemoApp extends ServerApp {
 
     case GET -> Root / "pwd" =>
       Ok(System.getProperty("user.dir"))
+
+//    case GET -> Root / "todolist" =>
+//      WS(TreeStoreValueExchange(todoListStore))
 
     case GET -> Root / "address" =>
       WS(TreeStoreValueExchange(address))

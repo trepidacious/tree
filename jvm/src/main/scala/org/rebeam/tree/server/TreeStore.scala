@@ -1,6 +1,5 @@
 package org.rebeam.tree.server
 
-
 import scalaz.concurrent.Task
 import scalaz.stream.{Exchange, Process, Sink}
 import org.rebeam.tree.server.util._
@@ -9,8 +8,9 @@ import scalaz.Scalaz.none
 
 import org.http4s.websocket.WebsocketBits._
 import org.rebeam.tree._
-import upickle.Js
-import upickle.default._
+
+import io.circe._
+import io.circe.parser._
 
 import scalaz.{\/, \/-}
 
@@ -160,7 +160,7 @@ class TreeStore[T](initialModel: T) {
   * and full updates to a model for deltas of that model. Always sends a complete change of
   * base model as outgoing messages.
   */
-private class TreeStoreValueDispatcher[T: Writer: DeltaReader](val store: TreeStore[T]) extends Dispatcher[T, Js.Value, Js.Value] {
+private class TreeStoreValueDispatcher[T](val store: TreeStore[T])(implicit encoder: Encoder[T], deltaDecoder: Decoder[Delta[T]]) extends Dispatcher[T, Json, Json] {
 
   var pendingModelToClient = none[T]
 
@@ -171,33 +171,34 @@ private class TreeStoreValueDispatcher[T: Writer: DeltaReader](val store: TreeSt
 
   //Clear pending model. If we had a value, write it as a "value" delta
   //to completely replace model on client
-  override def msgForClient(): Option[Js.Value] = {
+  override def msgForClient(): Option[Json] = {
     val model = pendingModelToClient
     pendingModelToClient = None
-    model.map(m => Js.Obj("value" -> implicitly[Writer[T]].write(m)))
+    model.map(m => Json.obj("value" -> encoder(m)))
   }
 
   //Read the Js.Value as a delta, and apply it to the store
-  override def msgFromClient(msg: Js.Value): Unit = {
-    val delta = implicitly[DeltaReader[T]].readDelta(msg)
-    store.applyDelta(delta)
+  override def msgFromClient(msg: Json): Unit = {
+    val delta = deltaDecoder.decodeJson(msg)
+    //TODO a bit messy using map?
+    delta.map(store.applyDelta)
   }
 }
 
 object TreeStoreValueExchange {
-  def apply[M: Reader: Writer: DeltaReader](store: TreeStore[M]): Exchange[WebSocketFrame, WebSocketFrame] = {
+  def apply[M](store: TreeStore[M])(implicit encoder: Encoder[M], decoder: Decoder[M], deltaDecoder: Decoder[Delta[M]]): Exchange[WebSocketFrame, WebSocketFrame] = {
 
     val dispatcher = new TreeStoreValueDispatcher(store)
     val observer = new DispatchObserver(dispatcher)
     store.observe(observer)
 
-    //Treat received text as deltas to data
+    //Treat received text as JSON encoded deltas to data, if valid
     val sink: Sink[Task, WebSocketFrame] = Process.constant {
-      case Text(t, _) => Task.delay( dispatcher.msgFromClient(upickle.json.read(t)) )
+      case Text(t, _) => Task.delay( parse(t).toOption.foreach(msg => dispatcher.msgFromClient(msg)) )
     }
 
     //Get source of messages for client from the observer's process
-    val source = observer.process.map(js => Text(upickle.json.write(js)))
+    val source = observer.process.map(js => Text(js.noSpaces))
 
     Exchange(source, sink)
   }
