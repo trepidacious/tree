@@ -64,9 +64,14 @@ object WSRootComponent {
 
         def onmessage(e: MessageEvent): Unit = {
           println(s"Updating with: ${e.data.toString}")
-//          println(parse(e.data.toString))
-          //TODO respond to failure
-          parse(e.data.toString).toOption.flatMap(valueDecoder.decodeJson(_).toOption).foreach(m => direct.modState(_.copy(model = Some(m))))
+          val msg = e.data.toString
+          parse(msg).fold[Unit](
+            pf => console.log("Invalid JSON from server " + pf),
+            json => valueDecoder.decodeJson(_).fold(
+              df => console.log("Could not decide JSON from server " + df),
+              m => direct.modState(_.copy(model = Some(m)))
+            )
+          )
         }
 
         def onerror(e: ErrorEvent): Unit = println(s"Error: ${e.message}")
