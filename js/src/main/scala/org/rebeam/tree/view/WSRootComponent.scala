@@ -67,7 +67,7 @@ object WSRootComponent {
           val msg = e.data.toString
           parse(msg).fold[Unit](
             pf => console.log("Invalid JSON from server " + pf),
-            json => valueDecoder.decodeJson(_).fold(
+            json => valueDecoder.decodeJson(json).fold(
               df => console.log("Could not decide JSON from server " + df),
               m => direct.modState(_.copy(model = Some(m)))
             )
