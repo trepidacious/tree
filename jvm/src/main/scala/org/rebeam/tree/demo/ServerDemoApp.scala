@@ -25,18 +25,18 @@ object ServerDemoApp extends ServerApp {
 
   val address = new TreeStore(Address(Street("OLD STREET", 1)))
 
-//  val todoList = {
-//    val time = System.currentTimeMillis()
-//    TodoList(
-//      "Todo", "trepidacious@gmail.com", MaterialColor.Amber(),
-//      (1 to 10).map(i => {
-//        Todo(i, "Item " + i, Moment(time - 60000 * (10 - i)))
-//      }).toList,
-//      11
-//    )
-//  }
-//
-//  val todoListStore = new TreeStore(todoList)
+  val todoList = {
+    val time = System.currentTimeMillis()
+    TodoList(
+      "Todo", "trepidacious@gmail.com", MaterialColor.Amber(),
+      (1 to 10).map(i => {
+        Todo(i, "Item " + i, Moment(time - 60000 * (10 - i)))
+      }).toList,
+      11
+    )
+  }
+
+  val todoListStore = new TreeStore(todoList)
 
   val apiService = HttpService {
 
@@ -46,8 +46,8 @@ object ServerDemoApp extends ServerApp {
     case GET -> Root / "pwd" =>
       Ok(System.getProperty("user.dir"))
 
-//    case GET -> Root / "todolist" =>
-//      WS(TreeStoreValueExchange(todoListStore))
+    case GET -> Root / "todolist" =>
+      WS(TreeStoreValueExchange(todoListStore))
 
     case GET -> Root / "address" =>
       WS(TreeStoreValueExchange(address))

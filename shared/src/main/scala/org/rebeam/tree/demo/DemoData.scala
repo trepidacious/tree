@@ -13,13 +13,24 @@ import io.circe.generic.JsonCodec
 
 object DemoData {
 
-  @JsonCodec @Lenses case class Street(name: String, number: Int)
-  @JsonCodec @Lenses case class Address(street: Street)
-  @JsonCodec @Lenses case class Company(address: Address)
-  @JsonCodec @Lenses case class Employee(name: String, company: Company)
+  @JsonCodec
+  @Lenses
+  case class Street(name: String, number: Int)
 
-  @JsonCodec sealed trait StreetAction extends Delta[Street]
+  @JsonCodec
+  @Lenses
+  case class Address(street: Street)
 
+  @JsonCodec
+  @Lenses
+  case class Company(address: Address)
+
+  @JsonCodec
+  @Lenses
+  case class Employee(name: String, company: Company)
+
+  @JsonCodec
+  sealed trait StreetAction extends Delta[Street]
   object StreetAction {
     case class NumberMultiple(multiple: Int) extends StreetAction {
       def apply(s: Street): Street = s.copy(number = s.name.length * multiple)
@@ -39,14 +50,17 @@ object DemoData {
 
   implicit val addressDeltaDecoder = value[Address] or lens("street", Address.street)
 
-  @JsonCodec sealed trait Priority
+  @JsonCodec
+  sealed trait Priority
   object Priority {
     object Low extends Priority
     object Medium extends Priority
     object High extends Priority
   }
 
-  @JsonCodec @Lenses case class Todo (
+  @JsonCodec
+  @Lenses
+  case class Todo (
                             id: Int,
                             name: String,
                             created: Moment,
@@ -54,14 +68,17 @@ object DemoData {
                             priority: Priority = Priority.Medium
                           )
 
-  @JsonCodec sealed trait TodoAction extends Delta[Todo]
+  @JsonCodec
+  sealed trait TodoAction extends Delta[Todo]
   object TodoAction {
     case class Complete(completed: Moment) extends TodoAction {
       def apply(t: Todo): Todo = t.copy(completed = Some(completed))
     }
   }
 
-  @JsonCodec @Lenses case class TodoList (
+  @JsonCodec
+  @Lenses
+  case class TodoList (
                                 name: String,
                                 email: String,
                                 color: Color,
@@ -69,7 +86,8 @@ object DemoData {
                                 nextId: Int = 1
                               )
 
-  @JsonCodec sealed trait TodoListAction extends Delta[TodoList]
+  @JsonCodec
+  sealed trait TodoListAction extends Delta[TodoList]
   object TodoListAction {
 
     case class CreateTodo(created: Moment, name: String = "New todo", priority: Priority = Priority.Medium) extends TodoListAction {
