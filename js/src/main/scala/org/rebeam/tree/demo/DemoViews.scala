@@ -9,11 +9,10 @@ object DemoViews {
 
   val StreetView = cursorView[Street]("StreetView") { c =>
     <.div(
-      <.div("Street: " + c.model.number + ", " + c.model.name),
       IntView(c.zoom("number", Street.number).label("Number")),
       TextView(c.zoom("name", Street.name).label("Name")),
-      ActButton("Number multiple", c.act(StreetAction.NumberMultiple(10): StreetAction)),
-      ActButton("Capitalise", c.act(StreetAction.Capitalise: StreetAction))
+      <.p(ActButton("Number multiple", c.act(StreetAction.NumberMultiple(10): StreetAction))),
+      <.p(ActButton("Capitalise", c.act(StreetAction.Capitalise: StreetAction)))
     )
   }
 
@@ -22,7 +21,7 @@ object DemoViews {
     addressCursor => {
       val streetCursor = addressCursor.zoom("street", Address.street)
       <.div(
-        <.h1("Address"),
+        <.h3("Address"),
         StreetView(streetCursor)
       )
     }
@@ -30,7 +29,7 @@ object DemoViews {
 
   val HomeView = staticView(
     <.div(
-      <.p("Home")
+      <.h3("Home")
     )
   )
 

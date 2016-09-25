@@ -4,6 +4,8 @@ import japgolly.scalajs.react.extra.router._
 import japgolly.scalajs.react.vdom.prefix_<^._
 import org.rebeam.tree.view.Nav._
 
+import com.payalabs.scalajs.react.mdl.MaterialAble
+
 object DemoRoutes {
 
   sealed trait Page
@@ -40,7 +42,7 @@ object DemoRoutes {
       navPageMenu(np),
       navPageDrawer(np),
       navContents(r.render())
-    )
+    ).material
   }
 
   val baseUrl = BaseUrl.fromWindowOrigin_/

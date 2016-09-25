@@ -85,11 +85,15 @@ object View {
 //    )
 //  }
 
-  def ActButton(s: String, c: Callback) =
+  def ActButton(s: String, c: Callback, accent: Boolean = false, colored: Boolean = true) =
     <.button(
       s,
       ^.onClick ==> ((e: ReactEventI) => e.preventDefaultCB >> c),
-      ^.classSet1("mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent")
+      ^.classSet1(
+        "mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect",
+        "mdl-button--accent" -> accent,
+        "mdl-button--colored" -> colored
+      )
     ).material
 
 }

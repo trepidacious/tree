@@ -22,10 +22,13 @@ object Nav {
       def nav(name: String, target: P) = {
         <.nav(
           ^.cls := "mdl-navigation mdl-layout--large-screen-only",
-          //TODO get highlighting of selected link
+          ^.key := name,
           <.span(
-            ^.cls := "mdl-navigation__link",
-            (if (p.page == target) ">" else "") + name,
+            ^.classSet1(
+              "mdl-navigation__link",
+              "mdl-navigation__link--active" -> (p.page == target)
+            ),
+            name,
             p.routerCtl setOnClick target
           )
         )
@@ -55,8 +58,12 @@ object Nav {
 
       def nav(name: String, target: P) = {
         <.span(
-          ^.cls := "mdl-navigation__link",
-          (if (p.page == target) ">" else "") + name,
+          ^.classSet1(
+            "mdl-navigation__link",
+            "mdl-navigation__link--active" -> (p.page == target)
+          ),
+          ^.key := name,
+          name,
           p.routerCtl setOnClick target
         )
       }
@@ -79,7 +86,7 @@ object Nav {
 
   def navContents(r: ReactElement) =
     <.main(
-      ^.cls := "mdl-layout__content",
+      ^.cls := "mdl-layout__content mdl-color-text--grey-600",
       <.div(
         ^.cls := "page-content",
         r

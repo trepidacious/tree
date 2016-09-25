@@ -1,0 +1,44 @@
+.mdl-layout__header-row .mdl-navigation__link {
+    line-height: 61px;
+    border-bottom-width: 3px;
+    border-bottom-style: solid;
+    border-bottom-color: transparent;
+    cursor: pointer;
+    text-decoration: none;
+    text-transform: uppercase;
+    color: rgba(255,255,255, 0.6);
+}
+
+.mdl-layout__header-row .mdl-navigation__link--active {
+    border-bottom-color: rgb(255,171,64);
+    color: rgb(255,255,255);
+}
+
+.mdl-layout__drawer .mdl-navigation .mdl-navigation__link {
+    cursor: pointer;
+}
+
+.mdl-layout__drawer .mdl-navigation .mdl-navigation__link:hover {
+    background-color: #f0f0f0;
+}
+
+.mdl-layout__drawer .mdl-navigation .mdl-navigation__link--active {
+    background-color: #e0e0e0;
+}
+
+.mdl-layout__drawer .mdl-navigation .mdl-navigation__link--active:hover {
+    background-color: #e0e0e0;
+}
+
+.mdl-layout__drawer .mdl-layout-title {
+    background-color: rgb(96,125,139);
+    color: #ffffff;
+}
+
+.mdl-layout__drawer {
+    border-right: 0px;
+}
+
+.mdl-layout__content {
+    padding: 32px;
+}
