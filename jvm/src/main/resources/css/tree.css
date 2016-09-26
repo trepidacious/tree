@@ -42,3 +42,14 @@
 .mdl-layout__content {
     padding: 32px;
 }
+
+.mdl-data-table .mdl-data-table__cell--priority {
+    text-align: center;
+    padding-top: 10px;
+    padding-bottom: 6px;
+}
+
+.mdl-data-table .mdl-data-table__cell--priority-high {
+    color: #D50000;
+}
+

@@ -10,6 +10,7 @@ object DemoRoutes {
 
   sealed trait Page
   case object Home          extends Page
+  case object TodoList      extends Page
   case object Address       extends Page
 
   val title = "Tree"
@@ -20,6 +21,7 @@ object DemoRoutes {
     (trimSlashes
       | staticRoute(root,   Home) ~> render(DemoViews.HomeView())
       | staticRoute("#address", Address) ~> render(DemoViews.AddressView)
+      | staticRoute("#todolist", TodoList) ~> render(DemoViews.TodoListView)
       )
 
       .notFound(redirectToPage(Home)(Redirect.Replace))
@@ -29,6 +31,7 @@ object DemoRoutes {
 
   val navs = Map(
     "Home" -> Home,
+    "Todo List" -> TodoList,
     "Address" -> Address
   )
 

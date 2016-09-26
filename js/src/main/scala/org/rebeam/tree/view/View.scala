@@ -37,6 +37,8 @@ object View {
 //    )
 //  }
 
+  val spinner = staticView(<.div(^.cls := "mdl-spinner mdl-js-spinner is-active").material, "Spinner")
+
   val TextView = view[LabelledCursor[String]]("TextView") { p =>
     <.form(
       <.div(

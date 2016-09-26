@@ -30,7 +30,14 @@ object ServerDemoApp extends ServerApp {
     TodoList(
       "Todo", "trepidacious@gmail.com", MaterialColor.Amber(),
       (1 to 10).map(i => {
-        Todo(i, "Item " + i, Moment(time - 60000 * (10 - i)))
+        Todo(
+          i, "Item " + i, Moment(time - 60000 * (10 - i)),
+          priority = i % 3 match {
+            case 0 => Priority.Low
+            case 1 => Priority.Medium
+            case _ => Priority.High
+          }
+        )
       }).toList,
       11
     )
