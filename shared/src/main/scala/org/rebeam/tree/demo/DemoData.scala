@@ -10,6 +10,7 @@ import scala.language.higherKinds
 import BasicDeltaDecoders._
 import DeltaDecoder._
 import io.circe.generic.JsonCodec
+import monocle.{Lens, Optional}
 
 object DemoData {
 
@@ -84,7 +85,14 @@ object DemoData {
                                 color: Color,
                                 items: List[Todo],
                                 nextId: Int = 1
-                              )
+                              ) {
+    def replaceTodoById(newTodo: Todo): TodoList = copy(items = items.map(oldTodo => if (oldTodo.id == newTodo.id) newTodo else oldTodo))
+    def todoById(id: Int): Option[Todo] = items.find(_.id == id)
+  }
+
+  object TodoList {
+    def todoById(id: Int): Optional[TodoList, Todo] = Optional[TodoList, Todo](_.todoById(id))(newTodo => list => list.replaceTodoById(newTodo))
+  }
 
   @JsonCodec
   sealed trait TodoListAction extends Delta[TodoList]

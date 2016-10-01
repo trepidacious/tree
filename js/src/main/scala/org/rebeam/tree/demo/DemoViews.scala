@@ -69,10 +69,10 @@ object DemoViews {
 
   val TodoListTableView = cursorView[TodoList]("TodoListTableView") { c =>
     <.table(
-      ^.cls := "mdl-data-table mdl-js-data-table mdl-data-table--selectable mdl-shadow--2dp",
+      ^.cls := "mdl-data-table mdl-js-data-table",  //mdl-data-table--selectable mdl-shadow--2dp
       <.thead(
         <.tr(
-          <.th(^.cls := "mdl-data-table__cell--non-numeric", ""),
+          <.th(^.cls := "mdl-data-table__cell--non-numeric", "Done?"),
           <.th(^.cls := "mdl-data-table__cell--non-numeric", "Id"),
           <.th(^.cls := "mdl-data-table__cell--non-numeric", "Name"),
           <.th(^.cls := "mdl-data-table__cell--non-numeric", "Priority")
