@@ -12,8 +12,8 @@ object DemoViews {
 
   val StreetView = cursorView[Street]("StreetView") { c =>
     <.div(
-      IntView(c.zoom("number", Street.number).label("Number")),
-      TextView(c.zoom("name", Street.name).label("Name")),
+      IntView(c.zoomN(Street.numberN).label("Number")),
+      TextView(c.zoomN(Street.nameN).label("Name")),
       <.p(ActButton("Number multiple", c.act(StreetAction.NumberMultiple(10): StreetAction))),
       <.p(ActButton("Capitalise", c.act(StreetAction.Capitalise: StreetAction)))
     )
@@ -25,7 +25,7 @@ object DemoViews {
   )
   val AddressView = WSRootComponent[Address](noAddress, "api/address") {
     addressCursor => {
-      val streetCursor = addressCursor.zoom("street", Address.street)
+      val streetCursor = addressCursor.zoomN(Address.streetN)
       <.div(
         <.h3("Address"),
         StreetView(streetCursor)
@@ -92,8 +92,8 @@ object DemoViews {
     c => {
       <.div(
         <.h3("Todo List"),
-        TextView(c.zoom("name", TodoList.name).label("Name")),
-        TextView(c.zoom("email", TodoList.email).label("Email")),
+        TextView(c.zoomN(TodoList.nameN).label("Name")),
+        TextView(c.zoomN(TodoList.emailN).label("Email")),
         TodoListTableView(c)
       )
     }

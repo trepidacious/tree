@@ -18,17 +18,32 @@ object DemoData {
   @Lenses
   case class Street(name: String, number: Int)
 
+  object Street {
+    val nameN = LensN("name", Street.name)
+    val numberN = LensN("number", Street.number)
+  }
+
   @JsonCodec
   @Lenses
   case class Address(street: Street)
+  object Address {
+    val streetN = LensN("street", Address.street)
+  }
 
   @JsonCodec
   @Lenses
   case class Company(address: Address)
+  object Company {
+    val addressN = LensN("address", Company.address)
+  }
 
   @JsonCodec
   @Lenses
   case class Employee(name: String, company: Company)
+  object Employee {
+    val nameN = LensN("name", Employee.name)
+    val companyN = LensN("company", Employee.company)
+  }
 
   @JsonCodec
   sealed trait StreetAction extends Delta[Street]
@@ -47,9 +62,9 @@ object DemoData {
 //  implicit val streetEncoder: Encoder[Street] = deriveEncoder[Street]
 
   implicit val streetDeltaDecoder =
-    value[Street] or lens("name", Street.name) or lens("number", Street.number) or action[Street, StreetAction]
+    value[Street] or lensN(Street.nameN) or lensN(Street.numberN) or action[Street, StreetAction]
 
-  implicit val addressDeltaDecoder = value[Address] or lens("street", Address.street)
+  implicit val addressDeltaDecoder = value[Address] or lensN(Address.streetN)
 
   @JsonCodec
   sealed trait Priority
@@ -68,6 +83,13 @@ object DemoData {
                             completed: Option[Moment] = None,
                             priority: Priority = Priority.Medium
                           )
+  object Todo {
+    val idN = LensN("id", Todo.id)
+    val nameN = LensN("name", Todo.name)
+    val createdN = LensN("created", Todo.created)
+    val completedN = LensN("completed", Todo.completed)
+    val priorityN = LensN("priority", Todo.priority)
+  }
 
   @JsonCodec
   sealed trait TodoAction extends Delta[Todo]
@@ -89,8 +111,13 @@ object DemoData {
     def replaceTodoById(newTodo: Todo): TodoList = copy(items = items.map(oldTodo => if (oldTodo.id == newTodo.id) newTodo else oldTodo))
     def todoById(id: Int): Option[Todo] = items.find(_.id == id)
   }
-
   object TodoList {
+    val nameN = LensN("name", TodoList.name)
+    val emailN = LensN("email", TodoList.email)
+    val colorN = LensN("color", TodoList.color)
+    val itemsN = LensN("items", TodoList.items)
+    val nextIdN = LensN("nextId", TodoList.nextId)
+
     def todoById(id: Int): Optional[TodoList, Todo] = Optional[TodoList, Todo](_.todoById(id))(newTodo => list => list.replaceTodoById(newTodo))
   }
 
@@ -127,9 +154,9 @@ object DemoData {
   implicit val colorDeltaDecoder = value[Color]
 
   //More complex deltas - can replace entire value, or operate using lenses or actions
-  implicit val todoDeltaDecoder = value[Todo] or lens("name", Todo.name) or lens("priority", Todo.priority) or action[Todo, TodoAction]
+  implicit val todoDeltaDecoder = value[Todo] or lensN(Todo.nameN) or lensN(Todo.priorityN) or action[Todo, TodoAction]
   implicit val todoListDeltaDecoder =
-      value[TodoList] or lens("name", TodoList.name) or lens("email", TodoList.email) or lens("color", TodoList.color) or action[TodoList, TodoListAction]
+      value[TodoList] or lensN(TodoList.nameN) or lensN(TodoList.emailN) or lensN(TodoList.colorN) or action[TodoList, TodoListAction]
 
 }
 

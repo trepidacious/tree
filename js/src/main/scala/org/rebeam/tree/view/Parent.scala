@@ -1,9 +1,7 @@
 package org.rebeam.tree.view
 
 import japgolly.scalajs.react._
-import monocle._
-import org.rebeam.tree.{Delta, LensDelta}
-
+import org.rebeam.tree._
 import io.circe._
 
 /**
@@ -41,6 +39,35 @@ case class RootParent[R](deltaToCallback: (Delta[R], Json) => Callback) extends 
   def callback(delta: Delta[R], deltaJs: Json): Callback = deltaToCallback(delta, deltaJs)
 }
 
+///**
+//  * We have some model p: P, which has a child c: C that can be reached using a
+//  * Lens[P, C]. Given a parent of p we can use this class to produce a parent of c.
+//  *
+//  * So for example P might be Person, and C could then be String - the type of the
+//  * first name of that person. The fieldName would be "firstName", and lens is a
+//  * lens from a person to their first name. Given a Parent[Person] we wish to
+//  * produce a Parent[String] suitable for a view of the person's first name.
+//  *
+//  * @param parent The parent of the parent component
+//  * @param fieldName The name of the field in the parent model
+//  * @param lens The lens from the parent model to the child model
+//  * @tparam P The type of the parent model
+//  * @tparam C The type of child model
+//  */
+//case class LensParent[P, C](parent: Parent[P], fieldName: String, lens: Lens[P, C]) extends Parent[C] {
+//  def callback(delta: Delta[C], deltaJs: Json): Callback = {
+//    //Produce a LensDelta from the provided child delta, to make it into a delta
+//    //of the parent
+//    val parentDelta = LensDelta(lens, delta)
+//
+//    //Add this delta to the JSON
+//    val parentDeltaJs = Json.obj("lens" -> Json.obj(fieldName -> deltaJs))
+//
+//    //Run using the parent's own parent
+//    parent.callback(parentDelta, parentDeltaJs)
+//  }
+//}
+
 /**
   * We have some model p: P, which has a child c: C that can be reached using a
   * Lens[P, C]. Given a parent of p we can use this class to produce a parent of c.
@@ -51,19 +78,18 @@ case class RootParent[R](deltaToCallback: (Delta[R], Json) => Callback) extends 
   * produce a Parent[String] suitable for a view of the person's first name.
   *
   * @param parent The parent of the parent component
-  * @param fieldName The name of the field in the parent model
-  * @param lens The lens from the parent model to the child model
+  * @param lensN The lens from the parent model to the child model
   * @tparam P The type of the parent model
   * @tparam C The type of child model
   */
-case class LensParent[P, C](parent: Parent[P], fieldName: String, lens: Lens[P, C]) extends Parent[C] {
+case class LensNParent[P, C](parent: Parent[P], lensN: LensN[P, C]) extends Parent[C] {
   def callback(delta: Delta[C], deltaJs: Json): Callback = {
     //Produce a LensDelta from the provided child delta, to make it into a delta
     //of the parent
-    val parentDelta = LensDelta(lens, delta)
+    val parentDelta = LensNDelta(lensN, delta)
 
     //Add this delta to the JSON
-    val parentDeltaJs = Json.obj("lens" -> Json.obj(fieldName -> deltaJs))
+    val parentDeltaJs = Json.obj("lens" -> Json.obj(lensN.name -> deltaJs))
 
     //Run using the parent's own parent
     parent.callback(parentDelta, parentDeltaJs)

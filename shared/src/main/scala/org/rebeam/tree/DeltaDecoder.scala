@@ -1,7 +1,6 @@
 package org.rebeam.tree
 
 import io.circe._
-import monocle._
 
 import scala.language.higherKinds
 
@@ -14,13 +13,22 @@ object DeltaDecoder {
     c.downField("value").as[M].map(ValueDelta(_))
   )
 
-  def lens[M, B](lensName: String, lens: Lens[M, B])(implicit deltaDecoder: Decoder[Delta[B]]): Decoder[Delta[M]] = Decoder.instance(c =>
+//  def lens[M, A](lensName: String, lens: Lens[M, A])(implicit deltaDecoder: Decoder[Delta[A]]): Decoder[Delta[M]] = Decoder.instance(c =>
+//    //This decodes a LensDelta on a data item of type M, using a lens from M to B.
+//    //The top level object has a "lens" field as a type identifier, with value encoding the delta.
+//    //We then require an object with a "lensName" field, if we find this we
+//    //decode the value of that field as a Delta[B]. Finally, we wrap this
+//    //Delta[B] in a LensDelta[M, B] to make it into a Delta[M].
+//    c.downField("lens").downField(lensName).as[Delta[A]].map(LensDelta(lens, _))
+//  )
+
+  def lensN[M, A](namedLens: LensN[M, A])(implicit deltaDecoder: Decoder[Delta[A]]): Decoder[Delta[M]] = Decoder.instance(c =>
     //This decodes a LensDelta on a data item of type M, using a lens from M to B.
     //The top level object has a "lens" field as a type identifier, with value encoding the delta.
-    //We then require an object with a "lensName" field, if we find this we
+    //We then require an object with a field matching the lens' name, if we find this we
     //decode the value of that field as a Delta[B]. Finally, we wrap this
-    //Delta[B] in a LensDelta[M, B] to make it into a Delta[M].
-    c.downField("lens").downField(lensName).as[Delta[B]].map(LensDelta(lens, _))
+    //Delta[B] in a LensNDelta[M, B] to make it into a Delta[M].
+    c.downField("lens").downField(namedLens.name).as[Delta[A]].map(LensNDelta(namedLens, _))
   )
 
   def action[M, A <: Delta[M] : Decoder]: Decoder[Delta[M]] = Decoder.instance(c =>
@@ -31,5 +39,26 @@ object DeltaDecoder {
 
   //Map to Delta[M] for neatness
   ).map(a => a: Delta[M])
+
+
+//  def lensNDeltaCodec[A, B](lensN: LensN[A,B])(implicit deltaBEncoder: Encoder[Delta[B]], deltaBDecoder: Decoder[Delta[B]]): Codec[LensNDelta[A, B]] = Codec (
+//    Encoder.instance(lnd =>
+//      Json.obj(
+////        "lens" -> Json.obj(
+//          lensN.name -> deltaBEncoder(lnd.delta)
+////        )
+//      )
+//    ),
+//
+//    Decoder.instance(c =>
+//      //This decodes a LensDelta on a data item of type M, using a lens from M to B.
+//      //The top level object has a "lens" field as a type identifier, with value encoding the delta.
+//      //We then require an object with a field matching the lens' name, if we find this we
+//      //decode the value of that field as a Delta[B]. Finally, we wrap this
+//      //Delta[B] in a LensNDelta[M, B] to make it into a Delta[M].
+////      c.downField("lens").downField(lensN.name).as[Delta[B]].map(LensNDelta(lensN, _))
+//      c.downField(lensN.name).as[Delta[B]].map(LensNDelta(lensN, _))
+//    )
+//  )
 
 }

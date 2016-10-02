@@ -37,10 +37,13 @@ case class Cursor[M](parent: Parent[M], model: M) extends Parent[M] {
   //type for that child (e.g. StreetCursor), when that child is also using the same macro?
   //This would then prevent use of invalid fields, and could propagate access control through
   //a data model, etc.
-  def zoom[C](fieldName: String, lens: Lens[M, C]): Cursor[C] =
-    Cursor[C](LensParent(parent, fieldName, lens), lens.get(model))
+//  def zoom[C](fieldName: String, lens: Lens[M, C]): Cursor[C] =
+//    Cursor[C](LensParent(parent, fieldName, lens), lens.get(model))
 
-//  def zoomOptional[C](fieldName: String, optional: Optional[M, C]): Cursor[C] =
+  def zoomN[C](lensN: LensN[M, C]): Cursor[C] =
+    Cursor[C](LensNParent(parent, lensN), lensN.get(model))
+
+  //  def zoomOptional[C](fieldName: String, optional: Optional[M, C]): Cursor[C] =
 //    Cursor[C](LensParent(parent, fieldName, lens), lens.get(model))
 
   def label(label: String) = LabelledCursor(label, this)

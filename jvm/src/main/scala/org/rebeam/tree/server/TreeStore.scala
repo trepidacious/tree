@@ -180,6 +180,8 @@ private class TreeStoreValueDispatcher[T](val store: TreeStore[T])(implicit enco
   //Read the Js.Value as a delta, and apply it to the store
   override def msgFromClient(msg: Json): Unit = {
     val delta = deltaDecoder.decodeJson(msg)
+    println("Applying delta " + delta)
+    println("  from json " + msg)
     //TODO a bit messy using map?
     delta.map(store.applyDelta)
   }
