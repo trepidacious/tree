@@ -106,21 +106,4 @@ object DemoViews {
     }
   }
 
-
-//  val TodoView = cursorView[Todo]("TodoView") { c =>
-//    def td(s: String) = <.td(^.cls := "mdl-data-table__cell--non-numeric", s)
-//
-//    val t = c.model
-//    <.tr(
-//      td(t.completed.fold(" ")(_ => "x")),
-//      td("#" + t.id),
-//      td(t.name),
-//      td(t.priority match {
-//        case High => "!"
-//        case Medium => ""
-//        case Low => "?"
-//      })
-//    )
-//  }
-
 }
