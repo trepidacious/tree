@@ -4,7 +4,7 @@ import io.circe._
 
 import scala.language.higherKinds
 
-object DeltaDecoder {
+object DeltaCodecs {
 
   def value[M: Decoder]: Decoder[Delta[M]] = Decoder.instance(c =>
     //Expect an object with a value field, containing an encoded M instance. We
@@ -28,8 +28,26 @@ object DeltaDecoder {
     //We then require an object with a field matching the lens' name, if we find this we
     //decode the value of that field as a Delta[B]. Finally, we wrap this
     //Delta[B] in a LensNDelta[M, B] to make it into a Delta[M].
-    c.downField("lens").downField(namedLens.name).as[Delta[A]].map(LensNDelta(namedLens, _))
+    c.downField("lens").downField("lensN").downField(namedLens.name).as[Delta[A]].map(LensNDelta(namedLens, _))
   )
+
+  def optionalI[A](implicit deltaDecoder: Decoder[Delta[A]]): Decoder[Delta[List[A]]] = Decoder.instance(c => {
+    //This decodes a LensDelta on a data item of type M, using a lens from M to B.
+    //The top level object has a "lens" field as a type identifier, with value encoding the delta.
+    //We then require an object with a field matching the lens' name, if we find this we
+    //decode the value of that field as a Delta[B]. Finally, we wrap this
+    //Delta[B] in a LensNDelta[M, B] to make it into a Delta[M].
+    val o = c.downField("optional").downField("optionalI")
+    for {
+      index <- o.downField("index").as[Int]
+      delta <- o.downField("delta").as[Delta[A]]
+    } yield OptionalIDelta[A](OptionalI(index), delta)
+  })
+
+//  implicit def lensNOuterEncoder[A, B]: OuterEncoder[LensN[A, B]] = OuterEncoder.instance(
+//    (lensN: LensN[A, B], deltaJs: Json) =>
+//      Json.obj("lensN" -> Json.obj(lensN.name -> deltaJs))
+//  )
 
   def action[M, A <: Delta[M] : Decoder]: Decoder[Delta[M]] = Decoder.instance(c =>
     //Expect an object with a value field, containing an encoded M instance. We
@@ -39,6 +57,7 @@ object DeltaDecoder {
 
   //Map to Delta[M] for neatness
   ).map(a => a: Delta[M])
+
 
 
 //  def lensNDeltaCodec[A, B](lensN: LensN[A,B])(implicit deltaBEncoder: Encoder[Delta[B]], deltaBDecoder: Decoder[Delta[B]]): Codec[LensNDelta[A, B]] = Codec (

@@ -8,10 +8,13 @@ import org.rebeam.tree.demo.DemoData.Priority.{High, Low, Medium}
 
 import com.payalabs.scalajs.react.mdl.MaterialAble
 
+import org.rebeam.tree.DeltaCodecs._
+
 object DemoViews {
 
   val StreetView = cursorView[Street]("StreetView") { c =>
     <.div(
+      <.p("Blah"),
       IntView(c.zoomN(Street.numberN).label("Number")),
       TextView(c.zoomN(Street.nameN).label("Name")),
       <.p(ActButton("Number multiple", c.act(StreetAction.NumberMultiple(10): StreetAction))),
@@ -39,7 +42,7 @@ object DemoViews {
     )
   )
 
-  val TodoView = view[Todo]("TodoView") { c =>
+  val TodoView = cursorView[Todo]("TodoView") { c =>
     def tdText(xs: TagMod*) = <.td(^.cls := "mdl-data-table__cell--non-numeric")(xs)
 
     def tdPriority(p: Priority) =
@@ -58,16 +61,17 @@ object DemoViews {
         )
       )
 
-    val t = c
+    val t = c.model
     <.tr(
       tdText(t.completed.fold(" ")(_ => "x")),
       tdText("#" + t.id),
-      tdText(t.name),
+      tdText(TextViewPlainLabel(c.zoomN(Todo.nameN).label("Name"))),
       tdPriority(t.priority)
     )
   }
 
-  val TodoListTableView = cursorView[TodoList]("TodoListTableView") { c =>
+  val TodoListTableView = cursorView[TodoList]("TodoListTableView") { c => {
+    val itemsCursor = c.zoomN(TodoList.itemsN)
     <.table(
       ^.cls := "mdl-data-table mdl-js-data-table",  //mdl-data-table--selectable mdl-shadow--2dp
       <.thead(
@@ -79,10 +83,15 @@ object DemoViews {
         )
       ),
       <.tbody(
-        c.model.items.map(i => TodoView.withKey(i.id)(i))
+        c.model.items.zipWithIndex.flatMap {
+          case(todo, i) =>
+            itemsCursor.zoomI[Todo](i).map(
+              TodoView.withKey(todo.id)(_)
+            )
+        }
       )
     ).material
-  }
+  }}
 
   val noTodoList = <.div(
     <.h3("Todo"),

@@ -30,23 +30,33 @@ case class Cursor[M](parent: Parent[M], model: M) extends Parent[M] {
   def set(newModel: M)(implicit encoder: Encoder[M]): Callback =
     callback(ValueDelta(newModel), Json.obj("value" -> encoder(newModel)))
 
-  //TODO if we had a FieldLens being a Lens with an added fieldName: String we could use this instead, and
-  //use a macro to provide these (and readDelta implementation)
-  //TODO macros could generate a specific cursor type (e.g. AddressCursor) for each model type, having
-  //methods to zoom to the cursor for each field, providing the appropriate child cursor
-  //type for that child (e.g. StreetCursor), when that child is also using the same macro?
-  //This would then prevent use of invalid fields, and could propagate access control through
-  //a data model, etc.
-//  def zoom[C](fieldName: String, lens: Lens[M, C]): Cursor[C] =
-//    Cursor[C](LensParent(parent, fieldName, lens), lens.get(model))
+  //FIXME Zoomer and zoom in this form are a workaround for not being able to infer
+  //type C from the lens itself in the nicer form:
+  //  def zoom[C, L <: Lens[M, C]: OuterEncoder](lens: L): Cursor[C] =
+  //  Cursor[C](LensParent[M, C, L](parent, lens), lens.get(model))
+  class Zoomer[C] {
+    def apply[L <: Lens[M, C]: OuterEncoder](lens: L): Cursor[C] =
+      Cursor[C](LensParent[M, C, L](parent, lens), lens.get(model))
+  }
+  def zoom[C] = new Zoomer[C]()
 
   def zoomN[C](lensN: LensN[M, C]): Cursor[C] =
     Cursor[C](LensNParent(parent, lensN), lensN.get(model))
 
-  //  def zoomOptional[C](fieldName: String, optional: Optional[M, C]): Cursor[C] =
-//    Cursor[C](LensParent(parent, fieldName, lens), lens.get(model))
+  def zoomI[C](index: Int)(implicit evidence: Cursor[M] =:= Cursor[List[C]]): Option[Cursor[C]] = {
+    Cursor.zoomI(this, index)
+  }
 
   def label(label: String) = LabelledCursor(label, this)
+}
+
+object Cursor {
+  def zoomI[C](cursor: Cursor[List[C]], index: Int): Option[Cursor[C]] = {
+    val optionalI: OptionalI[C] = OptionalI[C](index)
+    optionalI.getOption(cursor.model).map { c =>
+      Cursor[C](OptionalIParent(cursor.parent, optionalI), c)
+    }
+  }
 }
 
 case class LabelledCursor[A](label: String, cursor: Cursor[A])

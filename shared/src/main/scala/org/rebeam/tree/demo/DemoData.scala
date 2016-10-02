@@ -8,7 +8,7 @@ import io.circe.generic.semiauto._
 
 import scala.language.higherKinds
 import BasicDeltaDecoders._
-import DeltaDecoder._
+import DeltaCodecs._
 import io.circe.generic.JsonCodec
 import monocle.{Lens, Optional}
 
@@ -153,10 +153,13 @@ object DemoData {
   implicit val priorityDeltaDecoder = value[Priority]
   implicit val colorDeltaDecoder = value[Color]
 
-  //More complex deltas - can replace entire value, or operate using lenses or actions
   implicit val todoDeltaDecoder = value[Todo] or lensN(Todo.nameN) or lensN(Todo.priorityN) or action[Todo, TodoAction]
+
+  //This makes it possible to act on any List[Todo] using an OptionalIDelta
+  implicit val listOfTodoDeltaDecoder = optionalI[Todo]
+
   implicit val todoListDeltaDecoder =
-      value[TodoList] or lensN(TodoList.nameN) or lensN(TodoList.emailN) or lensN(TodoList.colorN) or action[TodoList, TodoListAction]
+      value[TodoList] or lensN(TodoList.nameN) or lensN(TodoList.itemsN) or lensN(TodoList.emailN) or lensN(TodoList.colorN) or action[TodoList, TodoListAction]
 
 }
 
