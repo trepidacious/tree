@@ -15,10 +15,10 @@ object DemoViews {
   val StreetView = cursorView[Street]("StreetView") { c =>
     <.div(
       <.p("Blah"),
-      IntView(c.zoomN(Street.numberN).label("Number")),
-      TextView(c.zoomN(Street.nameN).label("Name")),
-      <.p(ActButton("Number multiple", c.act(StreetAction.NumberMultiple(10): StreetAction))),
-      <.p(ActButton("Capitalise", c.act(StreetAction.Capitalise: StreetAction)))
+      intView(c.zoomN(Street.numberN).label("Number")),
+      textView(c.zoomN(Street.nameN).label("Name")),
+      <.p(actButton("Number multiple", c.act(StreetAction.NumberMultiple(10): StreetAction))),
+      <.p(actButton("Capitalise", c.act(StreetAction.Capitalise: StreetAction)))
     )
   }
 
@@ -65,7 +65,7 @@ object DemoViews {
     <.tr(
       tdText(t.completed.fold(" ")(_ => "x")),
       tdText("#" + t.id),
-      tdText(TextViewPlainLabel(c.zoomN(Todo.nameN).label("Name"))),
+      tdText(textViewPlainLabel(c.zoomN(Todo.nameN).label("Name"))),
       tdPriority(t.priority)
     )
   }
@@ -101,8 +101,8 @@ object DemoViews {
     c => {
       <.div(
         <.h3("Todo List"),
-        TextView(c.zoomN(TodoList.nameN).label("Name")),
-        TextView(c.zoomN(TodoList.emailN).label("Email")),
+        textView(c.zoomN(TodoList.nameN).label("Name")),
+        textView(c.zoomN(TodoList.emailN).label("Email")),
         TodoListTableView(c)
       )
     }

@@ -28,7 +28,7 @@ object View {
 
   val spinner = staticView(<.div(^.cls := "mdl-spinner mdl-js-spinner is-active").material, "Spinner")
 
-  val TextView = labelledCursorView[String]("TextView") { p =>
+  val textView = labelledCursorView[String]("TextView") { p =>
     <.form(
       <.div(
         ^.classSet1("mdl-textfield mdl-js-textfield mdl-textfield--floating-label"),
@@ -48,7 +48,7 @@ object View {
     )
   }
 
-  val TextViewPlainLabel = labelledCursorView[String]("TextView") { p =>
+  val textViewPlainLabel = labelledCursorView[String]("TextView") { p =>
     <.form(
       <.div(
         ^.classSet1("mdl-textfield mdl-js-textfield"),
@@ -68,7 +68,7 @@ object View {
     )
   }
 
-  val IntView = labelledCursorView[Int]("IntView") { p =>
+  val intView = labelledCursorView[Int]("IntView") { p =>
     <.form(
       <.div(
         ^.classSet1("mdl-textfield mdl-js-textfield mdl-textfield--floating-label"),
@@ -96,7 +96,7 @@ object View {
 //    )
 //  }
 
-  def ActButton(s: String, c: Callback, accent: Boolean = false, colored: Boolean = true) =
+  def actButton(s: String, c: Callback, accent: Boolean = false, colored: Boolean = true) =
     <.button(
       s,
       ^.onClick ==> ((e: ReactEventI) => e.preventDefaultCB >> c),
