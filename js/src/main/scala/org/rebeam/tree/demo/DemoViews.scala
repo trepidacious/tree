@@ -8,11 +8,9 @@ import org.rebeam.tree.demo.DemoData.Priority.{High, Low, Medium}
 
 import com.payalabs.scalajs.react.mdl.MaterialAble
 
-import org.rebeam.tree.DeltaCodecs._
-
 object DemoViews {
 
-  val StreetView = cursorView[Street]("StreetView") { c =>
+  val streetView = cursorView[Street]("StreetView") { c =>
     <.div(
       <.p("Blah"),
       intView(c.zoomN(Street.numberN).label("Number")),
@@ -26,23 +24,23 @@ object DemoViews {
     <.h3("Address"),
     spinner()
   )
-  val AddressView = WSRootComponent[Address](noAddress, "api/address") {
+  val addressView = WSRootComponent[Address](noAddress, "api/address") {
     addressCursor => {
       val streetCursor = addressCursor.zoomN(Address.streetN)
       <.div(
         <.h3("Address"),
-        StreetView(streetCursor)
+        streetView(streetCursor)
       )
     }
   }
 
-  val HomeView = staticView (
+  val homeView = staticView (
     <.div (
       <.h3("Home")
     )
   )
 
-  val TodoView = cursorView[Todo]("TodoView") { c =>
+  val todoView = cursorView[Todo]("TodoView") { c =>
     def tdText(xs: TagMod*) = <.td(^.cls := "mdl-data-table__cell--non-numeric")(xs)
 
     def tdPriority(p: Priority) =
@@ -70,7 +68,7 @@ object DemoViews {
     )
   }
 
-  val TodoListTableView = cursorView[TodoList]("TodoListTableView") { c => {
+  val todoListTableView = cursorView[TodoList]("TodoListTableView") { c => {
     val itemsCursor = c.zoomN(TodoList.itemsN)
     <.table(
       ^.cls := "mdl-data-table mdl-js-data-table",  //mdl-data-table--selectable mdl-shadow--2dp
@@ -86,7 +84,7 @@ object DemoViews {
         c.model.items.zipWithIndex.flatMap {
           case(todo, i) =>
             itemsCursor.zoomI[Todo](i).map(
-              TodoView.withKey(todo.id)(_)
+              todoView.withKey(todo.id)(_)
             )
         }
       )
@@ -97,13 +95,13 @@ object DemoViews {
     <.h3("Todo"),
     spinner()
   )
-  val TodoListView = WSRootComponent[TodoList](noTodoList, "api/todolist") {
+  val todoListView = WSRootComponent[TodoList](noTodoList, "api/todolist") {
     c => {
       <.div(
         <.h3("Todo List"),
         textView(c.zoomN(TodoList.nameN).label("Name")),
         textView(c.zoomN(TodoList.emailN).label("Email")),
-        TodoListTableView(c)
+        todoListTableView(c)
       )
     }
   }

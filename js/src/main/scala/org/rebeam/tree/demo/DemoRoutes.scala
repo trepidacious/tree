@@ -19,9 +19,9 @@ object DemoRoutes {
     import dsl._
 
     (trimSlashes
-      | staticRoute(root,   Home) ~> render(DemoViews.HomeView())
-      | staticRoute("#address", Address) ~> render(DemoViews.AddressView)
-      | staticRoute("#todolist", TodoList) ~> render(DemoViews.TodoListView)
+      | staticRoute(root,   Home) ~> render(DemoViews.homeView())
+      | staticRoute("#address", Address) ~> render(DemoViews.addressView)
+      | staticRoute("#todolist", TodoList) ~> render(DemoViews.todoListView)
       )
 
       .notFound(redirectToPage(Home)(Redirect.Replace))
