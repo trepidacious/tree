@@ -123,6 +123,27 @@ case class OptionalIParent[C](parent: Parent[List[C]], optionalI: OptionalI[C]) 
   }
 }
 
+case class OptionalMatchParent[A, F <: A => Boolean](parent: Parent[List[A]], optionalMatch: OptionalMatch[A, F])(implicit cEncoder: Encoder[F]) extends Parent[A] {
+  def callback(delta: Delta[A], deltaJs: Json): Callback = {
+    //Produce a LensDelta from the provided child delta, to make it into a delta
+    //of the parent
+    val parentDelta = OptionalMatchDelta[A, F](optionalMatch, delta)
+
+    //Add this delta to the JSON
+    val parentDeltaJs = Json.obj(
+      "optional" -> Json.obj(
+        "optionalMatch" -> Json.obj(
+          "find" -> cEncoder(optionalMatch.f),
+          "delta" -> deltaJs
+        )
+      )
+    )
+
+    //Run using the parent's own parent
+    parent.callback(parentDelta, parentDeltaJs)
+  }
+}
+
 /**
   * We have some model p: P, which has a child c: C that can be reached using a
   * Lens[P, C]. Given a parent of p we can use this class to produce a parent of c.

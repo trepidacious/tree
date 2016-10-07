@@ -43,25 +43,34 @@ case class Cursor[M](parent: Parent[M], model: M) extends Parent[M] {
   def zoomN[C](lensN: LensN[M, C]): Cursor[C] =
     Cursor[C](LensNParent(parent, lensN), lensN.get(model))
 
-  def zoomI[C](index: Int)(implicit evidence: Cursor[M] =:= Cursor[List[C]]): Option[Cursor[C]] = Cursor.zoomI(this, index)
-
-  def zoomAllI[C](implicit evidence: Cursor[M] =:= Cursor[List[C]]): List[Cursor[C]] = Cursor.listToCursors(this)
-
   def label(label: String) = LabelledCursor(label, this)
 }
 
 object Cursor {
-  def zoomI[C](cursor: Cursor[List[C]], index: Int): Option[Cursor[C]] = {
-    val optionalI: OptionalI[C] = OptionalI[C](index)
-    optionalI.getOption(cursor.model).map { c =>
-      Cursor[C](OptionalIParent(cursor.parent, optionalI), c)
-    }
-  }
 
-  def listToCursors[A](cursor: Cursor[List[A]]): List[Cursor[A]] = {
-    cursor.model.zipWithIndex.flatMap {
-      case (a, i) => cursor.zoomI[A](i)
+  implicit class ListCursor[C](cursor: Cursor[List[C]]) {
+
+    def zoomI(index: Int): Option[Cursor[C]] = {
+      val optionalI: OptionalI[C] = OptionalI[C](index)
+      optionalI.getOption(cursor.model).map { c =>
+        Cursor[C](OptionalIParent(cursor.parent, optionalI), c)
+      }
     }
+
+    lazy val zoomAllI: List[Cursor[C]] = cursor.model.zipWithIndex.flatMap {
+      case (a, i) => cursor.zoomI(i)
+    }
+
+    def zoomMatch[F <: C => Boolean](f: F)(implicit fEncoder: Encoder[F]): Option[Cursor[C]] = {
+      val optionalMatch: OptionalMatch[C, F] = OptionalMatch[C, F](f)
+      optionalMatch.getOption(cursor.model).map { c =>
+        Cursor[C](OptionalMatchParent(cursor.parent, optionalMatch), c)
+      }
+    }
+
+    def zoomAllMatches[F <: C => Boolean](cToF: C => F)(implicit fEncoder: Encoder[F]): List[Cursor[C]] =
+      cursor.model.map(cToF).flatMap(zoomMatch(_))
+
   }
 
 }

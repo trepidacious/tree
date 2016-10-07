@@ -107,18 +107,20 @@ object DemoData {
                                 color: Color,
                                 items: List[Todo],
                                 nextId: Int = 1
-                              ) {
-    def replaceTodoById(newTodo: Todo): TodoList = copy(items = items.map(oldTodo => if (oldTodo.id == newTodo.id) newTodo else oldTodo))
-    def todoById(id: Int): Option[Todo] = items.find(_.id == id)
-  }
+                              )
+
   object TodoList {
     val nameN = LensN("name", TodoList.name)
     val emailN = LensN("email", TodoList.email)
     val colorN = LensN("color", TodoList.color)
     val itemsN = LensN("items", TodoList.items)
     val nextIdN = LensN("nextId", TodoList.nextId)
+  }
 
-    def todoById(id: Int): Optional[TodoList, Todo] = Optional[TodoList, Todo](_.todoById(id))(newTodo => list => list.replaceTodoById(newTodo))
+  //Works with Cursor.zoomMatch to zoom to a particular Todo
+  @JsonCodec
+  case class FindTodoById(id: Int) extends (Todo => Boolean) {
+    def apply(t: Todo): Boolean = t.id == id
   }
 
   @JsonCodec
@@ -155,8 +157,8 @@ object DemoData {
 
   implicit val todoDeltaDecoder = value[Todo] or lensN(Todo.nameN) or lensN(Todo.priorityN) or action[Todo, TodoAction]
 
-  //This makes it possible to act on any List[Todo] using an OptionalIDelta
-  implicit val listOfTodoDeltaDecoder = optionalI[Todo]
+  //This makes it possible to act on any List[Todo] using an OptionalIDelta or an OptionalMatchDelta
+  implicit val listOfTodoDeltaDecoder = optionalI[Todo] or optionalMatch[Todo, FindTodoById]
 
   implicit val todoListDeltaDecoder =
       value[TodoList] or lensN(TodoList.nameN) or lensN(TodoList.itemsN) or lensN(TodoList.emailN) or lensN(TodoList.colorN) or action[TodoList, TodoListAction]
