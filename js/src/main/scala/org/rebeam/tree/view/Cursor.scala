@@ -43,9 +43,9 @@ case class Cursor[M](parent: Parent[M], model: M) extends Parent[M] {
   def zoomN[C](lensN: LensN[M, C]): Cursor[C] =
     Cursor[C](LensNParent(parent, lensN), lensN.get(model))
 
-  def zoomI[C](index: Int)(implicit evidence: Cursor[M] =:= Cursor[List[C]]): Option[Cursor[C]] = {
-    Cursor.zoomI(this, index)
-  }
+  def zoomI[C](index: Int)(implicit evidence: Cursor[M] =:= Cursor[List[C]]): Option[Cursor[C]] = Cursor.zoomI(this, index)
+
+  def zoomAllI[C](implicit evidence: Cursor[M] =:= Cursor[List[C]]): List[Cursor[C]] = Cursor.listToCursors(this)
 
   def label(label: String) = LabelledCursor(label, this)
 }
@@ -57,6 +57,13 @@ object Cursor {
       Cursor[C](OptionalIParent(cursor.parent, optionalI), c)
     }
   }
+
+  def listToCursors[A](cursor: Cursor[List[A]]): List[Cursor[A]] = {
+    cursor.model.zipWithIndex.flatMap {
+      case (a, i) => cursor.zoomI[A](i)
+    }
+  }
+
 }
 
 case class LabelledCursor[A](label: String, cursor: Cursor[A])

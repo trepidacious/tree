@@ -2,10 +2,9 @@ package org.rebeam.tree.demo
 
 import japgolly.scalajs.react.vdom.prefix_<^._
 import org.rebeam.tree.view.View._
-import org.rebeam.tree.view.WSRootComponent
+import org.rebeam.tree.view.{Cursor, WSRootComponent}
 import DemoData._
 import org.rebeam.tree.demo.DemoData.Priority.{High, Low, Medium}
-
 import com.payalabs.scalajs.react.mdl.MaterialAble
 
 object DemoViews {
@@ -70,23 +69,21 @@ object DemoViews {
 
   val todoListTableView = cursorView[TodoList]("TodoListTableView") { c => {
     val itemsCursor = c.zoomN(TodoList.itemsN)
+
+    def th(xs: TagMod*) = <.th(^.cls := "mdl-data-table__cell--non-numeric")(xs)
+
     <.table(
       ^.cls := "mdl-data-table mdl-js-data-table",  //mdl-data-table--selectable mdl-shadow--2dp
       <.thead(
         <.tr(
-          <.th(^.cls := "mdl-data-table__cell--non-numeric", "Done?"),
-          <.th(^.cls := "mdl-data-table__cell--non-numeric", "Id"),
-          <.th(^.cls := "mdl-data-table__cell--non-numeric", "Name"),
-          <.th(^.cls := "mdl-data-table__cell--non-numeric", "Priority")
+          th("Done?"), th("Id"), th("Name"), th("Priority")
         )
       ),
       <.tbody(
-        c.model.items.zipWithIndex.flatMap {
-          case(todo, i) =>
-            itemsCursor.zoomI[Todo](i).map(
-              todoView.withKey(todo.id)(_)
-            )
-        }
+        //zoomAllI produces a list of cursors, then we view each one
+        itemsCursor.zoomAllI[Todo].map(
+          todoCursor => todoView.withKey(todoCursor.model.id)(todoCursor)
+        )
       )
     ).material
   }}
