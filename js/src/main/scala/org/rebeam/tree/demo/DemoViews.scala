@@ -14,8 +14,8 @@ object DemoViews {
   val streetView = cursorView[Street]("StreetView") { c =>
     <.div(
       <.p("Blah"),
-      intView(c.zoomN(Street.numberN).label("Number")),
-      textView(c.zoomN(Street.nameN).label("Name")),
+      intView(c.zoomN(Street.number).label("Number")),
+      textView(c.zoomN(Street.name).label("Name")),
       <.p(actButton("Number multiple", c.act(StreetAction.NumberMultiple(10): StreetAction))),
       <.p(actButton("Capitalise", c.act(StreetAction.Capitalise: StreetAction)))
     )
@@ -27,7 +27,7 @@ object DemoViews {
   )
   val addressView = WSRootComponent[Address](noAddress, "api/address") {
     addressCursor => {
-      val streetCursor = addressCursor.zoomN(Address.streetN)
+      val streetCursor = addressCursor.zoomN(Address.street)
       <.div(
         <.h3("Address"),
         streetView(streetCursor)
@@ -64,13 +64,13 @@ object DemoViews {
     <.tr(
       tdText(t.completed.fold(" ")(_ => "x")),
       tdText("#" + t.id),
-      tdText(textViewPlainLabel(c.zoomN(Todo.nameN).label("Name"))),
+      tdText(textViewPlainLabel(c.zoomN(Todo.name).label("Name"))),
       tdPriority(t.priority)
     )
   }
 
   val todoListTableView = cursorView[TodoList]("TodoListTableView") { c => {
-    val itemsCursor = c.zoomN(TodoList.itemsN)
+    val itemsCursor = c.zoomN(TodoList.items)
 
     def th(xs: TagMod*) = <.th(^.cls := "mdl-data-table__cell--non-numeric")(xs)
 
@@ -111,8 +111,8 @@ object DemoViews {
     c => {
       <.div(
         <.h3("Todo List"),
-        textView(c.zoomN(TodoList.nameN).label("Name")),
-        textView(c.zoomN(TodoList.emailN).label("Email")),
+        textView(c.zoomN(TodoList.name).label("Name")),
+        textView(c.zoomN(TodoList.email).label("Email")),
         todoListTableView(c)
       )
     }

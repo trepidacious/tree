@@ -1,9 +1,9 @@
 package org.rebeam.tree.demo
 
 import org.rebeam.tree._
-import org.rebeam.lenses._
-//import org.rebeam.tree.macros.Lenses
-import monocle.macros.Lenses
+//This macro gets us LensN rather than just Lens
+import org.rebeam.lenses.macros.Lenses
+//import monocle.macros.Lenses
 import org.rebeam.tree.view.Color
 import io.circe._
 import io.circe.generic.semiauto._
@@ -12,7 +12,6 @@ import scala.language.higherKinds
 import BasicDeltaDecoders._
 import DeltaCodecs._
 import io.circe.generic.JsonCodec
-import monocle.{Lens, Optional}
 
 object DemoData {
 
@@ -20,32 +19,17 @@ object DemoData {
   @Lenses
   case class Street(name: String, number: Int)
 
-  object Street {
-    val nameN = LensN("name", Street.name)
-    val numberN = LensN("number", Street.number)
-  }
-
   @JsonCodec
   @Lenses
   case class Address(street: Street)
-  object Address {
-    val streetN = LensN("street", Address.street)
-  }
 
   @JsonCodec
   @Lenses
   case class Company(address: Address)
-  object Company {
-    val addressN = LensN("address", Company.address)
-  }
 
   @JsonCodec
   @Lenses
   case class Employee(name: String, company: Company)
-  object Employee {
-    val nameN = LensN("name", Employee.name)
-    val companyN = LensN("company", Employee.company)
-  }
 
   @JsonCodec
   sealed trait StreetAction extends Delta[Street]
@@ -64,9 +48,9 @@ object DemoData {
 //  implicit val streetEncoder: Encoder[Street] = deriveEncoder[Street]
 
   implicit val streetDeltaDecoder =
-    value[Street] or lensN(Street.nameN) or lensN(Street.numberN) or action[Street, StreetAction]
+    value[Street] or lensN(Street.name) or lensN(Street.number) or action[Street, StreetAction]
 
-  implicit val addressDeltaDecoder = value[Address] or lensN(Address.streetN)
+  implicit val addressDeltaDecoder = value[Address] or lensN(Address.street)
 
   @JsonCodec
   sealed trait Priority
@@ -85,13 +69,6 @@ object DemoData {
                             completed: Option[Moment] = None,
                             priority: Priority = Priority.Medium
                           )
-  object Todo {
-    val idN = LensN("id", Todo.id)
-    val nameN = LensN("name", Todo.name)
-    val createdN = LensN("created", Todo.created)
-    val completedN = LensN("completed", Todo.completed)
-    val priorityN = LensN("priority", Todo.priority)
-  }
 
   @JsonCodec
   sealed trait TodoAction extends Delta[Todo]
@@ -110,14 +87,6 @@ object DemoData {
                                 items: List[Todo],
                                 nextId: Int = 1
                               )
-
-  object TodoList {
-    val nameN = LensN("name", TodoList.name)
-    val emailN = LensN("email", TodoList.email)
-    val colorN = LensN("color", TodoList.color)
-    val itemsN = LensN("items", TodoList.items)
-    val nextIdN = LensN("nextId", TodoList.nextId)
-  }
 
   //Works with Cursor.zoomMatch to zoom to a particular Todo
   @JsonCodec
@@ -157,13 +126,13 @@ object DemoData {
   implicit val priorityDeltaDecoder = value[Priority]
   implicit val colorDeltaDecoder = value[Color]
 
-  implicit val todoDeltaDecoder = value[Todo] or lensN(Todo.nameN) or lensN(Todo.priorityN) or action[Todo, TodoAction]
+  implicit val todoDeltaDecoder = value[Todo] or lensN(Todo.name) or lensN(Todo.priority) or action[Todo, TodoAction]
 
   //This makes it possible to act on any List[Todo] using an OptionalIDelta or an OptionalMatchDelta
   implicit val listOfTodoDeltaDecoder = optionalI[Todo] or optionalMatch[Todo, FindTodoById]
 
   implicit val todoListDeltaDecoder =
-      value[TodoList] or lensN(TodoList.nameN) or lensN(TodoList.itemsN) or lensN(TodoList.emailN) or lensN(TodoList.colorN) or action[TodoList, TodoListAction]
+      value[TodoList] or lensN(TodoList.name) or lensN(TodoList.items) or lensN(TodoList.email) or lensN(TodoList.color) or action[TodoList, TodoListAction]
 
 }
 

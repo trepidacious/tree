@@ -24,13 +24,9 @@ case class ValueDelta[M](v: M) extends Delta[M] {
 }
 
 case class OptionalIDelta[A](optionalI: OptionalI[A], delta: Delta[A]) extends Delta[List[A]] {
-  //Since optionalI produces an Option, we have to have a delta on an option.
-  //However modify expects a function on A, not Option[A], so we need to adapt
   def apply(l: List[A]) = optionalI.modify(delta.apply)(l)
 }
 
 case class OptionalMatchDelta[A, F <: A => Boolean](optionalMatch: OptionalMatch[A, F], delta: Delta[A]) extends Delta[List[A]] {
-  //Since optionalI produces an Option, we have to have a delta on an option.
-  //However modify expects a function on A, not Option[A], so we need to adapt
   def apply(l: List[A]) = optionalMatch.modify(delta.apply)(l)
 }
