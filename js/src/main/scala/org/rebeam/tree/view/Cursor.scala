@@ -3,6 +3,7 @@ package org.rebeam.tree.view
 import japgolly.scalajs.react._
 import monocle._
 import org.rebeam.tree._
+import org.rebeam.lenses._
 
 import io.circe._
 

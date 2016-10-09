@@ -1,6 +1,8 @@
 package org.rebeam.tree.demo
 
 import org.rebeam.tree._
+import org.rebeam.lenses._
+//import org.rebeam.tree.macros.Lenses
 import monocle.macros.Lenses
 import org.rebeam.tree.view.Color
 import io.circe._

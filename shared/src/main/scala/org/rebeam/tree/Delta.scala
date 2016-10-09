@@ -1,5 +1,6 @@
 package org.rebeam.tree
 
+import org.rebeam.lenses._
 import monocle._
 
 trait Delta[M] {

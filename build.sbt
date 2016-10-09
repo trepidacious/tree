@@ -1,5 +1,9 @@
 name := "tree root project"
 
+version in ThisBuild := "0.1-SNAPSHOT"
+
+organization in ThisBuild := "org.rebeam"
+
 scalaVersion in ThisBuild := "2.11.8"
 
 scalacOptions in ThisBuild ++= Seq(
@@ -38,12 +42,13 @@ lazy val tree = crossProject.in(file(".")).
       "com.github.julien-truffaut"  %%%  "monocle-state"   % monocleVersion,
       "com.github.julien-truffaut"  %%%  "monocle-refined" % monocleVersion,
       "com.github.julien-truffaut"  %%%  "monocle-law"     % monocleVersion % "test",
+      "org.rebeam"                  %%%  "lenses-codec"    % "0.1-SNAPSHOT",
       "io.circe"                    %%%  "circe-core"      % circeVersion,
       "io.circe"                    %%%  "circe-generic"   % circeVersion,
       "io.circe"                    %%%  "circe-parser"    % circeVersion
-      ),
-      addCompilerPlugin("org.scalamacros" %% "paradise" % "2.1.0" cross CrossVersion.full//for @Lenses
-    )
+    ),
+    //For @Lenses
+    addCompilerPlugin("org.scalamacros" %% "paradise" % "2.1.0" cross CrossVersion.full)
 
   ).jvmSettings(
   // Add JVM-specific settings here
