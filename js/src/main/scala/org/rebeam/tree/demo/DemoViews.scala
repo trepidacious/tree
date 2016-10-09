@@ -2,11 +2,11 @@ package org.rebeam.tree.demo
 
 import japgolly.scalajs.react.vdom.prefix_<^._
 import org.rebeam.tree.view.View._
-import org.rebeam.tree.view.{Cursor, WSRootComponent}
+import org.rebeam.tree.view._
 import org.rebeam.tree.view.Cursor._
 
 import DemoData._
-import org.rebeam.tree.demo.DemoData.Priority.{High, Low, Medium}
+import org.rebeam.tree.demo.DemoData.Priority._
 import com.payalabs.scalajs.react.mdl.MaterialAble
 
 object DemoViews {
