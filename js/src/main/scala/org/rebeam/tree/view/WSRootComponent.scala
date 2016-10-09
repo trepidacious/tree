@@ -7,12 +7,15 @@ import org.scalajs.dom._
 import io.circe._
 import io.circe.parser._
 
+import scala.scalajs.js.timers._
+
 import scala.util.{Failure, Success}
 
 object WSRootComponent {
 
   case class Props[R](render: Cursor[R] => ReactElement, wsUrl: String, noData: ReactElement)
-  case class State[R](model: Option[R], ws: Option[WebSocket])
+
+  case class State[R](model: Option[R], ws: Option[WebSocket], tick: Option[SetIntervalHandle])
 
   class Backend[R](scope: BackendScope[Props[R], State[R]])(implicit decoder: Decoder[R]) {
 
@@ -45,7 +48,7 @@ object WSRootComponent {
     def start: Callback = {
 
       // This will establish the connection and return the WebSocket
-      def connect(u: String) = CallbackTo[WebSocket] {
+      def connect(u: String) = CallbackTo[(WebSocket, SetIntervalHandle)] {
 
         val url = if (!u.startsWith("ws:")) {
           "ws://" + document.location.hostname + ":" + document.location.port + "/" + u
@@ -88,12 +91,19 @@ object WSRootComponent {
         ws.onclose = onclose _
         ws.onmessage = onmessage _
         ws.onerror = onerror _
-        ws
+
+        //Regularly send ping (empty object) through websocket, if we have one
+        val tick = setInterval(5000) {
+          println("Ping!")
+          direct.state.ws.foreach(_.send("{}"))
+        }
+
+        (ws, tick)
       }
 
       // Here use attemptTry to catch any exceptions in connect.
       scope.props.map(_.wsUrl).flatMap(connect).attemptTry.flatMap {
-        case Success(ws) => scope.modState(_.copy(ws = Some(ws)))
+        case Success((ws, tick)) => scope.modState(_.copy(ws = Some(ws)).copy(tick = Some(tick)))
         case Failure(error) => Callback(println(error.toString))
       }
     }
@@ -101,7 +111,8 @@ object WSRootComponent {
     def end: Callback = {
       def closeWebSocket = scope.state.map(_.ws.foreach(_.close()))
       def clearWebSocket = scope.modState(_.copy(ws = None))
-      closeWebSocket >> clearWebSocket
+      def clearTick = scope.state.map(_.tick.foreach(clearInterval)) >> scope.modState(_.copy(tick = None))
+      clearTick >> closeWebSocket >> clearWebSocket
     }
 
   }
@@ -113,7 +124,7 @@ object WSRootComponent {
 
   //Just make the component constructor - props to be supplied later to make a component
   def ctor[R](implicit decoder: Decoder[R]) = ReactComponentB[Props[R]]("TreeRootComponent")
-    .initialState(State[R](None: Option[R], None: Option[WebSocket]))
+    .initialState(State[R](None, None, None))
     .backend(new Backend[R](_)(decoder))
     .render(s => s.backend.render(s.props, s.state))
     .componentDidMount(_.backend.start)
