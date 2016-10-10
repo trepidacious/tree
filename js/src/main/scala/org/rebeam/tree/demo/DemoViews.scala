@@ -48,21 +48,24 @@ object DemoViews {
       <.td(
         ^.classSet1(
           "mdl-data-table__cell--priority",
-          "mdl-data-table__cell--priority-high" -> (p == High)
+          "mdl-data-table__cell--priority-high" -> (p == High),
+          "mdl-data-table__cell--priority-medium" -> (p == Medium),
+          "mdl-data-table__cell--priority-low" -> (p == Low)
         ),
+        ^.onClick --> c.act(TodoAction.CyclePriority: TodoAction),
         <.i(
           ^.cls := "material-icons",
           p match {
-            case High => "error"
-            case Medium => ""
-            case Low => "pause"
+            case High => "star"
+            case Medium => "star_half"
+            case Low => "star_border"
           }
         )
       )
 
     val t = c.model
     <.tr(
-      tdText(t.completed.fold(" ")(_ => "x")),
+      tdText(booleanView(c.zoomN(Todo.completed).label("Done"))),
       tdText("#" + t.id),
       tdText(textViewPlainLabel(c.zoomN(Todo.name).label("Name"))),
       tdPriority(t.priority)

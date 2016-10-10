@@ -66,15 +66,26 @@ object DemoData {
                             id: Int,
                             name: String,
                             created: Moment,
-                            completed: Option[Moment] = None,
+                            completed: Boolean = false,
                             priority: Priority = Priority.Medium
                           )
 
   @JsonCodec
   sealed trait TodoAction extends Delta[Todo]
   object TodoAction {
-    case class Complete(completed: Moment) extends TodoAction {
-      def apply(t: Todo): Todo = t.copy(completed = Some(completed))
+//    case class Complete(completed: Moment) extends TodoAction {
+//      def apply(t: Todo): Todo = t.copy(completed = Some(completed))
+//    }
+    case object CyclePriority extends TodoAction {
+      def apply(t: Todo): Todo = t.copy(priority =
+        if (t.priority == Priority.Low) {
+          Priority.Medium
+        } else if (t.priority == Priority.Medium) {
+          Priority.High
+        } else {
+          Priority.Low
+        }
+      )
     }
   }
 
@@ -100,7 +111,7 @@ object DemoData {
 
     case class CreateTodo(created: Moment, name: String = "New todo", priority: Priority = Priority.Medium) extends TodoListAction {
       def apply(l: TodoList): TodoList = {
-        val t = Todo(l.nextId, name, created, None, priority)
+        val t = Todo(l.nextId, name, created, false, priority)
         l.copy(items = t :: l.items, nextId = l.nextId + 1)
       }
     }
@@ -126,7 +137,7 @@ object DemoData {
   implicit val priorityDeltaDecoder = value[Priority]
   implicit val colorDeltaDecoder = value[Color]
 
-  implicit val todoDeltaDecoder = value[Todo] or lensN(Todo.name) or lensN(Todo.priority) or action[Todo, TodoAction]
+  implicit val todoDeltaDecoder = value[Todo] or lensN(Todo.name) or lensN(Todo.priority) or lensN(Todo.completed) or action[Todo, TodoAction]
 
   //This makes it possible to act on any List[Todo] using an OptionalIDelta or an OptionalMatchDelta
   implicit val listOfTodoDeltaDecoder = optionalI[Todo] or optionalMatch[Todo, FindTodoById]

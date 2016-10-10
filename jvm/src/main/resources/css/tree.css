@@ -48,9 +48,94 @@
     padding-top: 10px;
     padding-bottom: 6px;
     cursor: pointer;
+    -webkit-user-select: none; /* webkit (safari, chrome) browsers */
+    -moz-user-select: none; /* mozilla browsers */
+    -khtml-user-select: none; /* webkit (konqueror) browsers */
+    -ms-user-select: none; /* IE10+ */
 }
 
 .mdl-data-table .mdl-data-table__cell--priority-high {
     color: #D50000;
 }
 
+.mdl-data-table .mdl-data-table__cell--priority-medium {
+    color: #2962FF;
+}
+
+.mdl-data-table .mdl-data-table__cell--priority-low {
+    color: #9E9E9E;
+}
+
+.tree-checkbox {
+    /* Don't select text in checkboxes */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -khtml-user-select: none;
+    -ms-user-select: none;
+}
+
+.tree-checkbox input {
+    /*display:none;*/
+    /* Allows us to still receive focus */
+    position: relative;
+    z-index: -9999;
+}
+
+.tree-checkbox__div {
+    position: relative;
+    margin-right: 9px;
+}
+
+.tree-checkbox input + div span {
+    position: absolute;
+    border-radius: 50%;
+    left: -16px;
+    top: -16px;
+    width:46px;
+    height:46px;
+    transition: all 0.2s ease-in 0s;
+    background: rgba(96,125,139, 0.0);
+}
+
+.tree-checkbox input:focus + div span {
+    background: rgba(0,0,0, 0.1);
+}
+
+.tree-checkbox input:focus:checked + div span {
+    background: rgba(96,125,139, 0.2);
+}
+.tree-checkbox input + div {
+    display:inline-block;
+    width:14px;
+    height:14px;
+    background: rgba(0, 0, 0, 0.0);
+    border-radius: 2px;
+    border-width: 2px;
+    border-style: solid;
+    border-color: rgba(0, 0, 0, 0.54);
+    cursor:pointer;
+    transition: all 0.2s ease-in 0s;
+
+}
+
+.tree-checkbox input:checked + div {
+    transition: all 0.1s ease-in 0s;
+    background: rgb(96,125,139);
+    border-width: 2px;
+    border-color: rgba(0, 0, 0, 0.0);
+}
+
+.tree-checkbox input + div i {
+    transition: all 0.1s ease-in 0s;
+    font-size: 1px;
+    margin:7px;
+    /*color: rgba(255, 255, 255, 0.0);*/
+    /*color: rgba(255, 255, 255, 1.0);*/
+}
+
+.tree-checkbox input:checked + div i {
+    transition: all 0.2s ease-in 0s;
+    font-size: 14px;
+    margin:0px;
+    color: rgba(255, 255, 255, 1.0);
+}

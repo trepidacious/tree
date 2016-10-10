@@ -28,7 +28,7 @@ object View {
 
   val spinner = staticView(<.div(^.cls := "mdl-spinner mdl-js-spinner is-active").material, "Spinner")
 
-  val textView = labelledCursorView[String]("TextView") { p =>
+  val textView = labelledCursorView[String]("textView") { p =>
     <.form(
       <.div(
         ^.classSet1("mdl-textfield mdl-js-textfield mdl-textfield--floating-label"),
@@ -48,7 +48,7 @@ object View {
     )
   }
 
-  val textViewPlainLabel = labelledCursorView[String]("TextView") { p =>
+  val textViewPlainLabel = labelledCursorView[String]("textViewPlainLabel") { p =>
     <.form(
       <.div(
         ^.classSet1("mdl-textfield mdl-js-textfield"),
@@ -68,7 +68,7 @@ object View {
     )
   }
 
-  val intView = labelledCursorView[Int]("IntView") { p =>
+  val intView = labelledCursorView[Int]("intView") { p =>
     <.form(
       <.div(
         ^.classSet1("mdl-textfield mdl-js-textfield mdl-textfield--floating-label"),
@@ -88,7 +88,44 @@ object View {
     )
   }
 
-//  val IntView = cursorView[Int]("IntView"){ c =>
+  val booleanView = labelledCursorView[Boolean]("booleanView") { p =>
+    <.form(
+      <.label(
+        ^.classSet1("tree-checkbox"),
+//        ^.classSet1("mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect"),
+        <.input.checkbox(
+//        <.input(
+//          ^.`type` := "checkbox",
+//          ^.classSet1("mdl-checkbox__input"),
+          ^.checked := p.cursor.model,
+          ^.onChange --> p.cursor.set(!p.cursor.model)
+        ),
+        //This div contains elements to style as the checkbox itself
+//        <.span(^.classSet1("tree-checkbox__span")),
+        <.div(
+          ^.cls := "tree-checkbox__div",
+          <.i(
+            ^.cls := "material-icons",
+            "done"
+          ),
+          <.span()
+        ),
+        <.span(
+//          ^.classSet1("mdl-checkbox__label"),
+          p.label
+        )
+      ).material
+    )
+  }
+
+
+//    <label class="mdl-checkbox mdl-js-checkbox mdl-js-ripple-effect" for="checkbox-1">
+//      <input type="checkbox" id="checkbox-1" class="mdl-checkbox__input" checked>
+//        <span class="mdl-checkbox__label">Checkbox</span>
+//      </label>
+
+
+      //  val IntView = cursorView[Int]("IntView"){ c =>
 //    <.input(
 //      ^.`type` := "number",
 //      ^.value := c.model.toString,
