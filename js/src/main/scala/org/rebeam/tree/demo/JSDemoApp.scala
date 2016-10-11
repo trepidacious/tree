@@ -15,7 +15,7 @@ object JSDemoApp extends JSApp {
 
 //    MaterialSwatch.AllFamiliesView() render mountNode
 
-    //    ReactDOM.render(DemoViews.AddressView, mountNode)
+//    ReactDOM.render(DemoViews.todoListView, mountNode)
   }
 
 }

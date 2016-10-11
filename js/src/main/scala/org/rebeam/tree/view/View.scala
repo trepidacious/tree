@@ -111,7 +111,7 @@ object View {
           <.span()
         ),
         <.span(
-//          ^.classSet1("mdl-checkbox__label"),
+          ^.classSet1("tree-checkbox__label"),
           p.label
         )
       ).material

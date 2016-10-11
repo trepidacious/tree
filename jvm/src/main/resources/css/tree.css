@@ -79,6 +79,9 @@
     /* Allows us to still receive focus */
     position: relative;
     z-index: -9999;
+    width: 1px;
+    height: 1px;
+    margin: 0px;
 }
 
 .tree-checkbox__div {
@@ -116,6 +119,9 @@
     cursor:pointer;
     transition: all 0.2s ease-in 0s;
 
+}
+.tree-checkbox__label {
+    /*padding-bottom: 4px;*/
 }
 
 .tree-checkbox input:checked + div {
