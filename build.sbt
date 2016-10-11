@@ -24,6 +24,10 @@ lazy val monocleVersion = "1.2.2"     // or "1.3.0-SNAPSHOT"
 
 val circeVersion = "0.5.1"
 
+val scalajsReactVersion = "0.11.2"
+
+val reactVersion = "15.3.2"
+
 lazy val root = project.in(file(".")).
   aggregate(treeJS, treeJVM).
   settings(
@@ -65,26 +69,26 @@ lazy val tree = crossProject.in(file(".")).
 ).jsSettings(
   // Add JS-specific settings here
   libraryDependencies ++= Seq(
-    "com.github.japgolly.scalajs-react" %%% "core" % "0.11.1",
-    "com.github.japgolly.scalajs-react" %%% "extra" % "0.11.1",
+    "com.github.japgolly.scalajs-react" %%% "core" % scalajsReactVersion,
+    "com.github.japgolly.scalajs-react" %%% "extra" % scalajsReactVersion,
     "com.payalabs" %%% "scalajs-react-mdl" % "0.2.0-SNAPSHOT"
   ),
 
   // React JS itself (Note the filenames, adjust as needed, eg. to remove addons.)
   jsDependencies ++= Seq(
 
-    "org.webjars.bower" % "react" % "15.2.1"
+    "org.webjars.bower" % "react" % reactVersion
       /        "react-with-addons.js"
       minified "react-with-addons.min.js"
       commonJSName "React",
 
-    "org.webjars.bower" % "react" % "15.2.1"
+    "org.webjars.bower" % "react" % reactVersion
       /         "react-dom.js"
       minified  "react-dom.min.js"
       dependsOn "react-with-addons.js"
       commonJSName "ReactDOM",
 
-    "org.webjars.bower" % "react" % "15.2.1"
+    "org.webjars.bower" % "react" % reactVersion
       /         "react-dom-server.js"
       minified  "react-dom-server.min.js"
       dependsOn "react-dom.js"
