@@ -66,7 +66,7 @@ object WSRootComponent {
         def onopen(e: Event): Unit = println("Connected.")
 
         def onmessage(e: MessageEvent): Unit = {
-          println(s"Updating with: ${e.data.toString}")
+//          println(s"Updating with: ${e.data.toString}")
           val msg = e.data.toString
           parse(msg).fold[Unit](
             pf => console.log("Invalid JSON from server " + pf),
