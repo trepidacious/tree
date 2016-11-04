@@ -118,10 +118,12 @@ case class ClientState[A: ModelIdGen](id: ClientId, nextClientDeltaId: ClientDel
     * @param delta  The delta to apply
     * @return A new ClientState
     */
-  def apply(delta: Delta[A]): ClientState[A] = {
+  def apply(delta: Delta[A]): (ClientState[A], DeltaId) = {
     val nextModel = delta.apply(model)
-    val deltaAndId = DeltaAndId(delta, DeltaId(id, nextClientDeltaId))
-    copy(nextClientDeltaId = nextClientDeltaId.next, model = nextModel, pendingDeltas = pendingDeltas :+ deltaAndId)
+    val deltaId = DeltaId(id, nextClientDeltaId)
+    val deltaAndId = DeltaAndId(delta, deltaId)
+    val state = copy(nextClientDeltaId = nextClientDeltaId.next, model = nextModel, pendingDeltas = pendingDeltas :+ deltaAndId)
+    (state, deltaId)
   }
 
   /**
