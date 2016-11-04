@@ -95,6 +95,10 @@ private case class ModelAndDeltas[A](model: A, deltas: Seq[DeltaAndId[A]]) {
   def applyDelta(delta: Delta[A]): ModelAndDeltas[A] = copy(model = delta(model))
 }
 
+trait ModelIdGen[A] {
+  def genId(model: A): Option[ModelId]
+}
+
 /**
   * State for a root component, with data needed by client to synchronise with server.
   *
@@ -107,7 +111,7 @@ private case class ModelAndDeltas[A](model: A, deltas: Seq[DeltaAndId[A]]) {
   *                           applied in sequence to serverModel
   * @tparam A                 The type of model
   */
-case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, serverModel: ModelAndId[A], pendingDeltas: Seq[DeltaAndId[A]], model: A) {
+case class ClientState[A: ModelIdGen](id: ClientId, nextClientDeltaId: ClientDeltaId, serverModel: ModelAndId[A], pendingDeltas: Seq[DeltaAndId[A]], model: A) {
 
   /**
     * Apply a new delta to this client state, to produce a new client state
@@ -192,9 +196,17 @@ case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, server
         case (fail, _) => fail
       }
 
-      //TODO if we can generate ModelId for mad.model ourselves, do so and check against update.updatedModelId
-      
-      updatedMAD.map(mad => copy(model = mad.model, serverModel = ModelAndId(mad.model, update.updatedModelId), pendingDeltas = mad.deltas))
+      for {
+        mad <- updatedMAD
+        //Check the server-provided model id against one generated from our updated model (if we can generate one)
+        checkedMad <- implicitly[ModelIdGen[A]].genId(mad.model) match {
+          case Some(genId) if genId != update.updatedModelId =>
+            Xor.Left("Locally-generated id " + genId + " does not match remote-generated id " + update.updatedModelId)
+          case None => Xor.right(mad)
+        }
+      // Produce updated client state from the checked model and deltas
+      } yield copy(model = checkedMad.model, serverModel = ModelAndId(checkedMad.model, update.updatedModelId), pendingDeltas = checkedMad.deltas)
+
     }
   }
 }
