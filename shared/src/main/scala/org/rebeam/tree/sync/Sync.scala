@@ -80,7 +80,10 @@ sealed trait ModelUpdate[A]
   * @param updatedModelId The ModelId of the updated model
   * @tparam A             The type of model
   */
-case class ModelIncrementalUpdate[A](baseModelId: ModelId, updates: Seq[UpdateDelta[A]], updatedModelId: ModelId) extends ModelUpdate[A]
+case class ModelIncrementalUpdate[A](
+  baseModelId: ModelId,
+  updates: Seq[UpdateDelta[A]],
+  updatedModelId: ModelId) extends ModelUpdate[A]
 
 /**
   * A full update received from server, directly setting a new model and overwriting
@@ -93,10 +96,16 @@ case class ModelFullUpdate[A](model: ModelAndId[A]) extends ModelUpdate[A]
 // Temporary class used to manage a model and deltas
 private case class ModelAndDeltas[A](model: A, deltas: Seq[DeltaAndId[A]]) {
   def applyDelta(delta: Delta[A]): ModelAndDeltas[A] = copy(model = delta(model))
+  lazy val modelWithDeltas = deltas.foldLeft(model){case (m, d) => d.delta(m)}
 }
 
 trait ModelIdGen[A] {
   def genId(model: A): Option[ModelId]
+}
+
+object ClientState {
+  def initial[A: ModelIdGen](id: ClientId, serverModel: ModelAndId[A]) =
+    ClientState(id, ClientDeltaId(0), serverModel, Vector(), serverModel.model)
 }
 
 /**
@@ -181,7 +190,7 @@ case class ClientState[A: ModelIdGen](id: ClientId, nextClientDeltaId: ClientDel
             //Drop all deltas before the matching local delta (or drop everything if there is no matching local delta)
             val remainingDeltas = mad.deltas.dropWhile(_.id != localDeltaId)
             remainingDeltas match {
-              case delta :: tail => Xor.Right(
+              case delta +: tail => Xor.Right(
                 mad.copy(
                   model = delta.delta(mad.model),
                   deltas = tail
@@ -202,12 +211,15 @@ case class ClientState[A: ModelIdGen](id: ClientId, nextClientDeltaId: ClientDel
         mad <- updatedMAD
         //Check the server-provided model id against one generated from our updated model (if we can generate one)
         checkedMad <- implicitly[ModelIdGen[A]].genId(mad.model) match {
+          // Fail if we have a genId and it doesn't match
           case Some(genId) if genId != update.updatedModelId =>
             Xor.Left("Locally-generated id " + genId + " does not match remote-generated id " + update.updatedModelId)
-          case None => Xor.right(mad)
+          // Missing id or matched id give success
+          case _ => Xor.right(mad)
         }
-      // Produce updated client state from the checked model and deltas
-      } yield copy(model = checkedMad.model, serverModel = ModelAndId(checkedMad.model, update.updatedModelId), pendingDeltas = checkedMad.deltas)
+      // Produce updated client state from the checked model and deltas - new model
+      // has remaining deltas applied, server model doesn't, pending deltas are those remaining in checkedMAD
+      } yield copy(model = checkedMad.modelWithDeltas, serverModel = ModelAndId(checkedMad.model, update.updatedModelId), pendingDeltas = checkedMad.deltas)
 
     }
   }
