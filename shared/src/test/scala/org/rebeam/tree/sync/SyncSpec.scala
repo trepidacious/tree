@@ -73,11 +73,24 @@ class SyncSpec extends WordSpec with Matchers {
     "do full update" in {
       val cs1 = makeClientStateWithDeltas
 
-      val newServerModel = ModelAndId(950, ModelId(590))
-      val fullUpdate = ModelFullUpdate(newServerModel)
+      val newServerModel = ModelAndId(950, ModelId(950))
+      val fullUpdate = ModelFullUpdate(clientId, newServerModel)
       val cs2 = cs1.fullUpdate(fullUpdate)
 
-      assertClientState(cs2, 2, newServerModel, Vector.empty, 950)
+      cs2.fold(
+        fail(_),
+        cs => assertClientState(cs, 2, newServerModel, Vector.empty, 950)
+      )
+    }
+
+    "fail on full update with invalid model id" in {
+      val cs1 = makeClientStateWithDeltas
+
+      val newServerModel = ModelAndId(950, ModelId(590))
+      val fullUpdate = ModelFullUpdate(clientId, newServerModel)
+      val cs2 = cs1.fullUpdate(fullUpdate)
+
+      assert(cs2.isLeft)
     }
 
     "do incremental update partially applying pending with remote delta" in {
@@ -173,9 +186,25 @@ class SyncSpec extends WordSpec with Matchers {
         fail(_),
         cs => assertClientState(cs, 2, ModelAndId(247, ModelId(247)), Vector.empty, 247)
       )
-
     }
 
+    "be produced from first ModelFullUpdate" in {
+      val newServerModel = ModelAndId(950, ModelId(950))
+      val fullUpdate = ModelFullUpdate(clientId, newServerModel)
+      val r = ClientState.fromFirstUpdate(fullUpdate)
+
+      r.fold(
+        fail(_),
+        cs => assertClientState(cs, 0, newServerModel, Vector.empty, 950)
+      )
+    }
+
+    "fail on first ModelFullUpdate with invalid id" in {
+      val newServerModel = ModelAndId(950, ModelId(590))
+      val fullUpdate = ModelFullUpdate(clientId, newServerModel)
+      val r = ClientState.fromFirstUpdate(fullUpdate)
+      assert(r.isLeft)
+    }
   }
 
 }

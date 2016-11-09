@@ -60,7 +60,6 @@ case class RemoteDelta[A](delta: Delta[A], id: DeltaId) extends UpdateDelta[A]
 
 /**
   * A delta generated locally, by this client, then referenced by the server in an update
-  * @param delta  The delta
   * @param id     The id of the delta
   * @tparam A     The model type
   */
@@ -88,10 +87,14 @@ case class ModelIncrementalUpdate[A](
 /**
   * A full update received from server, directly setting a new model and overwriting
   * any pending deltas. The first update from the server must always be of this form.
+  * @param clientId       The client id for the client. Sets id on first update, and
+  *                       may be used to change client id on subsequent full updates.
   * @param model          The full model, and id
   * @tparam A             The type of model
   */
-case class ModelFullUpdate[A](model: ModelAndId[A]) extends ModelUpdate[A]
+case class ModelFullUpdate[A](
+  clientId: ClientId,
+  model: ModelAndId[A]) extends ModelUpdate[A]
 
 // Temporary class used to manage a model and deltas
 private case class ModelAndDeltas[A](model: A, deltas: Seq[DeltaAndId[A]]) {
@@ -106,6 +109,27 @@ trait ModelIdGen[A] {
 object ClientState {
   def initial[A: ModelIdGen](id: ClientId, serverModel: ModelAndId[A]) =
     ClientState(id, ClientDeltaId(0), serverModel, Vector(), serverModel.model)
+
+  /**
+    * Create a ClientState from the first update received. Must be a ModelFullUpdate, otherwise
+    * this will fail.
+    * @param update   The first update
+    * @return         A new ClientState or a String error.
+    * @tparam A       The type of model
+    */
+  def fromFirstUpdate[A: ModelIdGen](update: ModelUpdate[A]): Xor[String, ClientState[A]] = update match {
+    case i@ModelIncrementalUpdate(_,_,_) => Xor.Left("First ClientState update must be a ModelFullUpdate, got " + i)
+    case f@ModelFullUpdate(_,_)  => fromFullUpdate(f, ClientDeltaId(0))
+  }
+
+  def fromFullUpdate[A: ModelIdGen](update: ModelFullUpdate[A], nextClientDeltaId: ClientDeltaId): Xor[String, ClientState[A]] = {
+    implicitly[ModelIdGen[A]].genId(update.model.model) match {
+      case Some(genId) if genId != update.model.id =>
+        Xor.Left("Locally-generated id " + genId + " does not match full update's remote-generated id " + update.model.id)
+      // Missing id or matched id give success
+      case _ => Xor.right(ClientState(id = update.clientId, nextClientDeltaId = nextClientDeltaId, serverModel = update.model, pendingDeltas = Seq.empty, model = update.model.model))
+    }
+  }
 }
 
 /**
@@ -142,16 +166,16 @@ case class ClientState[A: ModelIdGen](id: ClientId, nextClientDeltaId: ClientDel
     */
   def update(update: ModelUpdate[A]): Xor[String, ClientState[A]] = update match {
     case i@ModelIncrementalUpdate(_,_,_) => incrementalUpdate(i)
-    case f@ModelFullUpdate(_)  => Xor.Right(fullUpdate(f))
+    case f@ModelFullUpdate(_,_)  => fullUpdate(f)
   }
 
   /**
     * Reconcile a full update to this client state, to produce a new client state. This will clear all pendingDeltas
-    * and set serverModel and model to the provided full model.
+    * and set serverModel and model to the provided full model, and use new client id.
     * @param update The update to apply
     * @return A new ClientState
     */
-  def fullUpdate(update: ModelFullUpdate[A]): ClientState[A] = copy(serverModel = update.model, pendingDeltas = Seq.empty, model = update.model.model)
+  def fullUpdate(update: ModelFullUpdate[A]): Xor[String, ClientState[A]] = ClientState.fromFullUpdate(update, nextClientDeltaId)
 
   /**
     * Reconcile an incremental update to this client state, to produce a new client state, if possible.
