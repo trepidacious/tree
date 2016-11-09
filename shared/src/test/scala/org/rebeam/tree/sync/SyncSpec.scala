@@ -205,6 +205,20 @@ class SyncSpec extends WordSpec with Matchers {
       val r = ClientState.fromFirstUpdate(fullUpdate)
       assert(r.isLeft)
     }
+
+    "fail on first ModelIncrementalUpdate" in {
+      val incrementalUpdate = ModelIncrementalUpdate(
+        initialServerModel.id,
+        Vector[UpdateDelta[Int]](
+          LocalDelta(dId(1)),
+          RemoteDelta(inc, rDId(200))
+        ),
+        ModelId(247)
+      )
+      val r = ClientState.fromFirstUpdate(incrementalUpdate)
+      assert(r.isLeft)
+    }
+
   }
 
 }
