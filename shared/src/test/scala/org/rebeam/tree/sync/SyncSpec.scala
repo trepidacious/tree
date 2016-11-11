@@ -2,6 +2,8 @@ package org.rebeam.tree.sync
 
 import org.rebeam.tree.Delta
 import org.scalatest._
+import org.rebeam.tree.sync.Sync._
+import org.rebeam.tree.sync.ClientSync._
 
 class SyncSpec extends WordSpec with Matchers {
 
