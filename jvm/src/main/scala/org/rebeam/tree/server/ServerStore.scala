@@ -145,10 +145,13 @@ private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clien
       println("Pong!")
     } else {
 
-      val deltaWithIJ = clientMsgDecoder.decodeJson(msg)
-      println("Got client msg committing: " + deltaWithIJ)
-      //TODO a bit messy using map just for side effect?
-      deltaWithIJ.map(store.applyDelta)
+      val deltaWithIJ = clientMsgDecoder.decodeJson(msg).toOption
+
+      //Reject deltas not from expected client
+      val filteredDIJ = deltaWithIJ.filter(_.id.clientId == clientId)
+
+      println("Got client msg committing: " + filteredDIJ)
+      filteredDIJ.foreach(store.applyDelta)
     }
   }
 }
