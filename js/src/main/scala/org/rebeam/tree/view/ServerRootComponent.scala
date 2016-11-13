@@ -1,5 +1,6 @@
 package org.rebeam.tree.view
 
+import cats.data.Xor
 import japgolly.scalajs.react._
 import org.rebeam.tree._
 import org.rebeam.tree.sync.ClientState
@@ -8,7 +9,6 @@ import org.scalajs.dom._
 
 import scala.scalajs.js.timers._
 import scala.util.{Failure, Success}
-
 import io.circe._
 import io.circe.parser._
 import io.circe.syntax._
@@ -19,7 +19,7 @@ object ServerRootComponent {
 
   case class State[R](clientState: Option[ClientState[R]], ws: Option[WebSocket], tick: Option[SetIntervalHandle])
 
-  class Backend[R](scope: BackendScope[Props[R], State[R]])(implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]]) {
+  class Backend[R](scope: BackendScope[Props[R], State[R]])(implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) {
 
     def encodeDeltaWithIj(id: DeltaId, js: Json) = Json.obj(
       "commit" -> Json.obj(
@@ -34,11 +34,14 @@ object ServerRootComponent {
           s <- scope.state
           _ <- s.clientState match {
             case None =>
+              // TODO implement
               Callback{"Delta before we have a clientState! Should queue deltas?"}
             case Some(cs) => {
               val (newCS, id) = cs.apply(delta)
               for {
                 _ <- scope.setState(s.copy(clientState = Some(newCS)))
+                // TODO should store up deltas if we don't have a websocket, and send when
+                // we do
                 _ <- Callback(s.ws.foreach(socket => socket.send(encodeDeltaWithIj(id, deltaJs).toString)))
               } yield {}
             }
@@ -79,11 +82,25 @@ object ServerRootComponent {
         def onmessage(e: MessageEvent): Unit = {
           println(s"Updating with: ${e.data.toString}")
           val msg = e.data.toString
+
           parse(msg).fold[Unit](
             pf => console.log("Invalid JSON from server " + pf),
-            json => valueDecoder.decodeJson(json).fold(
-              df => console.log("Could not decide JSON from server " + df),
-              m => direct.modState(_.copy(model = Some(m)))
+            json => updateDecoder[R].decodeJson(json).fold(
+              df => console.log("Could not decode JSON from server " + df),
+              update => {
+
+                val newCSX = direct.state.clientState.fold(
+                  ClientState.fromFirstUpdate[R](update)
+                )(
+                  _.update(update)
+                )
+
+                newCSX.fold(
+                  error => console.log("Can't use server update: " + error),
+                  newCS => direct.modState(_.copy(clientState = Some(newCS)))
+                )
+
+              }
             )
           )
         }
@@ -130,13 +147,13 @@ object ServerRootComponent {
 
   //Make the component itself, by providing a render method to initialise the props
   def apply[R](noData: ReactElement, wsUrl: String)
-              (render: Cursor[R] => ReactElement)(implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]]) =
-    ctor(decoder, deltaDecoder)(Props[R](render, wsUrl, noData))
+              (render: Cursor[R] => ReactElement)(implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) =
+    ctor(decoder, deltaDecoder, idGen)(Props[R](render, wsUrl, noData))
 
   //Just make the component constructor - props to be supplied later to make a component
-  def ctor[R](implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]]) = ReactComponentB[Props[R]]("TreeRootComponent")
+  def ctor[R](implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) = ReactComponentB[Props[R]]("TreeRootComponent")
     .initialState(State[R](None, None, None))
-    .backend(new Backend[R](_)(decoder, deltaDecoder))
+    .backend(new Backend[R](_)(decoder, deltaDecoder, idGen))
     .render(s => s.backend.render(s.props, s.state))
     .componentDidMount(_.backend.start)
     .componentWillUnmount(_.backend.end)
