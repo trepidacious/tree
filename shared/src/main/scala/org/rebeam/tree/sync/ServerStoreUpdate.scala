@@ -16,12 +16,12 @@ object ServerStoreUpdate {
     * Called each time the ServerStore's model changes due to one or more
     * deltas
     * @param baseModelId      The id of the model before the updates
-    * @param updates          The deltas that have been applied, in the order
+    * @param deltas           The deltas that have been applied, in the order
     *                         they were applied
     * @param updatedModelId   The id of the model after the updates
     */
   case class ServerStoreIncrementalUpdate[A](baseModelId: ModelId,
-                                             updates: Seq[DeltaWithIJ[A]],
+                                             deltas: Seq[DeltaWithIJ[A]],
                                              updatedModelId: ModelId) extends ServerStoreUpdate[A]
 
 }

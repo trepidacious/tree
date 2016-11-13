@@ -3,7 +3,6 @@ package org.rebeam.tree.sync
 import cats.data.Xor
 import org.rebeam.tree.Delta
 import org.rebeam.tree.sync.Sync._
-import org.rebeam.tree.sync.ClientSync._
 
 object ClientState {
   def initial[A: ModelIdGen](id: ClientId, serverModel: ModelAndId[A]) =
@@ -51,7 +50,7 @@ object ClientState {
   *                           applied in sequence to serverModel
   * @tparam A                 The type of model
   */
-case class ClientState[A: ModelIdGen](id: ClientId, nextClientDeltaId: ClientDeltaId, serverModel: ModelAndId[A], pendingDeltas: Seq[DeltaAndId[A]], model: A) {
+case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, serverModel: ModelAndId[A], pendingDeltas: Seq[DeltaAndId[A]], model: A) {
 
   import ClientState.ModelAndDeltas
 
@@ -73,7 +72,7 @@ case class ClientState[A: ModelIdGen](id: ClientId, nextClientDeltaId: ClientDel
     * @param update The update to apply
     * @return An error xor a new ClientState
     */
-  def update(update: ModelUpdate[A]): Xor[String, ClientState[A]] = update match {
+  def update(update: ModelUpdate[A])(implicit idGen: ModelIdGen[A]): Xor[String, ClientState[A]] = update match {
     case i@ModelIncrementalUpdate(_,_,_) => incrementalUpdate(i)
     case f@ModelFullUpdate(_,_)  => fullUpdate(f)
   }
@@ -84,14 +83,14 @@ case class ClientState[A: ModelIdGen](id: ClientId, nextClientDeltaId: ClientDel
     * @param update The update to apply
     * @return A new ClientState
     */
-  def fullUpdate(update: ModelFullUpdate[A]): Xor[String, ClientState[A]] = ClientState.fromFullUpdate(update, nextClientDeltaId)
+  def fullUpdate(update: ModelFullUpdate[A])(implicit idGen: ModelIdGen[A]): Xor[String, ClientState[A]] = ClientState.fromFullUpdate(update, nextClientDeltaId)
 
   /**
     * Reconcile an incremental update to this client state, to produce a new client state, if possible.
     * @param update The update to apply
     * @return An error xor a new ClientState
     */
-  def incrementalUpdate(update: ModelIncrementalUpdate[A]): Xor[String, ClientState[A]] = {
+  def incrementalUpdate(update: ModelIncrementalUpdate[A])(implicit idGen: ModelIdGen[A]): Xor[String, ClientState[A]] = {
     if (update.baseModelId != serverModel.id) {
       Xor.left("Server update expected base model id " + update.baseModelId + " but we have server model id " + serverModel.id)
 
