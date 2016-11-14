@@ -111,7 +111,7 @@ case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, server
 
       val initialMAD: Xor[String, ModelAndDeltas[A]] = Xor.Right(ModelAndDeltas(serverModel.model, pendingDeltas))
 
-      val updatedMAD = update.updates.foldLeft(initialMAD){
+      val updatedMAD = update.deltas.foldLeft(initialMAD){
         case (Xor.Right(mad), u) => u match {
           //For remote deltas, just apply them to the model, pending deltas are unaffected
           case RemoteDelta(delta, _) => Xor.Right(mad.applyDelta(delta))

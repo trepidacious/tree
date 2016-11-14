@@ -3,7 +3,6 @@ package org.rebeam.tree.sync
 import org.rebeam.tree.Delta
 import org.scalatest._
 import org.rebeam.tree.sync.Sync._
-import org.rebeam.tree.sync.ClientSync._
 
 class SyncSpec extends WordSpec with Matchers {
 
@@ -112,7 +111,7 @@ class SyncSpec extends WordSpec with Matchers {
         ModelId(125)
       )
 
-      val cs2 = cs1.incrementalUpdate(incrementalUpdate)
+      val cs2 = cs1.update(incrementalUpdate)
 
       // We expect the client state to remove first pending delta since server has applied
       // it, generating the expected model id, then apply the remaining pending delta,
@@ -137,7 +136,7 @@ class SyncSpec extends WordSpec with Matchers {
         ModelId(123)
       )
 
-      val cs2 = cs1.incrementalUpdate(incrementalUpdate)
+      val cs2 = cs1.update(incrementalUpdate)
 
       assert(cs2.isLeft)
 
@@ -157,7 +156,7 @@ class SyncSpec extends WordSpec with Matchers {
         ModelId(249)
       )
 
-      val cs2 = cs1.incrementalUpdate(incrementalUpdate)
+      val cs2 = cs1.update(incrementalUpdate)
 
       // Client should have no pending deltas
       cs2.fold(
@@ -181,7 +180,7 @@ class SyncSpec extends WordSpec with Matchers {
         ModelId(247)
       )
 
-      val cs2 = cs1.incrementalUpdate(incrementalUpdate)
+      val cs2 = cs1.update(incrementalUpdate)
 
       // Client should have no pending deltas
       cs2.fold(

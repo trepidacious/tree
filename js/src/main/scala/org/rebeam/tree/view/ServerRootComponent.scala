@@ -37,7 +37,11 @@ object ServerRootComponent {
                 _ <- scope.setState(s.copy(clientState = Some(newCS)))
                 // TODO should store up deltas if we don't have a websocket, and send when
                 // we do
-                _ <- Callback(s.ws.foreach(socket => socket.send(dij.asJson.toString)))
+                _ <- Callback {
+                  val msg = dij.asJson.noSpaces
+//                  println("Sending commit " + msg)
+                  s.ws.foreach(socket => socket.send(msg))
+                }
               } yield {}
             }
           }
@@ -75,13 +79,13 @@ object ServerRootComponent {
         def onopen(e: Event): Unit = println("Connected.")
 
         def onmessage(e: MessageEvent): Unit = {
-          println(s"Updating with: ${e.data.toString}")
+//          println(s"Updating with: ${e.data.toString}")
           val msg = e.data.toString
 
           parse(msg).fold[Unit](
-            pf => console.log("Invalid JSON from server " + pf),
+            pf => println("Invalid JSON from server " + pf),
             json => updateDecoder[R].decodeJson(json).fold(
-              df => console.log("Could not decode JSON from server " + df),
+              df => println("Could not decode JSON from server " + df),
               update => {
 
                 val newCSX = direct.state.clientState.fold(
@@ -91,7 +95,7 @@ object ServerRootComponent {
                 )
 
                 newCSX.fold(
-                  error => console.log("Can't use server update: " + error),
+                  error => println("Can't use server update: " + error),
                   newCS => direct.modState(_.copy(clientState = Some(newCS)))
                 )
 
@@ -131,6 +135,7 @@ object ServerRootComponent {
       // Here use attemptTry to catch any exceptions in connect.
       scope.props.map(_.wsUrl).flatMap(connect).attemptTry.flatMap {
         case Success((ws, tick)) => scope.modState(_.copy(ws = Some(ws)).copy(tick = Some(tick)))
+        // TODO handle failure
         case Failure(error) => Callback(println(error.toString))
       }
     }

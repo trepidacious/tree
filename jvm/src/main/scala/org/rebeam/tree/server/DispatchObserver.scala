@@ -36,6 +36,8 @@ private class DispatchObserver[D, I, O](d: Dispatcher[D, I, O]) extends Observer
 
     //If we have a pending pull and dispatcher now has a
     //message for client, give the message to the pull
+    //Note that pendingPull is checked first - we won't
+    //run d.msgForClient if there is no pending pull
     for {
       pull <- pendingPull
       msg <- d.msgForClient()
