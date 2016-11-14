@@ -122,25 +122,6 @@ private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clien
 
   }
 
-  //Expect incoming messages to be {"commit": {"delta": delta, "id": deltaId}}
-  //where delta is Delta[T] to be decoded by deltaDecoder, and deltaId is a DeltaId[T]
-  val clientMsgDecoder: Decoder[DeltaWithIJ[T]] = Decoder.instance(c => {
-
-    val o = c.downField("commit")
-
-    // We want to try to get the actual Json in the delta field value, this
-    // leads to some rather convoluted code
-    val d: Decoder.Result[Json] = o.downField("delta").focus
-      .map(Xor.right[DecodingFailure, Json])
-      .getOrElse(Xor.left[DecodingFailure, Json](DecodingFailure("Expected a delta field in commit object", o.history)))
-
-    for {
-      delta <- o.downField("delta").as[Delta[T]]
-      id <- o.downField("id").as[DeltaId]
-      deltaJs <- d
-    } yield DeltaWithIJ(delta, id, deltaJs)
-  })
-
   //Read the Js.Value as a delta, and apply it to the store
   override def msgFromClient(msg: Json): Unit = {
     val empty = msg.asObject.exists(_.fields.isEmpty)

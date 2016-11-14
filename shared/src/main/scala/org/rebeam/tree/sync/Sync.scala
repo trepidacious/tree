@@ -1,8 +1,11 @@
 package org.rebeam.tree.sync
 
-import io.circe._
-import io.circe.generic.JsonCodec
+import cats.data.Xor
 import org.rebeam.tree.Delta
+
+import io.circe._
+import io.circe.syntax._
+import io.circe.generic.JsonCodec
 
 object Sync {
 
@@ -195,5 +198,39 @@ object Sync {
 
   def updateDecoder[A](implicit d: Decoder[A], dd: Decoder[Delta[A]]): Decoder[ModelUpdate[A]] =
     fullUpdateDecoder[A] or incUpdateDecoder[A]
+
+  /**
+    * Decode incoming messages from the client.
+    * Expect incoming messages to be {"commit": {"delta": delta, "id": deltaId}}
+    * where delta is Delta[T] to be decoded by deltaDecoder, and deltaId is a DeltaId[T]
+    * @param deltaDecoder Decoder for Delta[T]
+    * @tparam A           The type of model
+    * @return             A decoder of DeltaWithIJ[T]
+    */
+  def clientMsgDecoder[A](implicit deltaDecoder: Decoder[Delta[A]]): Decoder[DeltaWithIJ[A]] = Decoder.instance(c => {
+
+    val o = c.downField("commit")
+
+    // We want to try to get the actual Json in the delta field value, this
+    // leads to some rather convoluted code
+    val d: Decoder.Result[Json] = o.downField("delta").focus
+      .map(Xor.right[DecodingFailure, Json])
+      .getOrElse(Xor.left[DecodingFailure, Json](DecodingFailure("Expected a delta field in commit object", o.history)))
+
+    for {
+      delta <- o.downField("delta").as[Delta[A]]
+      id <- o.downField("id").as[DeltaId]
+      deltaJs <- d
+    } yield DeltaWithIJ(delta, id, deltaJs)
+  })
+
+  def clientMsgEncoder[A]: Encoder[DeltaWithIJ[A]] = Encoder.instance{
+    dij => Json.obj(
+      "commit" -> Json.obj(
+        "delta" -> dij.deltaJs,
+        "id" -> dij.id.asJson
+      )
+    )
+  }
 
 }

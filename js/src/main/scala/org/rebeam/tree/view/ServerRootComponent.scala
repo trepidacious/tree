@@ -1,6 +1,5 @@
 package org.rebeam.tree.view
 
-import cats.data.Xor
 import japgolly.scalajs.react._
 import org.rebeam.tree._
 import org.rebeam.tree.sync.ClientState
@@ -21,12 +20,7 @@ object ServerRootComponent {
 
   class Backend[R](scope: BackendScope[Props[R], State[R]])(implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) {
 
-    def encodeDeltaWithIj(id: DeltaId, js: Json) = Json.obj(
-      "commit" -> Json.obj(
-        "delta" -> js,
-        "id" -> id.asJson
-      )
-    )
+    implicit val cme = clientMsgEncoder[R]
 
     val deltaToCallback: (Delta[R], Json) => Callback =
       (delta: Delta[R], deltaJs: Json) =>
@@ -38,11 +32,12 @@ object ServerRootComponent {
               Callback{"Delta before we have a clientState! Should queue deltas?"}
             case Some(cs) => {
               val (newCS, id) = cs.apply(delta)
+              val dij = DeltaWithIJ(delta, id, deltaJs)
               for {
                 _ <- scope.setState(s.copy(clientState = Some(newCS)))
                 // TODO should store up deltas if we don't have a websocket, and send when
                 // we do
-                _ <- Callback(s.ws.foreach(socket => socket.send(encodeDeltaWithIj(id, deltaJs).toString)))
+                _ <- Callback(s.ws.foreach(socket => socket.send(dij.asJson.toString)))
               } yield {}
             }
           }
@@ -105,9 +100,13 @@ object ServerRootComponent {
           )
         }
 
-        def onerror(e: ErrorEvent): Unit = println(s"Error: ${e.message}")
+        def onerror(e: ErrorEvent): Unit = {
+          // TODO recover?
+          println(s"Error: ${e.message}")
+        }
 
         def onclose(e: CloseEvent): Unit = {
+          // TODO reconnect
           println(s"Closed: ${e.reason}")
           // Close the connection
           direct.modState(_.copy(ws = None))
