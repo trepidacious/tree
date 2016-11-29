@@ -33,11 +33,6 @@ object DeltaCodecs {
   )
 
   def optionalI[A](implicit deltaDecoder: Decoder[Delta[A]]): Decoder[Delta[List[A]]] = Decoder.instance(c => {
-    //This decodes a LensDelta on a data item of type M, using a lens from M to B.
-    //The top level object has a "lens" field as a type identifier, with value encoding the delta.
-    //We then require an object with a field matching the lens' name, if we find this we
-    //decode the value of that field as a Delta[B]. Finally, we wrap this
-    //Delta[B] in a LensNDelta[M, B] to make it into a Delta[M].
     val o = c.downField("optional").downField("optionalI")
     for {
       index <- o.downField("index").as[Int]
@@ -46,16 +41,18 @@ object DeltaCodecs {
   })
 
   def optionalMatch[A, F <: A => Boolean](implicit deltaDecoder: Decoder[Delta[A]], cDecoder: Decoder[F]): Decoder[Delta[List[A]]] = Decoder.instance(c => {
-    //This decodes a LensDelta on a data item of type M, using a lens from M to B.
-    //The top level object has a "lens" field as a type identifier, with value encoding the delta.
-    //We then require an object with a field matching the lens' name, if we find this we
-    //decode the value of that field as a Delta[B]. Finally, we wrap this
-    //Delta[B] in a LensNDelta[M, B] to make it into a Delta[M].
     val o = c.downField("optional").downField("optionalMatch")
     for {
       f <- o.downField("find").as[F]
       delta <- o.downField("delta").as[Delta[A]]
     } yield OptionalMatchDelta[A, F](OptionalMatch(f), delta)
+  })
+
+  def option[A](implicit deltaDecoder: Decoder[Delta[A]]): Decoder[Delta[Option[A]]] = Decoder.instance(c => {
+    val o = c.downField("option")
+    for {
+      delta <- o.downField("delta").as[Delta[A]]
+    } yield OptionDelta[A](delta)
   })
 
 //  implicit def lensNOuterEncoder[A, B]: OuterEncoder[LensN[A, B]] = OuterEncoder.instance(

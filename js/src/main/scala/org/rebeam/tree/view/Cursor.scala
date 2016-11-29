@@ -8,9 +8,10 @@ import org.rebeam.lenses._
 import io.circe._
 
 /**
-  * Cursor giving a "position" in a data model, giving the model at that position
-  * and a parent to be used to run deltas to update the model, as well as means to
-  * zoom into the model (using a lens) to produce cursors for child data.
+  * Cursor giving a "position" in a data model, providing the value at that position
+  * and a parent to be used to run deltas as a callback to update the entire model,
+  * as well as means to zoom into the model (using lenses and similar) to produce
+  * cursors for child data.
   *
   * Most commonly used by a view of a position in a model, since it provides the
   * data to display, and a way of applying deltas to the data at that position.
@@ -71,7 +72,14 @@ object Cursor {
 
     def zoomAllMatches[F <: C => Boolean](cToF: C => F)(implicit fEncoder: Encoder[F]): List[Cursor[C]] =
       cursor.model.map(cToF).flatMap(zoomMatch(_))
+  }
 
+  implicit class OptionCursor[C](cursor: Cursor[Option[C]]) {
+    def zoomOption: Option[Cursor[C]] = {
+      cursor.model.map { c =>
+        Cursor[C](OptionParent[C](cursor.parent), c)
+      }
+    }
   }
 
 }

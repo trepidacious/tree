@@ -94,7 +94,7 @@ private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clien
       val deltaWithIJ = clientMsgDecoder.decodeJson(msg)
 
       deltaWithIJ.fold (
-        error => println("Error decoding client message: " + error),
+        error => println("Error decoding client message: " + error + "\nMessage: " + msg),
         //Reject deltas not from expected client
         dij => if (dij.id.clientId != clientId) {
           println("Got clientId " + dij.id.clientId + ", expected " + clientId)
