@@ -77,8 +77,7 @@ lazy val tree = crossProject.in(file(".")).
     libraryDependencies ++= Seq(
       "com.github.japgolly.scalajs-react" %%% "core" % scalajsReactVersion,
       "com.github.japgolly.scalajs-react" %%% "extra" % scalajsReactVersion,
-      "com.github.chandu0101.scalajs-react-components" %%% "core" % scalajsReactComponentsVersion,
-      "com.payalabs" %%% "scalajs-react-mdl" % "0.2.0-SNAPSHOT"
+      "com.github.chandu0101.scalajs-react-components" %%% "core" % scalajsReactComponentsVersion
     ),
 
     // React JS itself (Note the filenames, adjust as needed, eg. to remove addons.)
