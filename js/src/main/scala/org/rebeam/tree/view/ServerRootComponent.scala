@@ -14,7 +14,7 @@ import io.circe.syntax._
 
 object ServerRootComponent {
 
-  case class Props[R](render: Cursor[R] => ReactElement, wsUrl: String, noData: ReactElement)
+  case class Props[R](render: Cursor[R, R] => ReactElement, wsUrl: String, noData: ReactElement)
 
   case class State[R](clientState: Option[ClientState[R]], ws: Option[WebSocket], tick: Option[SetIntervalHandle])
 
@@ -51,7 +51,7 @@ object ServerRootComponent {
 
     def render(props: Props[R], state: State[R]) = {
       state.clientState.map { cs =>
-        val rootCursor = org.rebeam.tree.view.Cursor[R](rootParent, cs.model)
+        val rootCursor = org.rebeam.tree.view.Cursor(rootParent, cs.model)
         props.render(rootCursor)
       }.getOrElse(
         props.noData
@@ -151,7 +151,7 @@ object ServerRootComponent {
 
   //Make the component itself, by providing a render method to initialise the props
   def apply[R](noData: ReactElement, wsUrl: String)
-              (render: Cursor[R] => ReactElement)(implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) =
+              (render: Cursor[R, R] => ReactElement)(implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) =
     ctor(decoder, deltaDecoder, idGen)(Props[R](render, wsUrl, noData))
 
   //Just make the component constructor - props to be supplied later to make a component

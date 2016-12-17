@@ -7,7 +7,7 @@ import io.circe._
 
 object SimpleRootComponent {
 
-  case class Props[R](render: Cursor[R] => ReactElement)
+  case class Props[R](render: Cursor[R, R] => ReactElement)
   case class State[R](model: R)
 
   class Backend[R](scope: BackendScope[Props[R], State[R]])(implicit decoder: Decoder[R]) {
@@ -23,7 +23,7 @@ object SimpleRootComponent {
     }
   }
 
-  def apply[R](initialModel: R)(render: Cursor[R] => ReactElement)(implicit decoder: Decoder[R]) =
+  def apply[R](initialModel: R)(render: Cursor[R, R] => ReactElement)(implicit decoder: Decoder[R]) =
     ctor(initialModel)(decoder)(Props[R](render))
 
   //Just make the component constructor - props to be supplied later to make a component
