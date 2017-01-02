@@ -4,8 +4,8 @@ import japgolly.scalajs.react._
 import monocle._
 import org.rebeam.tree._
 import org.rebeam.lenses._
-
 import io.circe._
+import japgolly.scalajs.react.extra.Reusability
 
 /**
   * Cursor giving a "position" in a data model, providing the value at that position
@@ -85,3 +85,5 @@ object Cursor {
 }
 
 case class LabelledCursor[A](label: String, cursor: Cursor[A])
+
+case class CursorP[A, P](cursor: Cursor[A], p: P)

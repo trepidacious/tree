@@ -11,14 +11,15 @@ import scala.util.{Failure, Success}
 import io.circe._
 import io.circe.parser._
 import io.circe.syntax._
+import japgolly.scalajs.react.extra.Reusability
 
 object ServerRootComponent {
 
-  case class Props[R](render: Cursor[R] => ReactElement, wsUrl: String, noData: ReactElement)
+  case class Props[R, P](page: P, render: CursorP[R, P] => ReactElement, wsUrl: String, noData: ReactElement)
 
   case class State[R](clientState: Option[ClientState[R]], ws: Option[WebSocket], tick: Option[SetIntervalHandle])
 
-  class Backend[R](scope: BackendScope[Props[R], State[R]])(implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) {
+  class Backend[R, P](scope: BackendScope[Props[R, P], State[R]])(implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) {
 
     implicit val cme = clientMsgEncoder[R]
 
@@ -35,11 +36,9 @@ object ServerRootComponent {
               val dij = DeltaWithIJ(delta, id, deltaJs)
               for {
                 _ <- scope.setState(s.copy(clientState = Some(newCS)))
-                // TODO should store up deltas if we don't have a websocket, and send when
-                // we do
+                // TODO should store up deltas if we don't have a websocket, and send when we do
                 _ <- Callback {
                   val msg = dij.asJson.noSpaces
-//                  println("Sending commit " + msg)
                   s.ws.foreach(socket => socket.send(msg))
                 }
               } yield {}
@@ -49,10 +48,11 @@ object ServerRootComponent {
 
     val rootParent = RootParent[R](deltaToCallback)
 
-    def render(props: Props[R], state: State[R]) = {
+    def render(props: Props[R, P], state: State[R]) = {
       state.clientState.map { cs =>
         val rootCursor = org.rebeam.tree.view.Cursor[R](rootParent, cs.model)
-        props.render(rootCursor)
+        val cursorAndPage = CursorP(rootCursor, props.page)
+        props.render(cursorAndPage)
       }.getOrElse(
         props.noData
       )
@@ -76,9 +76,9 @@ object ServerRootComponent {
 
         // These are message-receiving events from the WebSocket "thread".
 
-        def onopen(e: Event): Unit = println("Connected.")
+        def onOpen(e: Event): Unit = println("Connected.")
 
-        def onmessage(e: MessageEvent): Unit = {
+        def onMessage(e: MessageEvent): Unit = {
 //          println(s"Updating with: ${e.data.toString}")
           val msg = e.data.toString
 
@@ -104,12 +104,12 @@ object ServerRootComponent {
           )
         }
 
-        def onerror(e: ErrorEvent): Unit = {
+        def onError(e: ErrorEvent): Unit = {
           // TODO recover?
           println(s"Error: ${e.message}")
         }
 
-        def onclose(e: CloseEvent): Unit = {
+        def onClose(e: CloseEvent): Unit = {
           // TODO reconnect
           println(s"Closed: ${e.reason}")
           // Close the connection
@@ -118,10 +118,10 @@ object ServerRootComponent {
 
         // Create WebSocket and setup listeners
         val ws = new WebSocket(url)
-        ws.onopen = onopen _
-        ws.onclose = onclose _
-        ws.onmessage = onmessage _
-        ws.onerror = onerror _
+        ws.onopen = onOpen _
+        ws.onclose = onClose _
+        ws.onmessage = onMessage _
+        ws.onerror = onError _
 
         //Regularly send ping (empty object) through websocket, if we have one
         val tick = setInterval(5000) {
@@ -149,15 +149,28 @@ object ServerRootComponent {
 
   }
 
-  //Make the component itself, by providing a render method to initialise the props
-  def apply[R](noData: ReactElement, wsUrl: String)
-              (render: Cursor[R] => ReactElement)(implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) =
-    ctor(decoder, deltaDecoder, idGen)(Props[R](render, wsUrl, noData))
+  def factory[R, P]
+    (noData: ReactElement, wsUrl: String)
+    (render: CursorP[R, P] => ReactElement)
+    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) = {
+    val c = ctor[R, P](decoder, deltaDecoder, idGen)
+    (page: P) => c(Props[R, P](page, render, wsUrl, noData))
+  }
+
+
+  def apply[R]
+  (noData: ReactElement, wsUrl: String)
+  (render: Cursor[R] => ReactElement)
+  (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) = {
+    val c = ctor[R, Unit](decoder, deltaDecoder, idGen)
+    val capRender = (cap: CursorP[R, Unit]) => render.apply(cap.cursor)
+    c(Props[R, Unit]((), capRender, wsUrl, noData))
+  }
 
   //Just make the component constructor - props to be supplied later to make a component
-  def ctor[R](implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) = ReactComponentB[Props[R]]("TreeRootComponent")
+  def ctor[R, P](implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) = ReactComponentB[Props[R, P]]("ServerRootComponent")
     .initialState(State[R](None, None, None))
-    .backend(new Backend[R](_)(decoder, deltaDecoder, idGen))
+    .backend(new Backend[R, P](_)(decoder, deltaDecoder, idGen))
     .render(s => s.backend.render(s.props, s.state))
     .componentDidMount(_.backend.start)
     .componentWillUnmount(_.backend.end)
