@@ -11,11 +11,10 @@ import scala.util.{Failure, Success}
 import io.circe._
 import io.circe.parser._
 import io.circe.syntax._
-import japgolly.scalajs.react.extra.Reusability
 
 object ServerRootComponent {
 
-  case class Props[R, P](page: P, render: CursorP[R, P] => ReactElement, wsUrl: String, noData: ReactElement)
+  case class Props[R, P](p: P, render: CursorP[R, P] => ReactElement, wsUrl: String, noData: ReactElement)
 
   case class State[R](clientState: Option[ClientState[R]], ws: Option[WebSocket], tick: Option[SetIntervalHandle])
 
@@ -50,9 +49,8 @@ object ServerRootComponent {
 
     def render(props: Props[R, P], state: State[R]) = {
       state.clientState.map { cs =>
-        val rootCursor = org.rebeam.tree.view.Cursor[R](rootParent, cs.model)
-        val cursorAndPage = CursorP(rootCursor, props.page)
-        props.render(cursorAndPage)
+        val cursorP = CursorP(rootParent, cs.model, props.p)
+        props.render(cursorP)
       }.getOrElse(
         props.noData
       )
@@ -163,8 +161,8 @@ object ServerRootComponent {
   (render: Cursor[R] => ReactElement)
   (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) = {
     val c = ctor[R, Unit](decoder, deltaDecoder, idGen)
-    val capRender = (cap: CursorP[R, Unit]) => render.apply(cap.cursor)
-    c(Props[R, Unit]((), capRender, wsUrl, noData))
+    val cpRender = (cp: CursorP[R, Unit]) => render.apply(cp)
+    c(Props[R, Unit]((), cpRender, wsUrl, noData))
   }
 
   //Just make the component constructor - props to be supplied later to make a component
