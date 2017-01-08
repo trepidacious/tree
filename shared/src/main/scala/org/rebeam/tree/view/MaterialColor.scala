@@ -395,7 +395,7 @@ object MaterialColor {
 
   val all: Seq[Family] = Seq(accented, shaded, single).flatten
 
-  // Backgrounds, using all the non-greyscale colors that have
+  // Backgrounds, using all the accented colors that have
   // shades suitable as a background for white text. In each case
   // we use the lightest shade suitable for use with white text.
   val backgrounds: Seq[Color] = Seq(
@@ -405,17 +405,16 @@ object MaterialColor {
     MaterialColor.DeepPurple(500),
     MaterialColor.Indigo(500),
     MaterialColor.Blue(500),
-    MaterialColor.LightBlue(600),
+//    MaterialColor.LightBlue(600),
     MaterialColor.Cyan(700),
-    MaterialColor.Teal(500),
+//    MaterialColor.Teal(500),
     MaterialColor.Green(600),
-    MaterialColor.LightGreen(700),
-//    MaterialColor.Lime(900),
-//    MaterialColor.Yellow(500),
+    MaterialColor.LightGreen(600),
+//    MaterialColor.Lime(700),
+//    MaterialColor.Yellow(800),
 //    MaterialColor.Amber(500),
-    MaterialColor.Orange(800),
-    MaterialColor.DeepOrange(500),
-    MaterialColor.Brown(500)
+    MaterialColor.Orange(800)
+//    MaterialColor.DeepOrange(500)
   )
 
   def backgroundForIndex(i: Int) = backgrounds(i % backgrounds.size)
