@@ -58,6 +58,8 @@ trait Cursor[M] extends Parent[M] {
     CursorBasic[C](LensNParent(parent, lensN), lensN.get(model))
 
   def label(label: String) = CursorL(parent, model, label)
+
+  def withP[P](p: P): CursorP[M, P] = CursorP(parent, model, p)
 }
 
 
@@ -99,8 +101,55 @@ object Cursor {
     }
   }
 
+  implicit class ListCursorP[C, P](cursor: CursorP[List[C], P]) {
+
+    def zoomIP(index: Int): Option[CursorP[C, P]] = {
+      val optionalI: OptionalI[C] = OptionalI[C](index)
+      optionalI.getOption(cursor.model).map { c =>
+        CursorP[C, P](OptionalIParent(cursor.parent, optionalI), c, cursor.p)
+      }
+    }
+
+    lazy val zoomAllIP: List[CursorP[C, P]] = cursor.model.zipWithIndex.flatMap {
+      case (a, i) => cursor.zoomIP(i)
+    }
+
+    def zoomMatchP[F <: C => Boolean](f: F)(implicit fEncoder: Encoder[F]): Option[CursorP[C, P]] = {
+      val optionalMatch: OptionalMatch[C, F] = OptionalMatch[C, F](f)
+      optionalMatch.getOption(cursor.model).map { c =>
+        CursorP[C, P](OptionalMatchParent(cursor.parent, optionalMatch), c, cursor.p)
+      }
+    }
+
+    def zoomAllMatchesP[F <: C => Boolean](cToF: C => F)(implicit fEncoder: Encoder[F]): List[CursorP[C, P]] =
+      cursor.model.map(cToF).flatMap(zoomMatchP(_))
+  }
+
+  implicit class OptionCursorP[C, P](cursor: CursorP[Option[C], P]) {
+    def zoomOptionP: Option[CursorP[C, P]] = {
+      cursor.model.map { c =>
+        CursorP[C, P](OptionParent[C](cursor.parent), c, cursor.p)
+      }
+    }
+  }
+
 }
 
 case class CursorL[A](parent: Parent[A], model: A, label: String) extends Cursor[A]
 
-case class CursorP[A, P](parent: Parent[A], model: A, p: P) extends Cursor[A]
+case class CursorP[A, P](parent: Parent[A], model: A, p: P) extends Cursor[A] {
+
+  // FIXME Zoomer and zoom in this form are a workaround for not being able to infer
+  // type C from the lens itself in the nicer form:
+  //  def zoom[C, L <: Lens[M, C]: OuterEncoder](lens: L): Cursor[C] =
+  //  Cursor[C](LensParent[M, C, L](parent, lens), lens.get(model))
+  class ZoomerP[C] {
+    def apply[L <: Lens[A, C]: OuterEncoder](lens: L): Cursor[C] =
+      CursorP[C, P](LensParent[A, C, L](parent, lens), lens.get(model), p)
+  }
+  def zoomP[C] = new ZoomerP[C]()
+
+  def zoomNP[C](lensN: LensN[A, C]): CursorP[C, P] =
+    CursorP[C, P](LensNParent(parent, lensN), lensN.get(model), p)
+
+}
