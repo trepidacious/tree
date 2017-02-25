@@ -41,6 +41,20 @@ object Sync {
   case class DeltaId(clientId: ClientId, clientDeltaId: ClientDeltaId)
 
   /**
+    * Identifier for a data item, globally unique (globally refers to the whole system under consideration -
+    * may just be one server). This uses the id data of the delta where the data item is created, and adds
+    * an additional id that makes it unique within that delta.
+    * @param clientId       Client id
+    * @param clientDeltaId  Id of delta on that client
+    * @param id             Id of the item amongst those created in this delta
+    * @tparam A             Type of the identified item - Unit if there is no specific identified item.
+    */
+  @JsonCodec
+  case class Guid[A](clientId: ClientId, clientDeltaId: ClientDeltaId, id: Long) {
+    override def toString: String = s"#${clientId.id}-${clientDeltaId.id}-$id"
+  }
+
+  /**
     * A delta and its id
     * @param delta  The Delta
     * @param id     The DeltaId of the Delta
