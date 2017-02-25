@@ -2,6 +2,7 @@ package org.rebeam.tree
 
 import io.circe._
 import org.rebeam.lenses._
+import cats.syntax.either._
 
 import scala.language.higherKinds
 

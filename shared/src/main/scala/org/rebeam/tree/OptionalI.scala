@@ -1,7 +1,7 @@
 package org.rebeam.tree
 
 import monocle._
-import monocle.std.list._
+import monocle.function.Index.listIndex
 
 import scala.language.higherKinds
 import scalaz.{Applicative, \/}

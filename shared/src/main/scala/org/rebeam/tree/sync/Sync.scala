@@ -1,11 +1,11 @@
 package org.rebeam.tree.sync
 
-import cats.data.Xor
 import org.rebeam.tree.Delta
 import io.circe._
 import io.circe.syntax._
 import io.circe.generic.JsonCodec
 import org.rebeam.tree.sync.ServerStoreUpdate.{ServerStoreFullUpdate, ServerStoreIncrementalUpdate}
+import cats.syntax.either._
 
 object Sync {
 
@@ -214,8 +214,8 @@ object Sync {
     // We want to try to get the actual Json in the delta field value, this
     // leads to some rather convoluted code
     val d: Decoder.Result[Json] = o.downField("delta").focus
-      .map(Xor.right[DecodingFailure, Json])
-      .getOrElse(Xor.left[DecodingFailure, Json](DecodingFailure("Expected a delta field in commit object", o.history)))
+      .map(Right[DecodingFailure, Json])
+      .getOrElse(Left[DecodingFailure, Json](DecodingFailure("Expected a delta field in commit object", o.history)))
 
     for {
       delta <- o.downField("delta").as[Delta[A]]

@@ -9,6 +9,7 @@ import org.http4s.websocket.WebsocketBits._
 import org.rebeam.tree._
 import io.circe._
 import io.circe.parser._
+import cats.syntax.either._
 
 class TreeStore[T](initialModel: T) {
   private var m: T = initialModel

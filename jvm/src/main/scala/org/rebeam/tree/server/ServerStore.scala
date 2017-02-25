@@ -18,6 +18,8 @@ import org.http4s.websocket.WebsocketBits._
 import io.circe._
 import io.circe.parser._
 
+import cats.syntax.either._
+
 /**
   * Stores a model, and allows that model to be updated (mutated) by
   * providing ServerDeltas, assigning ModelIds to . Can be observed to receive a firstUpdate with

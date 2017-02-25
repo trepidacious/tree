@@ -1,8 +1,8 @@
 package org.rebeam.tree.sync
 
-import cats.data.Xor
 import org.rebeam.tree.Delta
 import org.rebeam.tree.sync.Sync._
+import cats.syntax.either._
 
 object ClientState {
   def initial[A: ModelIdGen](id: ClientId, serverModel: ModelAndId[A]) =
@@ -15,17 +15,17 @@ object ClientState {
     * @return         A new ClientState or a String error.
     * @tparam A       The type of model
     */
-  def fromFirstUpdate[A: ModelIdGen](update: ModelUpdate[A]): Xor[String, ClientState[A]] = update match {
-    case i@ModelIncrementalUpdate(_,_,_) => Xor.Left("First ClientState update must be a ModelFullUpdate, got " + i)
+  def fromFirstUpdate[A: ModelIdGen](update: ModelUpdate[A]): Either[String, ClientState[A]] = update match {
+    case i@ModelIncrementalUpdate(_,_,_) => Left("First ClientState update must be a ModelFullUpdate, got " + i)
     case f@ModelFullUpdate(_,_)  => fromFullUpdate(f, ClientDeltaId(0))
   }
 
-  def fromFullUpdate[A: ModelIdGen](update: ModelFullUpdate[A], nextClientDeltaId: ClientDeltaId): Xor[String, ClientState[A]] = {
+  def fromFullUpdate[A: ModelIdGen](update: ModelFullUpdate[A], nextClientDeltaId: ClientDeltaId): Either[String, ClientState[A]] = {
     implicitly[ModelIdGen[A]].genId(update.model.model) match {
       case Some(genId) if genId != update.model.id =>
-        Xor.Left("Locally-generated id " + genId + " does not match full update's remote-generated id " + update.model.id)
+        Left("Locally-generated id " + genId + " does not match full update's remote-generated id " + update.model.id)
       // Missing id or matched id give success
-      case _ => Xor.right(ClientState(id = update.clientId, nextClientDeltaId = nextClientDeltaId, serverModel = update.model, pendingDeltas = Seq.empty, model = update.model.model))
+      case _ => Right(ClientState(id = update.clientId, nextClientDeltaId = nextClientDeltaId, serverModel = update.model, pendingDeltas = Seq.empty, model = update.model.model))
     }
   }
 
@@ -33,7 +33,7 @@ object ClientState {
   private case class ModelAndDeltas[A](model: A, deltas: Seq[DeltaAndId[A]]) {
     def applyDelta(delta: Delta[A]): ModelAndDeltas[A] = copy(model = delta(model))
 
-    lazy val modelWithDeltas = deltas.foldLeft(model) { case (m, d) => d.delta(m) }
+    lazy val modelWithDeltas: A = deltas.foldLeft(model) { case (m, d) => d.delta(m) }
   }
 
 }
@@ -72,7 +72,7 @@ case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, server
     * @param update The update to apply
     * @return An error xor a new ClientState
     */
-  def update(update: ModelUpdate[A])(implicit idGen: ModelIdGen[A]): Xor[String, ClientState[A]] = update match {
+  def update(update: ModelUpdate[A])(implicit idGen: ModelIdGen[A]): Either[String, ClientState[A]] = update match {
     case i@ModelIncrementalUpdate(_,_,_) => incrementalUpdate(i)
     case f@ModelFullUpdate(_,_)  => fullUpdate(f)
   }
@@ -83,16 +83,16 @@ case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, server
     * @param update The update to apply
     * @return A new ClientState
     */
-  def fullUpdate(update: ModelFullUpdate[A])(implicit idGen: ModelIdGen[A]): Xor[String, ClientState[A]] = ClientState.fromFullUpdate(update, nextClientDeltaId)
+  def fullUpdate(update: ModelFullUpdate[A])(implicit idGen: ModelIdGen[A]): Either[String, ClientState[A]] = ClientState.fromFullUpdate(update, nextClientDeltaId)
 
   /**
     * Reconcile an incremental update to this client state, to produce a new client state, if possible.
     * @param update The update to apply
     * @return An error xor a new ClientState
     */
-  def incrementalUpdate(update: ModelIncrementalUpdate[A])(implicit idGen: ModelIdGen[A]): Xor[String, ClientState[A]] = {
+  def incrementalUpdate(update: ModelIncrementalUpdate[A])(implicit idGen: ModelIdGen[A]): Either[String, ClientState[A]] = {
     if (update.baseModelId != serverModel.id) {
-      Xor.left("Server update expected base model id " + update.baseModelId + " but we have server model id " + serverModel.id)
+      Left("Server update expected base model id " + update.baseModelId + " but we have server model id " + serverModel.id)
 
     } else {
 
@@ -109,12 +109,12 @@ case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, server
       // 5. The reduced pending delta list can then be used to build our new client model, optimistically applying deltas we
       //    believe are still pending (on their way to the server and back).
 
-      val initialMAD: Xor[String, ModelAndDeltas[A]] = Xor.Right(ModelAndDeltas(serverModel.model, pendingDeltas))
+      val initialMAD: Either[String, ModelAndDeltas[A]] = Right(ModelAndDeltas(serverModel.model, pendingDeltas))
 
       val updatedMAD = update.deltas.foldLeft(initialMAD){
-        case (Xor.Right(mad), u) => u match {
+        case (Right(mad), u) => u match {
           //For remote deltas, just apply them to the model, pending deltas are unaffected
-          case RemoteDelta(delta, _) => Xor.Right(mad.applyDelta(delta))
+          case RemoteDelta(delta, _) => Right(mad.applyDelta(delta))
 
           //For local deltas, find them in pendingDeltas
           case LocalDelta(localDeltaId) =>
@@ -122,14 +122,14 @@ case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, server
             //Drop all deltas before the matching local delta (or drop everything if there is no matching local delta)
             val remainingDeltas = mad.deltas.dropWhile(_.id != localDeltaId)
             remainingDeltas match {
-              case delta +: tail => Xor.Right(
+              case delta +: tail => Right(
                 mad.copy(
                   model = delta.delta(mad.model),
                   deltas = tail
                 )
               )
 
-              case Nil => Xor.Left("No pending delta for server-specified local id " + localDeltaId )
+              case Nil => Left("No pending delta for server-specified local id " + localDeltaId )
             }
 
         }
@@ -145,9 +145,9 @@ case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, server
         checkedMad <- implicitly[ModelIdGen[A]].genId(mad.model) match {
           // Fail if we have a genId and it doesn't match
           case Some(genId) if genId != update.updatedModelId =>
-            Xor.Left("Locally-generated id " + genId + " does not match remote-generated id " + update.updatedModelId)
+            Left("Locally-generated id " + genId + " does not match remote-generated id " + update.updatedModelId)
           // Missing id or matched id give success
-          case _ => Xor.right(mad)
+          case _ => Right(mad)
         }
       // Produce updated client state from the checked model and deltas - new model
       // has remaining deltas applied, server model doesn't, pending deltas are those remaining in checkedMAD
