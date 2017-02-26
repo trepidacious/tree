@@ -12,6 +12,7 @@ import scala.language.higherKinds
 import org.rebeam.tree._
 import BasicDeltaDecoders._
 import DeltaCodecs._
+import org.rebeam.tree.DeltaContext._
 import org.rebeam.tree.sync.ServerStoreUpdate.ServerStoreIncrementalUpdate
 
 class SyncCodecsSpec extends WordSpec with Matchers {
@@ -28,11 +29,11 @@ class SyncCodecsSpec extends WordSpec with Matchers {
   sealed trait AddressAction extends Delta[Address]
   object AddressAction {
     case class NumberMultiple(multiple: Int) extends AddressAction {
-      def apply(s: Address): Address = s.copy(number = s.streetName.length * multiple)
+      def apply(s: Address): DeltaContext[Address] = pure(s.copy(number = s.streetName.length * multiple))
     }
 
     case object Capitalise extends AddressAction {
-      def apply(s: Address): Address = s.copy(streetName = s.streetName.toLowerCase.capitalize)
+      def apply(s: Address): DeltaContext[Address] = pure(s.copy(streetName = s.streetName.toLowerCase.capitalize))
     }
   }
 
@@ -64,10 +65,12 @@ class SyncCodecsSpec extends WordSpec with Matchers {
   "Sync codecs" should {
     "encode and decode client message" in {
       val p = Person("Ada", Address("Street", 1))
-      val p2 = delta.apply(p)
+      val id = DeltaId(ClientId(123), ClientDeltaId(456))
+
+      val p2 = DeltaContextInterpreter.run(delta.apply(p), id)
+
       assert(p2 == Person("Ada", Address("New Street", 1)))
 
-      val id = DeltaId(ClientId(123), ClientDeltaId(456))
 
       val dij = DeltaWithIJ[Person](delta, id, deltaJs)
 

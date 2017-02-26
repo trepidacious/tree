@@ -2,22 +2,18 @@ package org.rebeam.tree.server
 
 import org.rebeam.tree.Delta
 import org.rebeam.tree.server.util._
-import org.rebeam.tree.sync.ServerStoreUpdate
+import org.rebeam.tree.sync.{DeltaContextInterpreter, ServerStoreUpdate}
 import org.rebeam.tree.sync.ServerStoreUpdate._
 import org.rebeam.tree.sync.Sync._
 
 import scalaz.Scalaz._
-
 import org.http4s.websocket.WebsocketBits.WebSocketFrame
 
 import scalaz.concurrent.Task
 import scalaz.stream.{Exchange, Process, Sink}
-
 import org.http4s.websocket.WebsocketBits._
-
 import io.circe._
 import io.circe.parser._
-
 import cats.syntax.either._
 
 /**
@@ -42,7 +38,8 @@ class ServerStore[A: ModelIdGen](initialModel: A) {
 
   def applyDelta(d: DeltaWithIJ[A]): Unit = lock {
     val baseModelId = m.id
-    val newModel = d.delta.apply(m.model)
+    val newModelContext = d.delta.apply(m.model)
+    val newModel = DeltaContextInterpreter.run(newModelContext, d.id)
     val newId = makeId(newModel)
     m = ModelAndId(newModel, newId)
     observers.foreach(_.observe(ServerStoreIncrementalUpdate(baseModelId, Vector(d), newId)))
@@ -65,9 +62,9 @@ class ServerStore[A: ModelIdGen](initialModel: A) {
   */
 private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clientId: ClientId)(implicit encoder: Encoder[T], deltaDecoder: Decoder[Delta[T]]) extends Dispatcher[ServerStoreUpdate[T], Json, Json] {
 
-  var pendingUpdateToClient = none[ServerStoreUpdate[T]]
+  private var pendingUpdateToClient = none[ServerStoreUpdate[T]]
 
-  val updateEncoder = serverStoreUpdateEncoder(clientId)
+  private val updateEncoder = serverStoreUpdateEncoder(clientId)
 
   //Store pending update
   override def modelUpdated(update: ServerStoreUpdate[T]): Unit = {

@@ -1,6 +1,7 @@
 package org.rebeam.tree.sync
 
 import org.rebeam.tree.Delta
+import org.rebeam.tree.DeltaContext._
 import org.scalatest._
 import org.rebeam.tree.sync.Sync._
 
@@ -21,11 +22,11 @@ class SyncSpec extends WordSpec with Matchers {
   val remoteClientId = ClientId(600)
 
   def add(i: Int): Delta[Int] = new Delta[Int] {
-    override def apply(m: Int): Int = m + i
+    override def apply(m: Int): DeltaContext[Int] = pure(m + i)
   }
 
   def mult(i: Int): Delta[Int] = new Delta[Int] {
-    override def apply(m: Int): Int = m * i
+    override def apply(m: Int): DeltaContext[Int] = pure(m * i)
   }
 
   val inc = add(1)

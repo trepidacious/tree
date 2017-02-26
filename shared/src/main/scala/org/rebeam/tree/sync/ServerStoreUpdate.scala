@@ -21,7 +21,7 @@ object ServerStoreUpdate {
         // Full 1 + inc 1 = new full update with model from full 1 update with deltas from inc 1
         case i@ServerStoreIncrementalUpdate(_, _, _) =>
           val updatedModel = i.deltas.foldLeft(modelAndId.model){
-            case (m, dij) => dij.delta(m)
+            case (m, dij) => DeltaContextInterpreter.run(dij.delta(m), dij.id)
           }
           ServerStoreFullUpdate(ModelAndId(updatedModel, i.updatedModelId))
       }

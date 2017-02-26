@@ -16,4 +16,6 @@ object DeltaContext {
   def getId[T]: DeltaContext[Guid[T]] =
     liftF[DeltaContextA, Guid[T]](GetId[T]())
 
+  def pure[T](t: T): DeltaContext[T] = Free.pure(t)
+
 }
