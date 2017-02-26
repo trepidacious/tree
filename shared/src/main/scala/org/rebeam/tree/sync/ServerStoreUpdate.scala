@@ -1,6 +1,7 @@
 package org.rebeam.tree.sync
 
 import org.rebeam.tree.sync.Sync._
+import DeltaIORun._
 
 sealed trait ServerStoreUpdate[A] {
   def append(e: ServerStoreUpdate[A]): ServerStoreUpdate[A]
@@ -21,7 +22,7 @@ object ServerStoreUpdate {
         // Full 1 + inc 1 = new full update with model from full 1 update with deltas from inc 1
         case i@ServerStoreIncrementalUpdate(_, _, _) =>
           val updatedModel = i.deltas.foldLeft(modelAndId.model){
-            case (m, dij) => DeltaContextInterpreter.run(dij.delta(m), dij.id)
+            case (m, dij) => dij.runWithA(m)
           }
           ServerStoreFullUpdate(ModelAndId(updatedModel, i.updatedModelId))
       }

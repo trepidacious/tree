@@ -3,6 +3,7 @@ package org.rebeam.tree.sync
 import org.rebeam.tree.Delta
 import org.rebeam.tree.sync.Sync._
 import cats.syntax.either._
+import DeltaIORun._
 
 object ClientState {
   def initial[A: ModelIdGen](id: ClientId, serverModel: ModelAndId[A]) =
@@ -31,9 +32,9 @@ object ClientState {
 
   // Temporary class used to manage a model and deltas
   private case class ModelAndDeltas[A](model: A, deltas: Seq[DeltaAndId[A]]) {
-    def applyDelta(delta: Delta[A], deltaId: DeltaId): ModelAndDeltas[A] = copy(model = DeltaContextInterpreter.run(delta(model), deltaId))
+    def applyDelta(delta: Delta[A], deltaId: DeltaId): ModelAndDeltas[A] = copy(model = delta.runWithIdAndA(deltaId, model))
 
-    lazy val modelWithDeltas: A = deltas.foldLeft(model) { case (m, d) => DeltaContextInterpreter.run(d.delta(m), d.id) }
+    lazy val modelWithDeltas: A = deltas.foldLeft(model) { case (m, d) => d.runWithA(m) }
   }
 
 }
@@ -61,8 +62,9 @@ case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, server
     */
   def apply(delta: Delta[A]): (ClientState[A], DeltaId) = {
     val deltaId = DeltaId(id, nextClientDeltaId)
-    val nextModelContext = delta.apply(model)
-    val nextModel = DeltaContextInterpreter.run(nextModelContext, deltaId)
+
+    val nextModel = delta.runWithIdAndA(deltaId, model)
+
     val deltaAndId = DeltaAndId(delta, deltaId)
     val state = copy(nextClientDeltaId = nextClientDeltaId.next, model = nextModel, pendingDeltas = pendingDeltas :+ deltaAndId)
     (state, deltaId)
@@ -115,7 +117,7 @@ case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, server
       val updatedMAD = update.deltas.foldLeft(initialMAD){
         case (Right(mad), u) => u match {
           //For remote deltas, just apply them to the model, pending deltas are unaffected
-          case RemoteDelta(delta, id) => Right(mad.applyDelta(delta, id))
+          case RemoteDelta(delta, remoteId) => Right(mad.applyDelta(delta, remoteId))
 
           //For local deltas, find them in pendingDeltas
           case LocalDelta(localDeltaId) =>
@@ -125,7 +127,7 @@ case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, server
             remainingDeltas match {
               case delta +: tail => Right(
                 mad.copy(
-                  model = DeltaContextInterpreter.run(delta.delta(mad.model), delta.id),
+                  model = delta.runWithA(mad.model),
                   deltas = tail
                 )
               )

@@ -2,9 +2,10 @@ package org.rebeam.tree.server
 
 import org.rebeam.tree.Delta
 import org.rebeam.tree.server.util._
-import org.rebeam.tree.sync.{DeltaContextInterpreter, ServerStoreUpdate}
+import org.rebeam.tree.sync.{DeltaIORun, ServerStoreUpdate}
 import org.rebeam.tree.sync.ServerStoreUpdate._
 import org.rebeam.tree.sync.Sync._
+import DeltaIORun._
 
 import scalaz.Scalaz._
 import org.http4s.websocket.WebsocketBits.WebSocketFrame
@@ -38,8 +39,9 @@ class ServerStore[A: ModelIdGen](initialModel: A) {
 
   def applyDelta(d: DeltaWithIJ[A]): Unit = lock {
     val baseModelId = m.id
-    val newModelContext = d.delta.apply(m.model)
-    val newModel = DeltaContextInterpreter.run(newModelContext, d.id)
+
+    val newModel = d.runWithA(m.model)
+
     val newId = makeId(newModel)
     m = ModelAndId(newModel, newId)
     observers.foreach(_.observe(ServerStoreIncrementalUpdate(baseModelId, Vector(d), newId)))
