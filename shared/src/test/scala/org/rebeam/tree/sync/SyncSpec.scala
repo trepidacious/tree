@@ -25,12 +25,12 @@ class SyncSpec extends WordSpec with Matchers {
     override def apply(m: Int): DeltaContext[Int] = pure(m + i)
   }
 
-  def mult(i: Int): Delta[Int] = new Delta[Int] {
+  def multiply(i: Int): Delta[Int] = new Delta[Int] {
     override def apply(m: Int): DeltaContext[Int] = pure(m * i)
   }
 
-  val inc = add(1)
-  val double = mult(2)
+  private val inc = add(1)
+  private val double = multiply(2)
 
   // DeltaId coming from the local client
   def dId(clientDeltaId: Long) = DeltaId(clientId, ClientDeltaId(clientDeltaId))
@@ -52,7 +52,7 @@ class SyncSpec extends WordSpec with Matchers {
     assert(cs.model == model)
   }
 
-  def makeClientStateWithDeltas = {
+  private def makeClientStateWithDeltas = {
     val cs1 = initialClientState
     val cs3 = cs1.apply(inc)._1.apply(double)._1
     assertClientState(cs3, 2, initialServerModel, Vector(DeltaAndId(inc, dId(0)), DeltaAndId(double, dId(1))), 248)
