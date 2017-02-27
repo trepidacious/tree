@@ -7,9 +7,9 @@ import DeltaIORun._
 
 import scala.language.higherKinds
 
-class DeltaContextSpec extends WordSpec with Matchers {
+class DeltaIOSpec extends WordSpec with Matchers {
 
-  "DeltaContextInterpreter" should {
+  "DeltaIORun" should {
     "provide incrementing Guids" in {
       val dc = for {
         a <- getId[String]

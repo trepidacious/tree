@@ -5,6 +5,7 @@ import org.rebeam.lenses._
 import cats.syntax.either._
 
 import scala.language.higherKinds
+import scala.reflect.ClassTag
 
 object DeltaCodecs {
 
@@ -56,7 +57,12 @@ object DeltaCodecs {
     } yield OptionDelta[A](delta)
   })
 
-//  implicit def lensNOuterEncoder[A, B]: OuterEncoder[LensN[A, B]] = OuterEncoder.instance(
+  def prismByClass[S, A <: S](implicit deltaDecoder: Decoder[Delta[A]], classTag: ClassTag[A]): Decoder[Delta[S]] = Decoder.instance(c => {
+    val prism = PrismByClass[S, A]()
+    c.downField("prism").downField("prismByClass").downField(prism.name).as[Delta[A]].map(delta => PrismByClassDelta[S, A](prism, delta))
+  })
+
+  //  implicit def lensNOuterEncoder[A, B]: OuterEncoder[LensN[A, B]] = OuterEncoder.instance(
 //    (lensN: LensN[A, B], deltaJs: Json) =>
 //      Json.obj("lensN" -> Json.obj(lensN.name -> deltaJs))
 //  )

@@ -14,6 +14,7 @@ import BasicDeltaDecoders._
 import DeltaCodecs._
 import org.rebeam.tree.Delta._
 import org.rebeam.tree.sync.ServerStoreUpdate.ServerStoreIncrementalUpdate
+import cats.syntax.either._
 
 class SyncCodecsSpec extends WordSpec with Matchers {
 
@@ -43,6 +44,32 @@ class SyncCodecsSpec extends WordSpec with Matchers {
   implicit val personDeltaDecoder =
     DeltaCodecs.value[Person] or lensN(Person.name) or lensN(Person.address)
 
+  @JsonCodec
+  sealed trait Animal {
+    def name: String
+  }
+  object Animal {
+    @JsonCodec
+    @Lenses
+    case class Dog(name: String, barkLevel: Double) extends Animal
+
+    @JsonCodec
+    @Lenses
+    case class Cat(name: String, ennui: Double) extends Animal
+  }
+
+  import Animal._
+
+  implicit val dogDeltaDecoder: Decoder[Delta[Dog]] =
+    DeltaCodecs.value[Dog]
+
+  implicit val catDeltaDecoder: Decoder[Delta[Cat]] =
+    DeltaCodecs.value[Cat]
+
+  implicit val animalDeltaDecoder: Decoder[Delta[Animal]] =
+    DeltaCodecs.value[Animal] or prismByClass[Animal, Dog] or prismByClass[Animal, Cat]
+
+
   //A delta and js encoding
   val delta = LensNDelta(Person.address, LensNDelta(Address.streetName, ValueDelta("New Street")))
   val deltaJs = Json.obj(
@@ -61,6 +88,37 @@ class SyncCodecsSpec extends WordSpec with Matchers {
     )
   )
 
+  //Delta and js encoding attempting to edit an animal as a dog
+  val dog2 = Dog("Fido2", 2.0)
+  val cat2 = Cat("Mittens2", 2.0)
+  val animalDogDelta = PrismByClassDelta[Animal, Dog](PrismByClass(), ValueDelta(dog2))
+  val animalDogDeltaJs = Json.obj(
+    "prism" -> Json.obj(
+      "prismByClass" -> Json.obj(
+        "Dog" -> Json.obj(
+          "value" -> dog2.asJson
+        )
+      )
+    )
+  )
+
+  val animalCatDelta = PrismByClassDelta[Animal, Cat](PrismByClass(), ValueDelta(cat2))
+  val animalCatDeltaJs = Json.obj(
+    "prism" -> Json.obj(
+      "prismByClass" -> Json.obj(
+        "Cat" -> Json.obj(
+          "value" -> cat2.asJson
+        )
+      )
+    )
+  )
+
+  "prismByClass delta decoder" should {
+    "decode via deltas using prisms" in {
+      assert(animalDeltaDecoder.decodeJson(animalDogDeltaJs).toOption.contains(animalDogDelta))
+      assert(animalDeltaDecoder.decodeJson(animalCatDeltaJs).toOption.contains(animalCatDelta))
+    }
+  }
 
   "Sync codecs" should {
     "encode and decode client message" in {

@@ -8,8 +8,23 @@ import monocle.std.option
 import org.rebeam.tree.Delta._
 import org.rebeam.tree.sync.Sync.Guid
 
-trait Delta[M] {
-  def apply(m: M): DeltaIO[M]
+import scala.reflect.ClassTag
+
+class WidenedDelta[A, B >: A](aDelta: Delta[A], f: B => Option[A]) extends Delta[B] {
+  def apply(b: B): DeltaIO[B] = f(b).fold(
+    pure(b)
+  )(
+    a => aDelta(a).map(r => r: B)
+  )
+}
+
+trait Delta[A] {
+  def apply(a: A): DeltaIO[A]
+
+  def widen[B >: A](f: B => Option[A]): Delta[B] = new WidenedDelta[A, B](this, f)
+  def widenPF[B >: A](f: PartialFunction[B, A]): Delta[B] = new WidenedDelta[A, B](this, f.lift)
+  def widenCT[B >: A](implicit ct: ClassTag[A]): Delta[B] = new WidenedDelta[A, B](this, ct.unapply)
+
 }
 
 sealed trait DeltaContextA[A]
@@ -75,3 +90,11 @@ case class OptionDelta[A](delta: Delta[A]) extends Delta[Option[A]] {
   )  //mod(o)
 }
 
+case class PrismByClassDelta[S, A <: S](prismByClass: PrismByClass[S, A], delta: Delta[A]) extends Delta[S] {
+  def apply(s: S): DeltaIO[S] =
+    prismByClass.getOption(s).fold(
+      pure(s)
+    )(
+      a => delta(a).map(modifiedA => prismByClass.set(modifiedA)(s))
+    )  //optionalI.modify(delta.apply)(l)
+}
