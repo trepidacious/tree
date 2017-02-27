@@ -2,10 +2,14 @@ package org.rebeam.tree.sync
 
 import org.rebeam.tree.Delta
 import org.rebeam.tree.Delta._
-import org.scalatest._
 import org.rebeam.tree.sync.Sync._
 
-class SyncSpec extends WordSpec with Matchers {
+import org.scalatest._
+import org.scalatest.prop.Checkers
+import org.scalacheck.Arbitrary._
+import org.scalacheck.Prop._
+
+class SyncSpec extends WordSpec with Matchers with Checkers {
 
   implicit val intIdGen = new ModelIdGen[Int] {
     def genId(l: Int) = Some(ModelId(l))
@@ -219,6 +223,33 @@ class SyncSpec extends WordSpec with Matchers {
       )
       val r = ClientState.fromFirstUpdate(incrementalUpdate)
       assert(r.isLeft)
+    }
+
+  }
+
+  "Guid" should {
+    "produce valid string representation" in {
+      val g: Guid[Unit] = Guid(ClientId(1), ClientDeltaId(10), 255)
+      assert(g.toString == "guid-1-a-ff")
+    }
+
+    "parse valid string representation" in {
+      val g: Option[Guid[Unit]] = Guid.fromString("guid-1-a-ff")
+      assert(g.contains(Guid[Unit](ClientId(1), ClientDeltaId(10), 255)))
+    }
+
+    "parse ignoring case" in {
+      assert(Guid.fromString[Unit]("guid-1-a-ff") == Guid.fromString[Unit]("gUiD-1-A-fF"))
+    }
+
+    "recovers arbitrary guid from encoding in string" in {
+      check((clientId: Long, clientDeltaId: Long, id: Long) => {
+        val g: Guid[Unit] = Guid(ClientId(clientId), ClientDeltaId(clientDeltaId), id)
+        val s = g.toString
+        val regexMatches = Guid.regex.findFirstIn(s).contains(s)
+        val parseRecovers = Guid.fromString[Unit](s).contains(g)
+        regexMatches && parseRecovers
+      })
     }
 
   }

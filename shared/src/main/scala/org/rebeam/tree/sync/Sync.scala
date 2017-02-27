@@ -7,6 +7,9 @@ import io.circe.generic.JsonCodec
 import org.rebeam.tree.sync.ServerStoreUpdate.{ServerStoreFullUpdate, ServerStoreIncrementalUpdate}
 import cats.syntax.either._
 
+import scala.util.Try
+import scala.util.matching.Regex
+
 object Sync {
 
   /**
@@ -51,7 +54,22 @@ object Sync {
     */
   @JsonCodec
   case class Guid[A](clientId: ClientId, clientDeltaId: ClientDeltaId, id: Long) {
-    override def toString: String = s"#${clientId.id}-${clientDeltaId.id}-$id"
+    override def toString: String = f"guid-${clientId.id}%x-${clientDeltaId.id}%x-$id%x"
+  }
+
+  object Guid {
+    val regex: Regex = "([Gg][Uu][Ii][Dd]-[0-9a-fA-F]+-[0-9a-fA-F]+-[0-9a-fA-F]+)".r
+    val regexGrouped: Regex = "[Gg][Uu][Ii][Dd]-([0-9a-fA-F]+)-([0-9a-fA-F]+)-([0-9a-fA-F]+)".r
+
+    private def hex(x: String): Long = java.lang.Long.parseUnsignedLong(x, 16)
+
+    def fromString[A](s: String): Option[Guid[A]] = s match {
+      case regexGrouped(clientId, clientDeltaId, id) =>
+        Try {
+          Guid[A](ClientId(hex(clientId)), ClientDeltaId(hex(clientDeltaId)), hex(id))
+        }.toOption
+      case _ => None
+    }
   }
 
   /**
