@@ -92,17 +92,17 @@ case class OptionalIParent[C](parent: Parent[List[C]], optionalI: OptionalI[C]) 
   }
 }
 
-case class PrismByClassParent[S, C <: S](parent: Parent[S], prismByClass: PrismByClass[S, C]) extends Parent[C] {
+case class PrismNParent[S, C](parent: Parent[S], prismN: PrismN[S, C]) extends Parent[C] {
   def callback(delta: Delta[C], deltaJs: Json): Callback = {
-    //Produce a PrismByClassDelta from the provided child delta, to make it into a delta
+    //Produce a PrismNDelta from the provided child delta, to make it into a delta
     //of the parent (the sum class)
-    val parentDelta = PrismByClassDelta[S, C](prismByClass, delta)
+    val parentDelta = PrismNDelta[S, C](prismN, delta)
 
     //Add this delta to the JSON
     val parentDeltaJs = Json.obj(
       "prism" -> Json.obj(
-        "prismByClass" -> Json.obj(
-          prismByClass.name -> deltaJs
+        "prismN" -> Json.obj(
+          prismN.name -> deltaJs
         )
       )
     )

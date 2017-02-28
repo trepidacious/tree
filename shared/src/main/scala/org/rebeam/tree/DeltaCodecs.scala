@@ -57,9 +57,8 @@ object DeltaCodecs {
     } yield OptionDelta[A](delta)
   })
 
-  def prismByClass[S, A <: S](implicit deltaDecoder: Decoder[Delta[A]], classTag: ClassTag[A]): Decoder[Delta[S]] = Decoder.instance(c => {
-    val prism = PrismByClass[S, A]()
-    c.downField("prism").downField("prismByClass").downField(prism.name).as[Delta[A]].map(delta => PrismByClassDelta[S, A](prism, delta))
+  def prismN[S, A](prismN: PrismN[S, A])(implicit deltaDecoder: Decoder[Delta[A]]): Decoder[Delta[S]] = Decoder.instance(c => {
+    c.downField("prism").downField("prismByClass").downField(prismN.name).as[Delta[A]].map(delta => PrismNDelta[S, A](prismN, delta))
   })
 
   //  implicit def lensNOuterEncoder[A, B]: OuterEncoder[LensN[A, B]] = OuterEncoder.instance(
@@ -75,8 +74,6 @@ object DeltaCodecs {
 
   //Map to Delta[M] for neatness
   ).map(a => a: Delta[M])
-
-
 
 //  def lensNDeltaCodec[A, B](lensN: LensN[A,B])(implicit deltaBEncoder: Encoder[Delta[B]], deltaBDecoder: Decoder[Delta[B]]): Codec[LensNDelta[A, B]] = Codec (
 //    Encoder.instance(lnd =>

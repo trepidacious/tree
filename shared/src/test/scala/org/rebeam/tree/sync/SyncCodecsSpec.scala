@@ -15,6 +15,7 @@ import DeltaCodecs._
 import org.rebeam.tree.Delta._
 import org.rebeam.tree.sync.ServerStoreUpdate.ServerStoreIncrementalUpdate
 import cats.syntax.either._
+import org.rebeam.lenses.PrismN
 
 class SyncCodecsSpec extends WordSpec with Matchers {
 
@@ -56,6 +57,9 @@ class SyncCodecsSpec extends WordSpec with Matchers {
     @JsonCodec
     @Lenses
     case class Cat(name: String, ennui: Double) extends Animal
+
+    val dogPrism: PrismN[Animal, Dog] = PrismN.classTag("Dog")
+    val catPrism: PrismN[Animal, Cat] = PrismN.classTag("Cat")
   }
 
   import Animal._
@@ -67,7 +71,7 @@ class SyncCodecsSpec extends WordSpec with Matchers {
     DeltaCodecs.value[Cat]
 
   implicit val animalDeltaDecoder: Decoder[Delta[Animal]] =
-    DeltaCodecs.value[Animal] or prismByClass[Animal, Dog] or prismByClass[Animal, Cat]
+    DeltaCodecs.value[Animal] or prismN(dogPrism) or prismN(catPrism)
 
 
   //A delta and js encoding
@@ -91,7 +95,7 @@ class SyncCodecsSpec extends WordSpec with Matchers {
   //Delta and js encoding attempting to edit an animal as a dog
   val dog2 = Dog("Fido2", 2.0)
   val cat2 = Cat("Mittens2", 2.0)
-  val animalDogDelta = PrismByClassDelta[Animal, Dog](PrismByClass(), ValueDelta(dog2))
+  val animalDogDelta = PrismNDelta[Animal, Dog](Animal.dogPrism, ValueDelta(dog2))
   val animalDogDeltaJs = Json.obj(
     "prism" -> Json.obj(
       "prismByClass" -> Json.obj(
@@ -102,7 +106,7 @@ class SyncCodecsSpec extends WordSpec with Matchers {
     )
   )
 
-  val animalCatDelta = PrismByClassDelta[Animal, Cat](PrismByClass(), ValueDelta(cat2))
+  val animalCatDelta = PrismNDelta[Animal, Cat](Animal.catPrism, ValueDelta(cat2))
   val animalCatDeltaJs = Json.obj(
     "prism" -> Json.obj(
       "prismByClass" -> Json.obj(

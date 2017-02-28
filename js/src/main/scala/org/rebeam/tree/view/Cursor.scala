@@ -59,9 +59,8 @@ trait Cursor[M] extends Parent[M] {
   def zoomN[C](lensN: LensN[M, C]): Cursor[C] =
     CursorBasic[C](LensNParent(parent, lensN), lensN.get(model))
 
-  def zoomClass[C <: M](implicit ct: ClassTag[C]): Option[Cursor[C]] = {
-    val prismByClass = PrismByClass[M, C]
-    prismByClass.getOption(model).map(c => CursorBasic[C](PrismByClassParent(parent, prismByClass), c))
+  def zoomPrismN[C](prismN: PrismN[M, C]): Option[Cursor[C]] = {
+    prismN.getOption(model).map(c => CursorBasic[C](PrismNParent[M, C](parent, prismN), c))
   }
 
   def label(label: String) = CursorL(parent, model, label)
@@ -159,8 +158,7 @@ case class CursorP[A, P](parent: Parent[A], model: A, p: P) extends Cursor[A] {
   def zoomNP[C](lensN: LensN[A, C]): CursorP[C, P] =
     CursorP[C, P](LensNParent(parent, lensN), lensN.get(model), p)
 
-  def zoomClassP[C <: A](implicit ct: ClassTag[C]): Option[CursorP[C, P]] = {
-    val prismByClass = PrismByClass[A, C]
-    prismByClass.getOption(model).map(c => CursorP[C, P](PrismByClassParent(parent, prismByClass), c, p))
+  def zoomPrismNP[C](prismN: PrismN[A, C]): Option[CursorP[C, P]] = {
+    prismN.getOption(model).map(c => CursorP[C, P](PrismNParent(parent, prismN), c, p))
   }
 }

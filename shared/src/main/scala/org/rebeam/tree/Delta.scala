@@ -90,11 +90,11 @@ case class OptionDelta[A](delta: Delta[A]) extends Delta[Option[A]] {
   )  //mod(o)
 }
 
-case class PrismByClassDelta[S, A <: S](prismByClass: PrismByClass[S, A], delta: Delta[A]) extends Delta[S] {
+case class PrismNDelta[S, A](prismN: PrismN[S, A], delta: Delta[A]) extends Delta[S] {
   def apply(s: S): DeltaIO[S] =
-    prismByClass.getOption(s).fold(
+    prismN.getOption(s).fold(
       pure(s)
     )(
-      a => delta(a).map(modifiedA => prismByClass.set(modifiedA)(s))
+      a => delta(a).map(modifiedA => prismN.set(modifiedA)(s))
     )  //optionalI.modify(delta.apply)(l)
 }
