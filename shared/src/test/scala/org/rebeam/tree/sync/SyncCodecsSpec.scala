@@ -98,7 +98,7 @@ class SyncCodecsSpec extends WordSpec with Matchers {
   val animalDogDelta = PrismNDelta[Animal, Dog](Animal.dogPrism, ValueDelta(dog2))
   val animalDogDeltaJs = Json.obj(
     "prism" -> Json.obj(
-      "prismByClass" -> Json.obj(
+      "prismN" -> Json.obj(
         "Dog" -> Json.obj(
           "value" -> dog2.asJson
         )
@@ -109,7 +109,7 @@ class SyncCodecsSpec extends WordSpec with Matchers {
   val animalCatDelta = PrismNDelta[Animal, Cat](Animal.catPrism, ValueDelta(cat2))
   val animalCatDeltaJs = Json.obj(
     "prism" -> Json.obj(
-      "prismByClass" -> Json.obj(
+      "prismN" -> Json.obj(
         "Cat" -> Json.obj(
           "value" -> cat2.asJson
         )
@@ -117,7 +117,7 @@ class SyncCodecsSpec extends WordSpec with Matchers {
     )
   )
 
-  "prismByClass delta decoder" should {
+  "prismN delta decoder" should {
     "decode via deltas using prisms" in {
       assert(animalDeltaDecoder.decodeJson(animalDogDeltaJs).toOption.contains(animalDogDelta))
       assert(animalDeltaDecoder.decodeJson(animalCatDeltaJs).toOption.contains(animalCatDelta))

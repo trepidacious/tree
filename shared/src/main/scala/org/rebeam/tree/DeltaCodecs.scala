@@ -58,7 +58,7 @@ object DeltaCodecs {
   })
 
   def prismN[S, A](prismN: PrismN[S, A])(implicit deltaDecoder: Decoder[Delta[A]]): Decoder[Delta[S]] = Decoder.instance(c => {
-    c.downField("prism").downField("prismByClass").downField(prismN.name).as[Delta[A]].map(delta => PrismNDelta[S, A](prismN, delta))
+    c.downField("prism").downField("prismN").downField(prismN.name).as[Delta[A]].map(delta => PrismNDelta[S, A](prismN, delta))
   })
 
   //  implicit def lensNOuterEncoder[A, B]: OuterEncoder[LensN[A, B]] = OuterEncoder.instance(
