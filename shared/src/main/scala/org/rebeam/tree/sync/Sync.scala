@@ -73,6 +73,28 @@ object Sync {
   }
 
   /**
+    * Indicates a data type has a Guid
+    * @tparam A The data type
+    */
+  trait HasId[A] {
+    /**
+      * @return The Guid
+      */
+    def id: Guid[A]
+  }
+
+  /**
+    * Find HasId instances by their Guid.
+    * Works with Cursor.zoomMatch and related methods to zoom to a particular element of a list by id
+    * @param id   The id to find
+    * @tparam A   The type of item to find, must implement HasId[A]
+    */
+  @JsonCodec
+  case class FindById[A <: HasId[A]](id: Guid[A]) extends (A => Boolean) {
+    def apply(a: A): Boolean = a.id == id
+  }
+
+  /**
     * A delta and its id
     * @param delta  The Delta
     * @param id     The DeltaId of the Delta
