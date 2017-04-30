@@ -6,7 +6,6 @@ import io.circe.generic.JsonCodec
 import org.rebeam.lenses._
 import monocle._
 import monocle.std.option
-import org.rebeam.lenses.macros.Lenses
 import org.rebeam.tree.Delta._
 import org.rebeam.tree.sync.Sync.Guid
 
@@ -29,9 +28,9 @@ trait Delta[A] {
 
 }
 
-sealed trait DeltaContextA[A]
-case class GetId[T]() extends DeltaContextA[Guid[T]]
-case object GetContext extends DeltaContextA[DeltaIOContext]
+sealed trait DeltaIOA[A]
+case class GetId[T]() extends DeltaIOA[Guid[T]]
+case object GetContext extends DeltaIOA[DeltaIOContext]
 
 /**
   * Provides the context within which an individual run of a DeltaIO can
@@ -58,7 +57,7 @@ trait DeltaIOContextSource {
 
 object Delta {
 
-  type DeltaIO[A] = Free[DeltaContextA, A]
+  type DeltaIO[A] = Free[DeltaIOA, A]
 
   /**
     * GetId returns a Guid[T] value.
@@ -67,7 +66,7 @@ object Delta {
     *         only one data item - do not reuse.
     */
   def getId[T]: DeltaIO[Guid[T]] =
-    liftF[DeltaContextA, Guid[T]](GetId[T]())
+    liftF[DeltaIOA, Guid[T]](GetId[T]())
 
   /**
     * Get the DeltaIOContext within which the DeltaIO
@@ -75,7 +74,7 @@ object Delta {
     * as a Moment.
     */
   val getContext: DeltaIO[DeltaIOContext] =
-    liftF[DeltaContextA, DeltaIOContext](GetContext)
+    liftF[DeltaIOA, DeltaIOContext](GetContext)
 
   def pure[T](t: T): DeltaIO[T] = Free.pure(t)
 

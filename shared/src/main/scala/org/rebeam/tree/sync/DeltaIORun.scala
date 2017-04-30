@@ -15,9 +15,9 @@ object DeltaIORun {
   // State monad using StateData
   private type DeltaContextState[A] = State[StateData, A]
 
-  private val pureCompiler: DeltaContextA ~> DeltaContextState =
-    new (DeltaContextA ~> DeltaContextState) {
-      def apply[A](fa: DeltaContextA[A]): DeltaContextState[A] =
+  private val pureCompiler: DeltaIOA ~> DeltaContextState =
+    new (DeltaIOA ~> DeltaContextState) {
+      def apply[A](fa: DeltaIOA[A]): DeltaContextState[A] =
         fa match {
           case GetId() => State(s => (s.withNextGuidId, Guid[Any](s.deltaId.clientId, s.deltaId.clientDeltaId, s.currentGuidId)))
 
