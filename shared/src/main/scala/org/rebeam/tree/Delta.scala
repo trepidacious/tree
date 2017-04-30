@@ -55,6 +55,12 @@ trait DeltaIOContextSource {
   def getContext: DeltaIOContext
 }
 
+object DeltaIOContextSource {
+  val default: DeltaIOContextSource = new DeltaIOContextSource {
+    override def getContext: DeltaIOContext = DeltaIOContext(Moment(System.currentTimeMillis()))
+  }
+}
+
 object Delta {
 
   type DeltaIO[A] = Free[DeltaIOA, A]
