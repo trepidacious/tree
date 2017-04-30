@@ -4,6 +4,7 @@ import org.rebeam.tree.Delta._
 import org.rebeam.tree.sync.Sync._
 import org.scalatest._
 import DeltaIORun._
+import org.rebeam.tree.{DeltaIOContext, Moment}
 
 import scala.language.higherKinds
 
@@ -19,12 +20,29 @@ class DeltaIOSpec extends WordSpec with Matchers {
 
       val cid = ClientId(42)
       val cdid = ClientDeltaId(76)
-      val l = runDeltaIO(dc, DeltaId(cid, cdid))
+      val context = DeltaIOContext(Moment(94))
+      val l = runDeltaIO(dc, context, DeltaId(cid, cdid))
 
       assert(
         l == List(0, 1, 2).map(Guid[String](cid, cdid, _))
       )
     }
+
+    "provide expected Context" in {
+      val dc = for {
+        c1 <- getContext
+        c2 <- getContext
+      } yield List(c1, c2)
+
+      val cid = ClientId(42)
+      val cdid = ClientDeltaId(76)
+      val context = DeltaIOContext(Moment(94))
+      val l = runDeltaIO(dc, context, DeltaId(cid, cdid))
+
+      l(0) === context
+      l(1) === context
+    }
+
   }
 
 }

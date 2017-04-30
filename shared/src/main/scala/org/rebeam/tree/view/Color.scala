@@ -1,7 +1,11 @@
 package org.rebeam.tree.view
 
+import io.circe.generic.JsonCodec
+
+@JsonCodec
 case class ColorHSLA(h: Float, s: Float, l: Float, a: Int)
 
+@JsonCodec
 case class Color(r: Int, g: Int, b: Int, a: Int) {
 
   def alphaUnitScale: Float = a/255.0f

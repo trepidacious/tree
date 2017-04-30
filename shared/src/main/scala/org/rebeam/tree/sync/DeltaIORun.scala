@@ -3,38 +3,53 @@ package org.rebeam.tree.sync
 import cats.data.State
 import cats.~>
 import org.rebeam.tree.Delta._
-import org.rebeam.tree.{Delta, DeltaContextA, GetId}
+import org.rebeam.tree._
 import org.rebeam.tree.sync.Sync._
 
 object DeltaIORun {
 
-  //Which delta we are in and which id we are up to
-  private type DeltaContextState[A] = State[(DeltaId, Long), A]
+  private case class StateData(context: DeltaIOContext, deltaId: DeltaId, currentGuidId: Long) {
+    def withNextGuidId: StateData = copy(currentGuidId = currentGuidId + 1)
+  }
+
+  // State monad using StateData
+  private type DeltaContextState[A] = State[StateData, A]
 
   private val pureCompiler: DeltaContextA ~> DeltaContextState =
     new (DeltaContextA ~> DeltaContextState) {
       def apply[A](fa: DeltaContextA[A]): DeltaContextState[A] =
         fa match {
-          case GetId() => State(s => ((s._1, s._2 + 1), Guid[Any](s._1.clientId, s._1.clientDeltaId, s._2)))
+          case GetId() => State(s => (s.withNextGuidId, Guid[Any](s.deltaId.clientId, s.deltaId.clientDeltaId, s.currentGuidId)))
+
+          case GetContext => State(s => (s, s.context))
         }
     }
 
-  def runDeltaIO[A](dc: DeltaIO[A], deltaId: DeltaId): A =
-    dc.foldMap(pureCompiler).run((deltaId, 0)).value._2
+  def runDeltaIO[A](dc: DeltaIO[A], context: DeltaIOContext, deltaId: DeltaId): A =
+    dc.foldMap(pureCompiler).run(StateData(context, deltaId, 0)).value._2
 
   implicit class DeltaRun[A](d: Delta[A]) {
-    def runWithIdAndA(id: DeltaId, a: A): A = runDeltaIO(d(a), id)
+    def runWith(a: A, context: DeltaIOContext, deltaId: DeltaId): A = runDeltaIO(d(a), context, deltaId)
   }
 
   implicit class DeltaIORun[A](dio: DeltaIO[A]) {
-    def runWithId(id: DeltaId): A = runDeltaIO(dio, id)
+    def runWith(context: DeltaIOContext, deltaId: DeltaId): A = runDeltaIO(dio, context, deltaId)
   }
 
   implicit class DeltaAndIdRun[A](deltaAndId: DeltaAndId[A]) {
-    def runWithA(a:A): A = runDeltaIO(deltaAndId.delta.apply(a), deltaAndId.id)
+    def runWith(a: A, context: DeltaIOContext): A = runDeltaIO(deltaAndId.delta.apply(a), context, deltaAndId.id)
   }
 
   implicit class DeltaWithIJRun[A](dij: DeltaWithIJ[A]) {
-    def runWithA(a:A): A = runDeltaIO(dij.delta.apply(a), dij.id)
+    def runWith(a: A, context: DeltaIOContext): A = runDeltaIO(dij.delta.apply(a), context, dij.id)
+  }
+
+  implicit class DeltaWithIJCRun[A](dijc: DeltaWithIJC[A]) {
+    def runWith(a: A): A = runDeltaIO(dijc.delta.apply(a), dijc.context, dijc.id)
+  }
+
+  implicit class DeltaWithICRun[A](dic: DeltaWithIC[A]) {
+    def runWith(a: A): A = runDeltaIO(dic.delta.apply(a), dic.context, dic.id)
+    def runWithNewContext(a: A, context: DeltaIOContext): A = runDeltaIO(dic.delta.apply(a), context, dic.id)
   }
 }

@@ -18,7 +18,8 @@ object ServerRootComponent {
 
   case class State[R](clientState: Option[ClientState[R]], ws: Option[WebSocket], tick: Option[SetIntervalHandle])
 
-  class Backend[R, P](scope: BackendScope[Props[R, P], State[R]])(implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) {
+  class Backend[R, P](scope: BackendScope[Props[R, P], State[R]])
+    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource) {
 
     implicit val cme = clientMsgEncoder[R]
 
@@ -31,7 +32,8 @@ object ServerRootComponent {
               // TODO implement
               Callback{"Delta before we have a clientState! Should queue deltas?"}
             case Some(cs) => {
-              val (newCS, id) = cs.apply(delta)
+              //SIDE-EFFECT: Note this is the point at which we generate the context
+              val (newCS, id) = cs.apply(delta, contextSource.getContext)
               val dij = DeltaWithIJ(delta, id, deltaJs)
               for {
                 _ <- scope.setState(s.copy(clientState = Some(newCS)))
@@ -150,8 +152,8 @@ object ServerRootComponent {
   def factory[R, P]
     (noData: ReactElement, wsUrl: String)
     (render: CursorP[R, P] => ReactElement)
-    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) = {
-    val c = ctor[R, P](decoder, deltaDecoder, idGen)
+    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource) = {
+    val c = ctor[R, P](decoder, deltaDecoder, idGen, contextSource)
     (page: P) => c(Props[R, P](page, render, wsUrl, noData))
   }
 
@@ -159,16 +161,16 @@ object ServerRootComponent {
   def apply[R]
   (noData: ReactElement, wsUrl: String)
   (render: Cursor[R] => ReactElement)
-  (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) = {
-    val c = ctor[R, Unit](decoder, deltaDecoder, idGen)
+  (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource) = {
+    val c = ctor[R, Unit](decoder, deltaDecoder, idGen, contextSource)
     val cpRender = (cp: CursorP[R, Unit]) => render.apply(cp)
     c(Props[R, Unit]((), cpRender, wsUrl, noData))
   }
 
   //Just make the component constructor - props to be supplied later to make a component
-  def ctor[R, P](implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R]) = ReactComponentB[Props[R, P]]("ServerRootComponent")
+  def ctor[R, P](implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource) = ReactComponentB[Props[R, P]]("ServerRootComponent")
     .initialState(State[R](None, None, None))
-    .backend(new Backend[R, P](_)(decoder, deltaDecoder, idGen))
+    .backend(new Backend[R, P](_)(decoder, deltaDecoder, idGen, contextSource))
     .render(s => s.backend.render(s.props, s.state))
     .componentDidMount(_.backend.start)
     .componentWillUnmount(_.backend.end)

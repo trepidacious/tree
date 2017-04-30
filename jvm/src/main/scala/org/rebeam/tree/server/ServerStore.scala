@@ -1,6 +1,6 @@
 package org.rebeam.tree.server
 
-import org.rebeam.tree.Delta
+import org.rebeam.tree.{Delta, DeltaIOContext, DeltaIOContextSource}
 import org.rebeam.tree.server.util._
 import org.rebeam.tree.sync.{DeltaIORun, ServerStoreUpdate}
 import org.rebeam.tree.sync.ServerStoreUpdate._
@@ -37,14 +37,14 @@ class ServerStore[A: ModelIdGen](initialModel: A) {
     mId
   }
 
-  def applyDelta(d: DeltaWithIJ[A]): Unit = lock {
+  def applyDelta(d: DeltaWithIJ[A], context: DeltaIOContext): Unit = lock {
     val baseModelId = m.id
 
-    val newModel = d.runWithA(m.model)
+    val newModel = d.runWith(m.model, context)
 
     val newId = makeId(newModel)
     m = ModelAndId(newModel, newId)
-    observers.foreach(_.observe(ServerStoreIncrementalUpdate(baseModelId, Vector(d), newId)))
+    observers.foreach(_.observe(ServerStoreIncrementalUpdate(baseModelId, Vector(d.withContext(context)), newId)))
   }
 
   def observe(o: Observer[ServerStoreUpdate[A]]): Unit = lock {
@@ -62,7 +62,7 @@ class ServerStore[A: ModelIdGen](initialModel: A) {
   * Uses DeltaWithIJs encoded as JSON for incoming messages, and ModelUpdates encoded to JSON for
   * outgoing messages.
   */
-private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clientId: ClientId)(implicit encoder: Encoder[T], deltaDecoder: Decoder[Delta[T]]) extends Dispatcher[ServerStoreUpdate[T], Json, Json] {
+private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clientId: ClientId, contextSource: DeltaIOContextSource)(implicit encoder: Encoder[T], deltaDecoder: Decoder[Delta[T]]) extends Dispatcher[ServerStoreUpdate[T], Json, Json] {
 
   private var pendingUpdateToClient = none[ServerStoreUpdate[T]]
 
@@ -101,7 +101,7 @@ private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clien
           println("Got clientId " + dij.id.clientId + ", expected " + clientId)
         } else {
 //          println("Committing msg from client id " + clientId.id + ": " + dij)
-          store.applyDelta(dij)
+          store.applyDelta(dij, contextSource.getContext)
         }
       )
     }
@@ -109,9 +109,9 @@ private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clien
 }
 
 object ServerStoreValueExchange {
-  def apply[M](store: ServerStore[M], clientId: ClientId)(implicit encoder: Encoder[M], decoder: Decoder[M], deltaDecoder: Decoder[Delta[M]]): Exchange[WebSocketFrame, WebSocketFrame] = {
+  def apply[M](store: ServerStore[M], clientId: ClientId, contextSource: DeltaIOContextSource)(implicit encoder: Encoder[M], decoder: Decoder[M], deltaDecoder: Decoder[Delta[M]]): Exchange[WebSocketFrame, WebSocketFrame] = {
 
-    val dispatcher = new ServerStoreValueDispatcher(store, clientId)
+    val dispatcher = new ServerStoreValueDispatcher(store, clientId, contextSource)
     val observer = new DispatchObserver(dispatcher)
     store.observe(observer)
 

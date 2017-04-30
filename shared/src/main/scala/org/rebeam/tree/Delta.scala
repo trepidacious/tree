@@ -2,9 +2,11 @@ package org.rebeam.tree
 
 import cats.free.Free
 import cats.free.Free.liftF
+import io.circe.generic.JsonCodec
 import org.rebeam.lenses._
 import monocle._
 import monocle.std.option
+import org.rebeam.lenses.macros.Lenses
 import org.rebeam.tree.Delta._
 import org.rebeam.tree.sync.Sync.Guid
 
@@ -29,14 +31,51 @@ trait Delta[A] {
 
 sealed trait DeltaContextA[A]
 case class GetId[T]() extends DeltaContextA[Guid[T]]
+case object GetContext extends DeltaContextA[DeltaIOContext]
+
+/**
+  * Provides the context within which an individual run of a DeltaIO can
+  * occur. Currently just the moment in which we should run, but may be extended
+  * in future.
+  * @param moment The moment in which this DeltaIO is running.
+  *  When run on the client this is provisional,
+  *  on the server it is authoritative - the authoritative
+  *  value is returned back to the client when the delta
+  *  is applied on the server, so the client can rerun
+  *  with the correct moment.)
+  */
+@JsonCodec
+case class DeltaIOContext(moment: Moment)
+
+/**
+  * Provides DeltaIOContext for executing DeltaIOs.
+  * Note that this has side effects - e.g. reading
+  * the current time. This should be used carefully.
+  */
+trait DeltaIOContextSource {
+  def getContext: DeltaIOContext
+}
 
 object Delta {
 
   type DeltaIO[A] = Free[DeltaContextA, A]
 
-  // GetId returns a Guid[T] value.
+  /**
+    * GetId returns a Guid[T] value.
+    * @tparam T The type for which we need a Guid
+    * @return A new Guid for the given type. Use for
+    *         only one data item - do not reuse.
+    */
   def getId[T]: DeltaIO[Guid[T]] =
     liftF[DeltaContextA, Guid[T]](GetId[T]())
+
+  /**
+    * Get the DeltaIOContext within which the DeltaIO
+    * is running, for example giving the current time
+    * as a Moment.
+    */
+  val getContext: DeltaIO[DeltaIOContext] =
+    liftF[DeltaContextA, DeltaIOContext](GetContext)
 
   def pure[T](t: T): DeltaIO[T] = Free.pure(t)
 

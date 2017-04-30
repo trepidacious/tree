@@ -127,12 +127,12 @@ class SyncCodecsSpec extends WordSpec with Matchers {
   "Sync codecs" should {
     "encode and decode client message" in {
       val p = Person("Ada", Address("Street", 1))
+      val context = DeltaIOContext(Moment(42))
       val id = DeltaId(ClientId(123), ClientDeltaId(456))
 
-      val p2 = delta.runWithIdAndA(id, p)
+      val p2 = delta.runWith(p, context, id)
 
       assert(p2 == Person("Ada", Address("New Street", 1)))
-
 
       val dij = DeltaWithIJ[Person](delta, id, deltaJs)
 
@@ -149,15 +149,20 @@ class SyncCodecsSpec extends WordSpec with Matchers {
 
     "decode incremental update" in {
 
+      // Make a delta caused by client id 99 at moment 42
       val deltaId = DeltaId(ClientId(99), ClientDeltaId(100))
+      val context = DeltaIOContext(Moment(42))
+
+      // Make a server store incremental update of this delta
       val update = ServerStoreIncrementalUpdate[Person](
         ModelId(123),
         Vector(
-          DeltaWithIJ[Person](delta, deltaId, deltaJs)
+          DeltaWithIJC[Person](delta, deltaId, deltaJs, context)
         ),
         ModelId(456)
       )
 
+      //Encode going to client id 0, so that delta is encoded as remote
       val encodedAsRemoteUpdate = serverStoreUpdateEncoder[Person](ClientId(0)).apply(update)
       val decodedAsRemoteUpdate = updateDecoder[Person].decodeJson(encodedAsRemoteUpdate)
 
@@ -168,13 +173,14 @@ class SyncCodecsSpec extends WordSpec with Matchers {
             assert(i.baseModelId == ModelId(123))
             assert(i.updatedModelId == ModelId(456))
             assert(i.deltas == Vector(
-              RemoteDelta(delta, deltaId)
+              RemoteDelta(delta, deltaId, context)
             ))
           case _ => fail("Incremental update decoded to full")
         }
 
       )
 
+      //Encode going to client id 99, so that delta is encoded as remote
       val encodedAsLocalUpdate = serverStoreUpdateEncoder[Person](ClientId(99)).apply(update)
       val decodedAsLocalUpdate = updateDecoder[Person].decodeJson(encodedAsLocalUpdate)
 
@@ -185,12 +191,11 @@ class SyncCodecsSpec extends WordSpec with Matchers {
             assert(i.baseModelId == ModelId(123))
             assert(i.updatedModelId == ModelId(456))
             assert(i.deltas == Vector(
-              LocalDelta(deltaId)
+              LocalDelta(deltaId, context)
             ))
           case _ => fail("Incremental update decoded to full")
         }
-
-        )
+      )
 
     }
   }

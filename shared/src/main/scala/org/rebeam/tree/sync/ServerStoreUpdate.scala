@@ -22,7 +22,7 @@ object ServerStoreUpdate {
         // Full 1 + inc 1 = new full update with model from full 1 update with deltas from inc 1
         case i@ServerStoreIncrementalUpdate(_, _, _) =>
           val updatedModel = i.deltas.foldLeft(modelAndId.model){
-            case (m, dij) => dij.runWithA(m)
+            case (m, dijc) => dijc.runWith(m)
           }
           ServerStoreFullUpdate(ModelAndId(updatedModel, i.updatedModelId))
       }
@@ -34,11 +34,11 @@ object ServerStoreUpdate {
     * deltas
     * @param baseModelId      The id of the model before the updates
     * @param deltas           The deltas that have been applied, in the order
-    *                         they were applied
+    *                         they were applied, with JSON encoding and context for execution
     * @param updatedModelId   The id of the model after the updates
     */
   case class ServerStoreIncrementalUpdate[A](baseModelId: ModelId,
-                                             deltas: Seq[DeltaWithIJ[A]],
+                                             deltas: Seq[DeltaWithIJC[A]],
                                              updatedModelId: ModelId) extends ServerStoreUpdate[A] {
     def append(e: ServerStoreUpdate[A]): ServerStoreUpdate[A] = {
       e match {
