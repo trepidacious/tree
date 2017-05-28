@@ -35,8 +35,8 @@ class RefSpec extends WordSpec with Matchers with Checkers {
     //TODO update new entry?
     def updated[A <: M](id: Guid[A], a: A): SimpleCache[M] = {
       val updatedRev = getState(id).map(_.revision + 1).getOrElse(0L)
-      val updatedA = dCodecM.updateRefs(a, this)
-      new SimpleCache(map.updated(id, SimpleCacheState(updatedA, updatedRev, Set.empty, Set.empty)))
+      val rur = dCodecM.updateRefs(RefUpdateResult.noRefs(a), this)
+      new SimpleCache(map.updated(id, SimpleCacheState(rur.data, updatedRev, Set.empty, rur.outgoingRefs)))
     }
 
     def updated[A <: M](a: A)(implicit toId: ToId[A]): SimpleCache[M] = updated(toId.id(a), a)
@@ -112,7 +112,7 @@ class RefSpec extends WordSpec with Matchers with Checkers {
   "DeltaCodecs" should {
     "update refs" in {
       val post = examplePost._1
-      val postUpdated = postDeltaDecoder.updateRefs(examplePost._1, examplePost._2)
+      val postUpdated = postDeltaDecoder.updateRefsDataOnly(examplePost._1, examplePost._2)
 
       //All refs should be updated to rev 0
       val postExpected = Post(
@@ -137,7 +137,7 @@ class RefSpec extends WordSpec with Matchers with Checkers {
       assert(cache(post.userRef).isEmpty)
 
       //Update the post's refs so they have revisions
-      val postUpdated = postDeltaDecoder.updateRefs(examplePost._1, examplePost._2)
+      val postUpdated = postDeltaDecoder.updateRefsDataOnly(examplePost._1, examplePost._2)
 
       // Get the user from the cache using updated ref having revision
       val user = cache(postUpdated.userRef).get
@@ -147,7 +147,7 @@ class RefSpec extends WordSpec with Matchers with Checkers {
       val cacheUpdated = cache.updated(userUpdated)
 
       //Now update the post's refs again with the updated cache
-      val postUpdated2 = postDeltaDecoder.updateRefs(postUpdated, cacheUpdated)
+      val postUpdated2 = postDeltaDecoder.updateRefsDataOnly(postUpdated, cacheUpdated)
 
       //User ref should be updated to rev 1, tags still at 0
       val postExpected = Post(

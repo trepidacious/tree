@@ -3,10 +3,10 @@ package org.rebeam.tree
 import io.circe._
 import org.rebeam.lenses._
 import cats.syntax.either._
-import org.rebeam.tree.sync.Sync
-import org.rebeam.tree.sync.Sync.Ref.RefResolved
 import org.rebeam.tree.sync.Sync._
 
+import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 import scala.language.higherKinds
 
 object DeltaCodecs {
@@ -24,22 +24,30 @@ object DeltaCodecs {
     def updateRef[A](ref: Ref[A]): Option[Ref[A]]
   }
 
-  class DeltaCodecOr[A](val deltaCodec1: DeltaCodec[A], val deltaCodec2: DeltaCodec[A]) extends DeltaCodec[A] {
-    val decoder: Decoder[Delta[A]] = deltaCodec1.decoder or deltaCodec2.decoder
-    def updateRefs(a: A, cache: Cache): A = deltaCodec2.updateRefs(deltaCodec1.updateRefs(a, cache), cache)
-    def apply(c: HCursor): Decoder.Result[Delta[A]] = decoder(c)
+  case class RefUpdateResult[A](data: A, outgoingRefs: Set[Guid[_]])
+
+  object RefUpdateResult {
+    def noRefs[A](a: A): RefUpdateResult[A] = RefUpdateResult(a, Set.empty)
   }
 
   trait DeltaCodec[A] extends Decoder[Delta[A]] {
     def decoder: Decoder[Delta[A]]
 
-    def updateRefs(a: A, cache: Cache): A
+    def updateRefs(a: RefUpdateResult[A], cache: Cache): RefUpdateResult[A]
+
+    def updateRefsDataOnly(a: A, cache: Cache): A = updateRefs(RefUpdateResult.noRefs(a), cache).data
 
     final def or(d: => DeltaCodec[A]): DeltaCodec[A] = new DeltaCodecOr(this, d)
   }
 
+  class DeltaCodecOr[A](val deltaCodec1: DeltaCodec[A], val deltaCodec2: DeltaCodec[A]) extends DeltaCodec[A] {
+    val decoder: Decoder[Delta[A]] = deltaCodec1.decoder or deltaCodec2.decoder
+    def updateRefs(a: RefUpdateResult[A], cache: Cache): RefUpdateResult[A] = deltaCodec2.updateRefs(deltaCodec1.updateRefs(a, cache), cache)
+    def apply(c: HCursor): Decoder.Result[Delta[A]] = decoder(c)
+  }
+
   class DeltaCodecNoRefs[M](val decoder: Decoder[Delta[M]]) extends DeltaCodec[M] {
-    def updateRefs(m: M, cache: Cache): M = m
+    def updateRefs(rur: RefUpdateResult[M], cache: Cache): RefUpdateResult[M] = rur
     def apply(c: HCursor): Decoder.Result[Delta[M]] = decoder(c)
   }
 
@@ -56,7 +64,9 @@ object DeltaCodecs {
     def decoder: Decoder[Delta[Ref[M]]] = Decoder.instance(c =>
       c.downField("value").as[Ref[M]].map(ValueDelta(_))
     )
-    def updateRefs(m: Ref[M], cache: Cache): Ref[M] = cache.updateRef(m).getOrElse(m)
+    def updateRefs(rur: RefUpdateResult[Ref[M]], cache: Cache): RefUpdateResult[Ref[M]] =
+      RefUpdateResult(cache.updateRef(rur.data).getOrElse(rur.data), rur.outgoingRefs + rur.data.guid)
+
     def apply(c: HCursor): Decoder.Result[Delta[Ref[M]]] = decoder(c)
   }
 
@@ -74,12 +84,34 @@ object DeltaCodecs {
     )
 
     // Use dCodecA to handle data reached using the lens
-    def updateRefs(m: M, cache: Cache): M = namedLens.modify(a => dCodecA.updateRefs(a, cache))(m)
+    def updateRefs(rur: RefUpdateResult[M], cache: Cache): RefUpdateResult[M] = {
+      //TODO any need to check for whether values have changed?
+      val field = namedLens.get(rur.data)
+      val fieldRUR = dCodecA.updateRefs(rur.copy(data = field), cache)
+      val newData = namedLens.set(fieldRUR.data)(rur.data)
+      RefUpdateResult(newData, fieldRUR.outgoingRefs)
+//      namedLens.modify(a => dCodecA.updateRefs(a, cache))(rur.data)
+    }
 
     def apply(c: HCursor): Decoder.Result[Delta[M]] = decoder(c)
   }
 
   def lensN[M, A](namedLens: LensN[M, A])(implicit dCodecA: DeltaCodec[A]): DeltaCodec[M] = new DeltaCodecLensN[M, A](namedLens)(dCodecA)
+
+  private def listUpdateRefs[A](m: RefUpdateResult[List[A]], cache: Cache)(implicit dCodecA: DeltaCodec[A]): RefUpdateResult[List[A]] = {
+    // Hidden mutability
+    val newList = new ListBuffer[A]
+    val newRefs = new mutable.HashSet[Guid[_]]()
+    newRefs ++= m.outgoingRefs
+    for (a <- m.data) {
+      val rur = RefUpdateResult.noRefs(a)
+      val rur2 = dCodecA.updateRefs(rur, cache)
+      newList += rur2.data
+      newRefs ++= rur2.outgoingRefs
+    }
+    RefUpdateResult(newList.toList, newRefs.toSet)
+    //      m.map(a => dCodecA.updateRefs(a, cache))
+  }
 
   class DeltaCodecOptionalI[A](implicit dCodecA: DeltaCodec[A]) extends DeltaCodec[List[A]] {
     def decoder: Decoder[Delta[List[A]]] = Decoder.instance(c => {
@@ -90,7 +122,7 @@ object DeltaCodecs {
       } yield OptionalIDelta[A](OptionalI(index), delta)
     })
 
-    def updateRefs(m: List[A], cache: Cache): List[A] = m.map(a => dCodecA.updateRefs(a, cache))
+    def updateRefs(m: RefUpdateResult[List[A]], cache: Cache): RefUpdateResult[List[A]] = listUpdateRefs(m, cache)
 
     def apply(c: HCursor): Decoder.Result[Delta[List[A]]] = decoder(c)
   }
@@ -107,7 +139,7 @@ object DeltaCodecs {
       } yield OptionalMatchDelta[A, F](OptionalMatch(f), delta)
     })
 
-    def updateRefs(m: List[A], cache: Cache): List[A] = m.map(a => dCodecA.updateRefs(a, cache))
+    def updateRefs(m: RefUpdateResult[List[A]], cache: Cache): RefUpdateResult[List[A]] = listUpdateRefs(m, cache)
 
     def apply(c: HCursor): Decoder.Result[Delta[List[A]]] = decoder(c)
   }
@@ -124,7 +156,14 @@ object DeltaCodecs {
       } yield OptionDelta[A](delta)
     })
 
-    def updateRefs(m: Option[A], cache: Cache): Option[A] = m.map(a => dCodecA.updateRefs(a, cache))
+    def updateRefs(m: RefUpdateResult[Option[A]], cache: Cache): RefUpdateResult[Option[A]] = m.data match {
+      case None => m
+      case Some(a) => {
+        //FIXME can we really change parametric type with copy?
+        val rur = dCodecA.updateRefs(m.copy(data = a), cache)
+        rur.copy(data = Some(rur.data))
+      }
+    }
 
     def apply(c: HCursor): Decoder.Result[Delta[Option[A]]] = decoder(c)
   }
@@ -138,7 +177,17 @@ object DeltaCodecs {
     })
 
     // Use dCodecA to handle data reached using the prism
-    def updateRefs(s: S, cache: Cache): S = prismN.modify(a => dCodecA.updateRefs(a, cache))(s)
+    def updateRefs(rur: RefUpdateResult[S], cache: Cache): RefUpdateResult[S] = {
+      //TODO any need to check for whether values have changed?
+      val fieldO = prismN.getOption(rur.data)
+      fieldO match {
+        case None => rur
+        case Some(field) =>
+          val fieldRUR = dCodecA.updateRefs(rur.copy(data = field), cache)
+          val newData = prismN.set(fieldRUR.data)(rur.data)
+          RefUpdateResult(newData, fieldRUR.outgoingRefs)
+      }
+    }
 
     def apply(c: HCursor): Decoder.Result[Delta[S]] = decoder(c)
   }
