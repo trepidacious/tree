@@ -16,8 +16,9 @@ import org.rebeam.tree.Delta._
 import org.rebeam.tree.sync.ServerStoreUpdate.ServerStoreIncrementalUpdate
 import cats.syntax.either._
 import org.rebeam.lenses.PrismN
+import org.scalatest.prop.Checkers
 
-class SyncCodecsSpec extends WordSpec with Matchers {
+class SyncCodecsSpec extends WordSpec with Matchers with Checkers{
 
   @JsonCodec
   @Lenses
@@ -64,15 +65,12 @@ class SyncCodecsSpec extends WordSpec with Matchers {
 
   import Animal._
 
-  implicit val dogDeltaDecoder: Decoder[Delta[Dog]] =
-    DeltaCodecs.value[Dog]
+  implicit val dogDeltaDecoder: DeltaCodec[Dog] = DeltaCodecs.value[Dog]
 
-  implicit val catDeltaDecoder: Decoder[Delta[Cat]] =
-    DeltaCodecs.value[Cat]
+  implicit val catDeltaDecoder: DeltaCodec[Cat] = DeltaCodecs.value[Cat]
 
-  implicit val animalDeltaDecoder: Decoder[Delta[Animal]] =
+  implicit val animalDeltaDecoder: DeltaCodec[Animal] =
     DeltaCodecs.value[Animal] or prismN(dogPrism) or prismN(catPrism)
-
 
   //A delta and js encoding
   val delta = LensNDelta(Person.address, LensNDelta(Address.streetName, ValueDelta("New Street")))
@@ -198,6 +196,31 @@ class SyncCodecsSpec extends WordSpec with Matchers {
       )
 
     }
+
+    "encode and decode arbitrary guid" in {
+      check((clientId: Long, clientDeltaId: Long, id: Long) => {
+        val g: Guid[Unit] = Guid(ClientId(clientId), ClientDeltaId(clientDeltaId), id)
+        val encoded = Guid.encodeGuid[Unit](g)
+        val decoded = Guid.decodeGuid[Unit].decodeJson(encoded)
+        decoded.fold(
+          fail(_),
+          _ == g
+        )
+      })
+    }
+
+    "encode and decode arbitrary ref" in {
+      check((clientId: Long, clientDeltaId: Long, id: Long) => {
+        val r: Ref[Unit] = Ref(Guid(ClientId(clientId), ClientDeltaId(clientDeltaId), id))
+        val encoded = Ref.encodeRef[Unit](r)
+        val decoded = Ref.decodeRef[Unit].decodeJson(encoded)
+        decoded.fold(
+          fail(_),
+          _ == r
+        )
+      })
+    }
+
   }
 
 }

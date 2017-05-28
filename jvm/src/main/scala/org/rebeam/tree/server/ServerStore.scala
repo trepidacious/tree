@@ -16,6 +16,7 @@ import org.http4s.websocket.WebsocketBits._
 import io.circe._
 import io.circe.parser._
 import cats.syntax.either._
+import org.rebeam.tree.DeltaCodecs.DeltaCodec
 
 /**
   * Stores a model, and allows that model to be updated (mutated) by
@@ -62,11 +63,11 @@ class ServerStore[A: ModelIdGen](initialModel: A) {
   * Uses DeltaWithIJs encoded as JSON for incoming messages, and ModelUpdates encoded to JSON for
   * outgoing messages.
   */
-private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clientId: ClientId, contextSource: DeltaIOContextSource)(implicit encoder: Encoder[T], deltaDecoder: Decoder[Delta[T]]) extends Dispatcher[ServerStoreUpdate[T], Json, Json] {
+private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clientId: ClientId, contextSource: DeltaIOContextSource)(implicit encoder: Encoder[T], deltaDecoder: DeltaCodec[T]) extends Dispatcher[ServerStoreUpdate[T], Json, Json] {
 
   private var pendingUpdateToClient = none[ServerStoreUpdate[T]]
 
-  private val updateEncoder = serverStoreUpdateEncoder(clientId)
+  private val updateEncoder = serverStoreUpdateEncoder[T](clientId)
 
   //Store pending update
   override def modelUpdated(update: ServerStoreUpdate[T]): Unit = {
@@ -109,7 +110,7 @@ private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clien
 }
 
 object ServerStoreValueExchange {
-  def apply[M](store: ServerStore[M], clientId: ClientId, contextSource: DeltaIOContextSource)(implicit encoder: Encoder[M], decoder: Decoder[M], deltaDecoder: Decoder[Delta[M]]): Exchange[WebSocketFrame, WebSocketFrame] = {
+  def apply[M](store: ServerStore[M], clientId: ClientId, contextSource: DeltaIOContextSource)(implicit encoder: Encoder[M], decoder: Decoder[M], deltaDecoder: DeltaCodec[M]): Exchange[WebSocketFrame, WebSocketFrame] = {
 
     val dispatcher = new ServerStoreValueDispatcher(store, clientId, contextSource)
     val observer = new DispatchObserver(dispatcher)

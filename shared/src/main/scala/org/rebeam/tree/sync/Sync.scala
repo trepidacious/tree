@@ -6,6 +6,9 @@ import io.circe.syntax._
 import io.circe.generic.JsonCodec
 import org.rebeam.tree.sync.ServerStoreUpdate.{ServerStoreFullUpdate, ServerStoreIncrementalUpdate}
 import cats.syntax.either._
+import io.circe.Json.JString
+import org.rebeam.tree.DeltaCodecs.DeltaCodec
+import org.rebeam.tree.sync.Sync.Ref.RefUnresolved
 
 import scala.util.Try
 import scala.util.matching.Regex
@@ -52,9 +55,8 @@ object Sync {
     * @param id             Id of the item amongst those created in this delta
     * @tparam A             Type of the identified item - Unit if there is no specific identified item.
     */
-  @JsonCodec
   case class Guid[A](clientId: ClientId, clientDeltaId: ClientDeltaId, id: Long) {
-    override def toString: String = f"guid-${clientId.id}%x-${clientDeltaId.id}%x-$id%x"
+    override def toString: String = Guid.toString(this)
   }
 
   object Guid {
@@ -70,6 +72,17 @@ object Sync {
         }.toOption
       case _ => None
     }
+
+    def toString(g: Guid[_]): String = f"guid-${g.clientId.id}%x-${g.clientDeltaId.id}%x-${g.id}%x"
+
+    //Encoder and decoder using plain string format for guid
+
+    implicit def decodeGuid[A]: Decoder[Guid[A]] = Decoder.instance(
+      c => c.as[String].flatMap(string => fromString[A](string).fold[Either[DecodingFailure, Guid[A]]](Left(DecodingFailure("Guid invalid string", c.history)))(Right(_)))
+    )
+    implicit def encodeGuid[A]: Encoder[Guid[A]] = Encoder.instance(
+      g => Json.fromString(g.toString)
+    )
   }
 
   /**
@@ -81,6 +94,87 @@ object Sync {
       * @return The Guid
       */
     def id: Guid[A]
+  }
+
+  /**
+    * Typeclass for getting guid
+    * @tparam A The data type
+    */
+  trait ToId[A] {
+    /**
+      * @return The Guid
+      */
+    def id(a: A): Guid[A]
+  }
+
+  implicit def hasIdToId[A <: HasId[A]] = new ToId[A]{ def id(a: A): Guid[A] = a.id }
+
+  /**
+    * A reference to a data item with a known Guid.
+    * @tparam A The type of data item
+    */
+  sealed trait Ref[A] {
+    /**
+      * The Guid of the referenced data item
+      * @return Guid
+      */
+    def guid: Guid[A]
+
+    def optionRevision: Option[Long]
+  }
+
+  object Ref {
+
+    /**
+      * A reference to data where the specific revision hasn't been specified.
+      * This cannot be used to look up data, and will be replaced with a RefResolved
+      * in order to enable looking up data at a specific revision.
+      * @param guid The guid of the referenced data item
+      * @tparam A The type of data item
+      */
+    case class RefUnresolved[A](guid: Guid[A]) extends Ref[A] {
+      lazy val optionRevision: Option[Long] = None
+
+      override def toString: String = Ref.toString(this) + "-u"
+    }
+
+    /**
+      * A reference to data of a specific revision. Can be used to attempt to look up that
+      * data.
+      * @param guid The guid of the referenced data item
+      * @param revision The revision of the data we are referencing
+      * @tparam A The type of data item
+      */
+    case class RefResolved[A](guid: Guid[A], revision: Long) extends Ref[A]{
+      lazy val optionRevision: Option[Long] = Some(revision)
+      override def toString: String = Ref.toString(this) + "-rev" + revision
+    }
+
+    val regex: Regex = "([Rr][Ee][Ff]-[0-9a-fA-F]+-[0-9a-fA-F]+-[0-9a-fA-F]+)".r
+    val regexGrouped: Regex = "[Rr][Ee][Ff]-([0-9a-fA-F]+)-([0-9a-fA-F]+)-([0-9a-fA-F]+)".r
+
+    private def hex(x: String): Long = java.lang.Long.parseUnsignedLong(x, 16)
+
+    def fromString[A](s: String): Option[Ref[A]] = s match {
+      case regexGrouped(clientId, clientDeltaId, id) =>
+        Try {
+          RefUnresolved[A](Guid[A](ClientId(hex(clientId)), ClientDeltaId(hex(clientDeltaId)), hex(id)))
+        }.toOption
+      case _ => None
+    }
+
+    def toString[A](r: Ref[A]): String = f"ref-${r.guid.clientId.id}%x-${r.guid.clientDeltaId.id}%x-${r.guid.id}%x"
+
+    //Encoder and decoder using plain string format for guid
+
+    implicit def decodeRef[A]: Decoder[Ref[A]] = Decoder.instance(
+      c => c.as[String].flatMap(string => fromString[A](string).fold[Either[DecodingFailure, Ref[A]]](Left(DecodingFailure("Ref invalid string", c.history)))(Right(_)))
+    )
+    implicit def encodeRef[A]: Encoder[Ref[A]] = Encoder.instance(
+      r => Json.fromString(toString(r))
+    )
+
+    def apply[A](g: Guid[A]): Ref[A] = RefUnresolved(g)
   }
 
   /**
@@ -288,7 +382,7 @@ object Sync {
     * @tparam A           The type of model
     * @return             A decoder of DeltaWithIJ[T]
     */
-  def clientMsgDecoder[A](implicit deltaDecoder: Decoder[Delta[A]]): Decoder[DeltaWithIJ[A]] = Decoder.instance(c => {
+  def clientMsgDecoder[A](implicit deltaDecoder: DeltaCodec[A]): Decoder[DeltaWithIJ[A]] = Decoder.instance(c => {
 
     val o = c.downField("commit")
 

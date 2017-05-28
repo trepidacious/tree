@@ -369,4 +369,31 @@ class SyncSpec extends WordSpec with Matchers with Checkers {
 
   }
 
+  "Ref" should {
+    "produce valid string representation" in {
+      val r: Ref[Unit] = Ref(Guid(ClientId(1), ClientDeltaId(10), 255))
+      assert(Ref.toString(r) == "ref-1-a-ff")
+    }
+
+    "parse valid string representation" in {
+      val r: Option[Ref[Unit]] = Ref.fromString("ref-1-a-ff")
+      assert(r.contains(Ref[Unit](Guid[Unit](ClientId(1), ClientDeltaId(10), 255))))
+    }
+
+    "parse ignoring case" in {
+      assert(Ref.fromString[Unit]("ref-1-a-ff") == Ref.fromString[Unit]("ReF-1-A-fF"))
+    }
+
+    "recovers arbitrary ref from encoding in string" in {
+      check((clientId: Long, clientDeltaId: Long, id: Long) => {
+        val r: Ref[Unit] = Ref(Guid(ClientId(clientId), ClientDeltaId(clientDeltaId), id))
+        val s = Ref.toString(r)
+        val regexMatches = Ref.regex.findFirstIn(s).contains(s)
+        val parseRecovers = Ref.fromString[Unit](s).contains(r)
+        regexMatches && parseRecovers
+      })
+    }
+
+  }
+
 }

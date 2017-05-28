@@ -117,7 +117,7 @@ object Cursor {
     }
 
     lazy val zoomAllIP: List[CursorP[C, P]] = cursor.model.zipWithIndex.flatMap {
-      case (a, i) => cursor.zoomIP(i)
+      case (_, i) => cursor.zoomIP(i)
     }
 
     def zoomMatchP[F <: C => Boolean](f: F)(implicit fEncoder: Encoder[F]): Option[CursorP[C, P]] = {
