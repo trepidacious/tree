@@ -5,10 +5,8 @@ import monocle._
 import org.rebeam.tree._
 import org.rebeam.lenses._
 import io.circe._
-
-import scala.reflect.ClassTag
-
-
+import org.rebeam.tree.ref.Cache
+import org.rebeam.tree.sync.Sync.Ref
 
 /**
   * Cursor giving a "position" in a data model, providing the value at that position
@@ -37,7 +35,7 @@ trait Cursor[M] extends Parent[M] {
     */
   def model: M
 
-  //Just pass through runDelta to parent for convenience
+  //Just pass through callback to parent for convenience
   def callback(delta: Delta[M], deltaJs: Json): Callback = parent.callback(delta, deltaJs)
 
   def act[A <: Delta[M]](actionDelta: A)(implicit encoder: Encoder[A]): Callback =
@@ -67,7 +65,6 @@ trait Cursor[M] extends Parent[M] {
 
   def withP[P](p: P): CursorP[M, P] = CursorP(parent, model, p)
 }
-
 
 private case class CursorBasic[M](parent: Parent[M], model: M) extends Cursor[M]
 
@@ -103,6 +100,14 @@ object Cursor {
     def zoomOption: Option[Cursor[C]] = {
       cursor.model.map { c =>
         Cursor[C](OptionParent[C](cursor.parent), c)
+      }
+    }
+  }
+
+  implicit class CacheCursor[M](cursor: Cursor[Cache[M]]) {
+    def zoomRef[A <: M](ref: Ref[A]): Option[Cursor[A]] = {
+      cursor.model(ref).map { data =>
+        Cursor[A](CacheParent[M, A](cursor.parent, OptionalCache(ref)), data)
       }
     }
   }

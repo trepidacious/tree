@@ -7,6 +7,7 @@ import org.rebeam.lenses._
 import monocle._
 import monocle.std.option
 import org.rebeam.tree.Delta._
+import org.rebeam.tree.ref.Cache
 import org.rebeam.tree.sync.Sync.Guid
 
 import scala.reflect.ClassTag
@@ -141,4 +142,13 @@ case class PrismNDelta[S, A](prismN: PrismN[S, A], delta: Delta[A]) extends Delt
     )(
       a => delta(a).map(modifiedA => prismN.set(modifiedA)(s))
     )  //optionalI.modify(delta.apply)(l)
+}
+
+case class CacheDelta[M, A <: M](optionalCache: OptionalCache[M, A], delta: Delta[A]) extends Delta[Cache[M]] {
+  def apply(c: Cache[M]): DeltaIO[Cache[M]] =
+    optionalCache.getOption(c).fold(
+      pure(c)
+    )(
+      a => delta(a).map(modifiedA => optionalCache.set(modifiedA)(c))
+    )
 }

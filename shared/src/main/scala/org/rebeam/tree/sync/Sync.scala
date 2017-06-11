@@ -6,9 +6,7 @@ import io.circe.syntax._
 import io.circe.generic.JsonCodec
 import org.rebeam.tree.sync.ServerStoreUpdate.{ServerStoreFullUpdate, ServerStoreIncrementalUpdate}
 import cats.syntax.either._
-import io.circe.Json.JString
 import org.rebeam.tree.DeltaCodecs.DeltaCodec
-import org.rebeam.tree.sync.Sync.Ref.RefUnresolved
 
 import scala.util.Try
 import scala.util.matching.Regex

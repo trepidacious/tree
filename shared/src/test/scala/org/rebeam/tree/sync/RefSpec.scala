@@ -158,7 +158,7 @@ class RefSpec extends WordSpec with Matchers with Checkers {
     "update refs incrementally" in {
       val post = examplePost._1
       val cache = examplePost._2
-      
+
       //Update the post's refs so they have revisions
       val postUpdated = postDeltaDecoder.updateRefsDataOnly(examplePost._1, examplePost._2)
 

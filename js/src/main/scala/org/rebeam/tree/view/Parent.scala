@@ -5,6 +5,8 @@ import org.rebeam.tree._
 import org.rebeam.lenses._
 import io.circe._
 import monocle.Lens
+import org.rebeam.tree.ref.Cache
+import org.rebeam.tree.sync.Sync.Ref
 
 /**
   * Interface provided by a parent component (view) to a child component,
@@ -178,6 +180,36 @@ case class LensParent[P, C, L <: Lens[P, C] : OuterEncoder](parent: Parent[P], l
 
     //Add this delta to the JSON
     val parentDeltaJs = Json.obj("lens" -> implicitly[OuterEncoder[L]].encode(lens, deltaJs))
+
+    //Run using the parent's own parent
+    parent.callback(parentDelta, parentDeltaJs)
+  }
+}
+
+/**
+  * Produce a Parent for a data item in a Cache, from a Parent for that Cache. This uses
+  * an OptionalCache to move between the Cache and the data item at a given Ref.
+  * @param parent         The parent of the cache
+  * @param optionalCache  The Optional from the Cache to the correct data item (if any)
+  * @tparam M             The type of data item in the Cache
+  * @tparam A             The type of the data item
+  */
+case class CacheParent[M, A <: M](parent: Parent[Cache[M]], optionalCache: OptionalCache[M, A]) extends Parent[A] {
+
+  def callback(delta: Delta[A], deltaJs: Json): Callback = {
+    //Produce an OptionalCacheDelta from the provided child delta, to make it into a delta
+    //of the parent (i.e. convert child's Delta[A] to parent's Delta[Cache[M]
+    val parentDelta = CacheDelta(optionalCache, delta)
+
+    //Add this delta to the JSON
+    val parentDeltaJs = Json.obj(
+      "optional" -> Json.obj(
+        "optionalCache" -> Json.obj(
+          "ref" -> Ref.encodeRef[A](optionalCache.ref),
+          "delta" -> deltaJs
+        )
+      )
+    )
 
     //Run using the parent's own parent
     parent.callback(parentDelta, parentDeltaJs)
