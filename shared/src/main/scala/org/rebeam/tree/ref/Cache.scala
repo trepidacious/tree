@@ -5,22 +5,14 @@ import org.rebeam.tree.DeltaCodecs.{DeltaCodec, RefUpdateResult}
 import org.rebeam.tree.sync.Sync.Ref.{RefResolved, RefUnresolved}
 import org.rebeam.tree.sync.Sync.{Guid, Ref, ToId}
 
-trait DeltaCache {
-    /**
-      * Retrieve the data for a reference, if reference is valid and data is present in cache
-      * @param ref  The reference
-      * @tparam A   The type of data
-      * @return     The data if present, or None
-      */
-    def apply[A](ref: Ref[A]): Option[A]
-
-    /**
-      * Update a ref to the latest version if necessary
-      * @param ref  The ref to update
-      * @tparam A   The type of the referent
-      * @return     Some(updated ref) if update is needed, None otherwise
-      */
-    def updateRef[A](ref: Ref[A]): Option[Ref[A]]
+trait RefUpdater {
+  /**
+    * Update a ref to the latest version if necessary
+    * @param ref  The ref to update
+    * @tparam A   The type of the referent
+    * @return     Some(updated ref) if update is needed, None otherwise
+    */
+  def updateRef[A](ref: Ref[A]): Option[Ref[A]]
 }
 
 object Cache {
@@ -63,7 +55,14 @@ private case class CacheState[A](data: A, revision: Long, incomingRefs: Set[Guid
   )
 }
 
-class Cache[M](private val map: Map[Guid[_], CacheState[M]])(implicit dCodecM: DeltaCodec[M]) extends DeltaCache {
+class Cache[M](private val map: Map[Guid[_], CacheState[M]])(implicit dCodecM: DeltaCodec[M]) extends RefUpdater {
+
+  /**
+    * Retrieve the data for a reference, if reference is valid and data is present in cache
+    * @param ref  The reference
+    * @tparam A   The type of data
+    * @return     The data if present, or None
+    */
   def apply[A](ref: Ref[A]): Option[A] = ref match {
     case RefUnresolved(_) => None
     case RefResolved(guid, revision) => getState(guid).filter(_.revision == revision).map(_.data)
