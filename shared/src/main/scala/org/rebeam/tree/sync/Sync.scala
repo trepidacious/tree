@@ -79,7 +79,7 @@ object Sync {
       c => c.as[String].flatMap(string => fromString[A](string).fold[Either[DecodingFailure, Guid[A]]](Left(DecodingFailure("Guid invalid string", c.history)))(Right(_)))
     )
     implicit def encodeGuid[A]: Encoder[Guid[A]] = Encoder.instance(
-      g => Json.fromString(g.toString)
+      g => Json.fromString(toString(g))
     )
   }
 

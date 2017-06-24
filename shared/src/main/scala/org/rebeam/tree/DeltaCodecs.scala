@@ -194,4 +194,23 @@ object DeltaCodecs {
     //Map to Delta[M] for neatness
     ).map(a => a: Delta[M])
   )
+
+  class DeltaCodecCache[M, A <: M](implicit dCodecA: DeltaCodec[A]) extends DeltaCodec[Cache[M]] {
+
+    //FIXME this is unsound - it will decode to eagerly. Since the type A is not encoded
+    //in the delta Json (and in particular not in the Json for the Ref[A]), we are happy
+    //to decode anything where the delta Json matches an expected delta for the type A.
+    //So for example say we have both Cats and Dogs in a Cache[Animal],
+    val decoder: Decoder[Delta[Cache[M]]] = Decoder.instance(c => {
+      val o = c.downField("optional").downField("optionalCache")
+      for {
+        ref <- o.downField("ref").as[Ref[A]]
+        delta <- o.downField("delta").as[Delta[A]]
+      } yield CacheDelta[M, A](OptionalCache(ref), delta)
+    })
+
+    def updateRefs(rur: RefUpdateResult[Cache[M]], cache: DeltaCache): RefUpdateResult[Cache[M]] = rur
+    def apply(c: HCursor): Decoder.Result[Delta[Cache[M]]] = decoder(c)
+  }
+
 }

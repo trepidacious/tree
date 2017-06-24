@@ -1,5 +1,6 @@
 package org.rebeam.tree.ref
 
+import io.circe._
 import org.rebeam.tree.DeltaCodecs.{DeltaCodec, RefUpdateResult}
 import org.rebeam.tree.sync.Sync.Ref.{RefResolved, RefUnresolved}
 import org.rebeam.tree.sync.Sync.{Guid, Ref, ToId}
@@ -22,6 +23,36 @@ trait DeltaCache {
     def updateRef[A](ref: Ref[A]): Option[Ref[A]]
 }
 
+object Cache {
+  def empty[M: DeltaCodec] = new Cache[M](Map.empty)
+
+  implicit val guidKeyEncoder: KeyEncoder[Guid[_]] = new KeyEncoder[Guid[_]] {
+    override def apply(key: Guid[_]): String = Guid.toString(key)
+  }
+
+  implicit val guidKeyDecoder = new KeyDecoder[Guid[_]] {
+    override def apply(key: String): Option[Guid[_]] = Guid.fromString(key)
+  }
+
+  // Decode as a plain map from guid to data, then add the entries to an actual Cache to update refs etc.
+  implicit def decodeCache[M](implicit dm: Decoder[M], deltaCodec: DeltaCodec[M]): Decoder[Cache[M]] =
+    Decoder.decodeMapLike[Map, Guid[_], M].map(
+      // Fold over entries in map, accumulating them into a cache
+      _.foldLeft(Cache.empty[M]){
+        // Here we have to assume that the cache was valid when encoded, so that in each entry
+        // the Guid was for the correct type of data, and also matches any Guid used in the
+        // future to look up data in the cache.
+        case (cache, entry) => cache.updated(entry._1.asInstanceOf[Guid[M]], entry._2)
+      }
+    )
+
+  // Encode by converting to a plain map from guid to data, and encoding the guids as their string representation
+  // so we can use a normal map Json encoding
+  implicit def encodeCache[M](implicit em: Encoder[M]): Encoder[Cache[M]] =
+    Encoder.encodeMapLike[Map, Guid[_], M](guidKeyEncoder, em).contramap[Cache[M]](_.map.mapValues(_.data))
+
+}
+
 private case class CacheState[A](data: A, revision: Long, incomingRefs: Set[Guid[_]], outgoingRefs: Set[Guid[_]]) {
   def updatedIncomingRefs(id: Guid[_], add: Boolean): CacheState[A] = copy(
     incomingRefs = if (add) {
@@ -32,8 +63,7 @@ private case class CacheState[A](data: A, revision: Long, incomingRefs: Set[Guid
   )
 }
 
-class Cache[M](private val map: Map[Guid[_], CacheState[_]])(implicit dCodecM: DeltaCodec[M]) extends DeltaCache {
-
+class Cache[M](private val map: Map[Guid[_], CacheState[M]])(implicit dCodecM: DeltaCodec[M]) extends DeltaCache {
   def apply[A](ref: Ref[A]): Option[A] = ref match {
     case RefUnresolved(_) => None
     case RefResolved(guid, revision) => getState(guid).filter(_.revision == revision).map(_.data)
@@ -78,7 +108,7 @@ class Cache[M](private val map: Map[Guid[_], CacheState[_]])(implicit dCodecM: D
           m
         }{
           // If data IS in the cache, we update its cache state to add/remove ourselves as an incoming ref
-          (otherCacheState: CacheState[_]) =>
+          (otherCacheState: CacheState[M]) =>
             m.updated(
               outgoingRef,
               otherCacheState.updatedIncomingRefs(id, add)
@@ -186,8 +216,4 @@ class Cache[M](private val map: Map[Guid[_], CacheState[_]])(implicit dCodecM: D
   }
 
     override def toString: String = "Cache(" + map + ")"
-}
-
-object Cache {
-  def empty[M: DeltaCodec] = new Cache[M](Map.empty)
 }
