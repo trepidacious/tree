@@ -104,10 +104,10 @@ object Cursor {
     }
   }
 
-  implicit class CacheCursor[M](cursor: Cursor[Cache[M]]) {
-    def zoomRef[A <: M](ref: Ref[A]): Option[Cursor[A]] = {
+  implicit class CacheCursor[A](cursor: Cursor[Cache[A]]) {
+    def zoomRef(ref: Ref[A]): Option[Cursor[A]] = {
       cursor.model(ref).map { data =>
-        Cursor[A](CacheParent[M, A](cursor.parent, OptionalCache(ref)), data)
+        Cursor[A](CacheParent[A](cursor.parent, OptionalCache(ref)), data)
       }
     }
   }

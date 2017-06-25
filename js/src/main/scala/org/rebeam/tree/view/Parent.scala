@@ -191,10 +191,9 @@ case class LensParent[P, C, L <: Lens[P, C] : OuterEncoder](parent: Parent[P], l
   * an OptionalCache to move between the Cache and the data item at a given Ref.
   * @param parent         The parent of the cache
   * @param optionalCache  The Optional from the Cache to the correct data item (if any)
-  * @tparam M             The type of data item in the Cache
-  * @tparam A             The type of the data item
+  * @tparam A             The type of data item in the Cache
   */
-case class CacheParent[M, A <: M](parent: Parent[Cache[M]], optionalCache: OptionalCache[M, A]) extends Parent[A] {
+case class CacheParent[A](parent: Parent[Cache[A]], optionalCache: OptionalCache[A]) extends Parent[A] {
 
   def callback(delta: Delta[A], deltaJs: Json): Callback = {
     //Produce an OptionalCacheDelta from the provided child delta, to make it into a delta

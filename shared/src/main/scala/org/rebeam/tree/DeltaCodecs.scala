@@ -195,29 +195,18 @@ object DeltaCodecs {
     ).map(a => a: Delta[M])
   )
 
-  class DeltaCodecCache[M, A <: M](implicit dCodecA: DeltaCodec[A]) extends DeltaCodec[Cache[M]] {
+  class DeltaCodecCache[A](implicit dCodecA: DeltaCodec[A]) extends DeltaCodec[Cache[A]] {
 
-    //FIXME this is unsound - it will decode too eagerly. Since the type A is not encoded
-    //in the delta Json (and in particular not in the Json for the Ref[A]), we are happy
-    //to decode anything where the delta Json matches an expected delta for the type A.
-    //So for example say we have both Cats and Dogs in a Cache[Animal], and both have
-    //a name field and LensN for this, we might encode a delta with an CacheDelta using
-    //a Ref[Dog], then a LensNDelta with Dog.name, and this would be decodable as a
-    //CacheDelta expecting a Ref[Cat] then a LensNDelta with Cat.name. While this could
-    //only happen where the Json for a delta on two different types in the cache looks
-    //the same, this case could be common enough to cause problems. We need to address
-    //this, for example by making Cache[M] always return Optional[M], so that we then
-    //need to use a Prism to get to the actual type needed.
-    val decoder: Decoder[Delta[Cache[M]]] = Decoder.instance(c => {
+    val decoder: Decoder[Delta[Cache[A]]] = Decoder.instance(c => {
       val o = c.downField("optional").downField("optionalCache")
       for {
         ref <- o.downField("ref").as[Ref[A]]
         delta <- o.downField("delta").as[Delta[A]]
-      } yield CacheDelta[M, A](OptionalCache(ref), delta)
+      } yield CacheDelta[A](OptionalCache(ref), delta)
     })
 
-    def updateRefs(rur: RefUpdateResult[Cache[M]], updater: RefUpdater): RefUpdateResult[Cache[M]] = rur
-    def apply(c: HCursor): Decoder.Result[Delta[Cache[M]]] = decoder(c)
+    def updateRefs(rur: RefUpdateResult[Cache[A]], updater: RefUpdater): RefUpdateResult[Cache[A]] = rur
+    def apply(c: HCursor): Decoder.Result[Delta[Cache[A]]] = decoder(c)
   }
 
 }

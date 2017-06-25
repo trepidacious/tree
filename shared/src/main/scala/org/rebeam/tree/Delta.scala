@@ -144,8 +144,8 @@ case class PrismNDelta[S, A](prismN: PrismN[S, A], delta: Delta[A]) extends Delt
     )  //optionalI.modify(delta.apply)(l)
 }
 
-case class CacheDelta[M, A <: M](optionalCache: OptionalCache[M, A], delta: Delta[A]) extends Delta[Cache[M]] {
-  def apply(c: Cache[M]): DeltaIO[Cache[M]] =
+case class CacheDelta[A](optionalCache: OptionalCache[A], delta: Delta[A]) extends Delta[Cache[A]] {
+  def apply(c: Cache[A]): DeltaIO[Cache[A]] =
     optionalCache.getOption(c).fold(
       pure(c)
     )(

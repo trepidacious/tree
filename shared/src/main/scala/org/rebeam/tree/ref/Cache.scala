@@ -1,6 +1,7 @@
 package org.rebeam.tree.ref
 
 import io.circe._
+import monocle.PPrism
 import org.rebeam.tree.DeltaCodecs.{DeltaCodec, RefUpdateResult}
 import org.rebeam.tree.sync.Sync.Ref.{RefResolved, RefUnresolved}
 import org.rebeam.tree.sync.Sync.{Guid, Ref, ToId}
@@ -60,13 +61,21 @@ class Cache[M](private val map: Map[Guid[_], CacheState[M]])(implicit dCodecM: D
   /**
     * Retrieve the data for a reference, if reference is valid and data is present in cache
     * @param ref  The reference
-    * @tparam A   The type of data
-    * @return     The data if present, or None
+    * @return     The data if present, or None otherwise
     */
-  def apply[A](ref: Ref[A]): Option[A] = ref match {
+  def apply(ref: Ref[M]): Option[M] = ref match {
     case RefUnresolved(_) => None
     case RefResolved(guid, revision) => getState(guid).filter(_.revision == revision).map(_.data)
   }
+
+  /**
+    * Retrieve the data for a reference, and then convert to another type via a PPrism
+    * @param ref  The reference
+    * @param p    The prism to use for conversion
+    * @tparam A   The type to which prism converts (from M)
+    * @return     The data if present in cache and convertible by p.getOption, or None otherwise
+    */
+  def prism[A <: M](ref: Ref[A])(implicit p: PPrism[M, _, A, _]): Option[A] = apply(ref).flatMap(p.getOption _)
 
   def updateRef[A](ref: Ref[A]): Option[Ref[A]] = getState(ref.guid).fold[Option[Ref[A]]]{
     // If ref is not in cache, update to unresolved
@@ -77,12 +86,14 @@ class Cache[M](private val map: Map[Guid[_], CacheState[M]])(implicit dCodecM: D
   // Skip update if new ref is equal to old one
   }.filterNot(_ == ref)
 
-  def incomingRefs[A](id: Guid[A]): Set[Guid[_]] = getState(id).map(_.incomingRefs).getOrElse(Set.empty[Guid[_]])
-  def outgoingRefs[A](id: Guid[A]): Set[Guid[_]] = getState(id).map(_.outgoingRefs).getOrElse(Set.empty[Guid[_]])
+  def incomingRefs(id: Guid[M]): Set[Guid[_]] = getState(id).map(_.incomingRefs).getOrElse(Set.empty[Guid[_]])
+  def outgoingRefs(id: Guid[M]): Set[Guid[_]] = getState(id).map(_.outgoingRefs).getOrElse(Set.empty[Guid[_]])
 
-  def get[A](id: Guid[A]): Option[A] = getState(id).map(_.data)
+  def get(id: Guid[M]): Option[M] = getState(id).map(_.data)
 
-  private def getState[A](id: Guid[A]): Option[CacheState[A]] = map.get(id).map(_.asInstanceOf[CacheState[A]])
+  def getPrism[A <: M](id: Guid[A])(implicit p: PPrism[M, _, A, _]): Option[A] = get(id).flatMap(p.getOption _)
+
+  private def getState(id: Guid[_]): Option[CacheState[M]] = map.get(id)
 
   private def incomingRefsFor(id: Guid[_]): Set[Guid[_]] = {
     map.foldLeft(Set.empty[Guid[_]]){
@@ -117,9 +128,9 @@ class Cache[M](private val map: Map[Guid[_], CacheState[M]])(implicit dCodecM: D
     new Cache[M](map2)
   }
 
-  def updated[A <: M](a: A)(implicit toId: ToId[A]): Cache[M] = updated(toId.id(a), a)
+  def updated(a: M)(implicit toId: ToId[M]): Cache[M] = updated(toId.id(a), a)
 
-  def updated[A <: M](id: Guid[A], a: A): Cache[M] = {
+  def updated(id: Guid[M], a: M): Cache[M] = {
     val state = getState(id)
 
     // Next revision, or start from 0
@@ -176,10 +187,9 @@ class Cache[M](private val map: Map[Guid[_], CacheState[M]])(implicit dCodecM: D
     * Create a new Cache with a data item not present (same cache if data was
     * not in the cache)
     * @param id Id of data to remove
-    * @tparam A Type of data to remove
     * @return   New cache with data item not present
     */
-  def removed[A <: M](id: Guid[A]): Cache[M] = {
+  def removed(id: Guid[M]): Cache[M] = {
     getState(id).fold{
       this
     }{

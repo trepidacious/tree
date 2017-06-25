@@ -53,7 +53,7 @@ object Sync {
     * @param id             Id of the item amongst those created in this delta
     * @tparam A             Type of the identified item - Unit if there is no specific identified item.
     */
-  case class Guid[A](clientId: ClientId, clientDeltaId: ClientDeltaId, id: Long) {
+  case class Guid[+A](clientId: ClientId, clientDeltaId: ClientDeltaId, id: Long) {
     override def toString: String = Guid.toString(this)
   }
 
@@ -87,7 +87,7 @@ object Sync {
     * Indicates a data type has a Guid
     * @tparam A The data type
     */
-  trait HasId[A] {
+  trait HasId[+A] {
     /**
       * @return The Guid
       */
@@ -111,7 +111,7 @@ object Sync {
     * A reference to a data item with a known Guid.
     * @tparam A The type of data item
     */
-  sealed trait Ref[A] {
+  sealed trait Ref[+A] {
     /**
       * The Guid of the referenced data item
       * @return Guid

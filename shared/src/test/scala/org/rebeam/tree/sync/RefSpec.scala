@@ -18,7 +18,7 @@ import org.rebeam.tree.sync.Sync.Ref._
 class RefSpec extends WordSpec with Matchers with Checkers {
 
   @JsonCodec
-  sealed trait Data
+  sealed trait Data extends HasId[Data]
 
   object Data {
     @JsonCodec
@@ -37,10 +37,10 @@ class RefSpec extends WordSpec with Matchers with Checkers {
     @Lenses
     case class Tag(id: Guid[Tag], tag: String) extends HasId[Tag] with Data
 
-    val addressPrism: PrismN[Data, Address] = PrismN.classTag("Address")
-    val userPrism: PrismN[Data, User] = PrismN.classTag("User")
-    val postPrism: PrismN[Data, Post] = PrismN.classTag("Post")
-    val tagPrism: PrismN[Data, Tag] = PrismN.classTag("Tag")
+    implicit val addressPrism: PrismN[Data, Address] = PrismN.classTag("Address")
+    implicit val userPrism: PrismN[Data, User] = PrismN.classTag("User")
+    implicit val postPrism: PrismN[Data, Post] = PrismN.classTag("Post")
+    implicit val tagPrism: PrismN[Data, Tag] = PrismN.classTag("Tag")
   }
 
   import Data._
@@ -84,7 +84,7 @@ class RefSpec extends WordSpec with Matchers with Checkers {
       .updated(Tag(tagId2, "Tag2"))
     (
       //FIXME get
-      cache.get(postId).get,
+      cache.getPrism(postId).get,
       cache
     )
   }
@@ -100,10 +100,10 @@ class RefSpec extends WordSpec with Matchers with Checkers {
       assert(cache.outgoingRefs(post.id) == Set(post.userRef.guid) ++ post.tagRefs.map(_.guid))
 
       val r = for {
-        user <- cache(post.userRef)
-        address <- cache(user.addressRef)
-        tag1 <- cache(post.tagRefs.head)
-        tag2 <- cache(post.tagRefs(1))
+        user <- cache.prism(post.userRef)
+        address <- cache.prism(user.addressRef)
+        tag1 <- cache.prism(post.tagRefs.head)
+        tag2 <- cache.prism(post.tagRefs(1))
       } yield {
         assert(cache.incomingRefs(user.id) == Set(post.id))
         assert(cache.outgoingRefs(user.id) == Set(address.id))
@@ -163,7 +163,7 @@ class RefSpec extends WordSpec with Matchers with Checkers {
       val postUpdated = postDeltaDecoder.updateRefsDataOnly(examplePost._1, examplePost._2)
 
       // Get the user from the cache using updated ref having revision
-      val user = cache(postUpdated.userRef).get
+      val user = cache.prism(postUpdated.userRef).get
 
       // Update the user data, and update the cache with thi data
       val userUpdated = user.copy(name = "UserModified")
