@@ -110,6 +110,10 @@ object Cursor {
         Cursor[A](CacheParent[A](cursor.parent, OptionalCache(ref)), data)
       }
     }
+
+    def zoomRefPrism[B <: A](ref: Ref[B])(implicit p: PrismN[A, B]): Option[Cursor[B]] = {
+      zoomRef(ref).flatMap(c => c.zoomPrismN[B](p))
+    }
   }
 
   implicit class ListCursorP[C, P](cursor: CursorP[List[C], P]) {
