@@ -6,7 +6,7 @@ import org.rebeam.tree._
 import org.rebeam.lenses._
 import io.circe._
 import org.rebeam.tree.ref.Cache
-import org.rebeam.tree.sync.Sync.Ref
+import org.rebeam.tree.ref.Ref
 
 /**
   * Cursor giving a "position" in a data model, providing the value at that position
@@ -113,6 +113,18 @@ object Cursor {
 
     def zoomRefPrism[B <: A](ref: Ref[B])(implicit p: PrismN[A, B]): Option[Cursor[B]] = {
       zoomRef(ref).flatMap(c => c.zoomPrismN[B](p))
+    }
+  }
+
+  implicit class CacheCursorP[A, P](cursor: CursorP[Cache[A], P]) {
+    def zoomRefP(ref: Ref[A]): Option[CursorP[A, P]] = {
+      cursor.model(ref).map { data =>
+        CursorP[A, P](CacheParent[A](cursor.parent, OptionalCache(ref)), data, cursor.p)
+      }
+    }
+
+    def zoomRefPrismP[B <: A](ref: Ref[B])(implicit prism: PrismN[A, B]): Option[CursorP[B, P]] = {
+      zoomRefP(ref).flatMap(c => c.zoomPrismNP[B](prism))
     }
   }
 

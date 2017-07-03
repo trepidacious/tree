@@ -9,6 +9,7 @@ import org.rebeam.tree.sync.Sync._
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.language.higherKinds
+import org.rebeam.tree.ref.Ref
 
 object DeltaCodecs {
 
@@ -208,5 +209,7 @@ object DeltaCodecs {
     def updateRefs(rur: RefUpdateResult[Cache[A]], updater: RefUpdater): RefUpdateResult[Cache[A]] = rur
     def apply(c: HCursor): Decoder.Result[Delta[Cache[A]]] = decoder(c)
   }
+
+  implicit def cache[A](implicit dCodecA: DeltaCodec[A]): DeltaCodec[Cache[A]] = new DeltaCodecCache[A]
 
 }

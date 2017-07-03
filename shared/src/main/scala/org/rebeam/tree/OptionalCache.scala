@@ -2,7 +2,7 @@ package org.rebeam.tree
 
 import monocle.{Optional, POptional}
 import org.rebeam.tree.ref.Cache
-import org.rebeam.tree.sync.Sync.Ref
+import org.rebeam.tree.ref.Ref
 
 import scalaz.{Applicative, \/}
 

@@ -6,7 +6,7 @@ import org.rebeam.lenses._
 import io.circe._
 import monocle.Lens
 import org.rebeam.tree.ref.Cache
-import org.rebeam.tree.sync.Sync.Ref
+import org.rebeam.tree.ref.Ref
 
 /**
   * Interface provided by a parent component (view) to a child component,

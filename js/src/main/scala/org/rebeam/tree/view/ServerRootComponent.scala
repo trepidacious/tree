@@ -85,7 +85,7 @@ object ServerRootComponent {
           parse(msg).fold[Unit](
             pf => println("Invalid JSON from server " + pf),
             json => updateDecoder[R].decodeJson(json).fold(
-              df => println("Could not decode JSON from server " + df),
+              df => println("Could not decode JSON from server " + df + ":\n" + msg),
               update => {
 
                 val newCSX = direct.state.clientState.fold(

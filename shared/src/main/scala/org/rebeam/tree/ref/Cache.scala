@@ -3,8 +3,8 @@ package org.rebeam.tree.ref
 import io.circe._
 import monocle.PPrism
 import org.rebeam.tree.DeltaCodecs.{DeltaCodec, RefUpdateResult}
-import org.rebeam.tree.sync.Sync.Ref.{RefResolved, RefUnresolved}
-import org.rebeam.tree.sync.Sync.{Guid, Ref, ToId}
+import org.rebeam.tree.sync.Sync.{Guid, ToId}
+import org.rebeam.tree.ref.Ref._
 
 trait RefUpdater {
   /**
@@ -63,10 +63,11 @@ class Cache[M](private val map: Map[Guid[_], CacheState[M]])(implicit dCodecM: D
     * @param ref  The reference
     * @return     The data if present, or None otherwise
     */
-  def apply(ref: Ref[M]): Option[M] = ref match {
-    case RefUnresolved(_) => None
-    case RefResolved(guid, revision) => getState(guid).filter(_.revision == revision).map(_.data)
-  }
+  def apply(ref: Ref[M]): Option[M] = getState(ref.guid).map(_.data)
+//    ref match {
+//    case RefUnresolved(_) => None
+//    case RefResolved(guid, revision) => getState(guid).filter(_.revision == revision).map(_.data)
+//  }
 
   /**
     * Retrieve the data for a reference, and then convert to another type via a PPrism
