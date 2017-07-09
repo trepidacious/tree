@@ -17,6 +17,7 @@ import org.rebeam.tree.sync.ServerStoreUpdate.ServerStoreIncrementalUpdate
 import cats.syntax.either._
 import org.rebeam.lenses.PrismN
 import org.scalatest.prop.Checkers
+import org.rebeam.tree.ref.Ref
 
 class SyncCodecsSpec extends WordSpec with Matchers with Checkers{
 

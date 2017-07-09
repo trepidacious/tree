@@ -7,6 +7,7 @@ import org.scalatest._
 import org.scalatest.prop.Checkers
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Prop._
+import org.rebeam.tree.ref.Ref
 
 class SyncSpec extends WordSpec with Matchers with Checkers {
 
