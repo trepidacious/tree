@@ -17,7 +17,7 @@ trait RefUpdater {
 }
 
 object Cache {
-  def empty[M: DeltaCodec] = new Cache[M](Map.empty)
+  def empty[M](implicit c: DeltaCodec[M, M]) = new Cache[M](Map.empty)
 
   implicit val guidKeyEncoder: KeyEncoder[Guid[_]] = new KeyEncoder[Guid[_]] {
     override def apply(key: Guid[_]): String = Guid.toString(key)
@@ -28,7 +28,7 @@ object Cache {
   }
 
   // Decode as a plain map from guid to data, then add the entries to an actual Cache to update refs etc.
-  implicit def decodeCache[M](implicit dm: Decoder[M], deltaCodec: DeltaCodec[M]): Decoder[Cache[M]] =
+  implicit def decodeCache[M](implicit dm: Decoder[M], deltaCodec: DeltaCodec[M, M]): Decoder[Cache[M]] =
     Decoder.decodeMapLike[Map, Guid[_], M].map(
       // Fold over entries in map, accumulating them into a cache
       _.foldLeft(Cache.empty[M]){
@@ -56,7 +56,7 @@ private case class CacheState[A](data: A, revision: Long, incomingRefs: Set[Guid
   )
 }
 
-class Cache[M](private val map: Map[Guid[_], CacheState[M]])(implicit dCodecM: DeltaCodec[M]) extends RefUpdater {
+class Cache[M](private val map: Map[Guid[_], CacheState[M]])(implicit dCodecM: DeltaCodec[M, M]) extends RefUpdater {
 
   /**
     * Retrieve the data for a reference, if reference is valid and data is present in cache

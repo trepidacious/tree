@@ -13,7 +13,8 @@ import org.scalatest.prop.Checkers
 import scala.language.higherKinds
 import org.rebeam.tree.BasicDeltaDecoders._
 import org.rebeam.tree.ref.Cache
-import org.rebeam.tree.sync.Sync.Ref._
+import org.rebeam.tree.ref.Ref._
+import org.rebeam.tree.ref.Ref
 
 class RefSpec extends WordSpec with Matchers with Checkers {
 
@@ -184,9 +185,9 @@ class RefSpec extends WordSpec with Matchers with Checkers {
       )
       assert(postUpdated2 == postExpected)
 
-      // And we can still get at the user in the updated cache, but only with the corresponding updated post
-      assert(cacheUpdated(post.userRef).isEmpty)
-      assert(cacheUpdated(postUpdated.userRef).isEmpty)
+      // And we can still get at the user in the updated cache, even using old refs
+      assert(cacheUpdated(post.userRef).contains(userUpdated))
+      assert(cacheUpdated(postUpdated.userRef).contains(userUpdated))
       assert(cacheUpdated(postUpdated2.userRef).contains(userUpdated))
 
     }

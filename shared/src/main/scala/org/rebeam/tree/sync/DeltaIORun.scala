@@ -8,20 +8,23 @@ import org.rebeam.tree.sync.Sync._
 
 object DeltaIORun {
 
-  private case class StateData(context: DeltaIOContext, deltaId: DeltaId, currentGuidId: Long) {
-    def withNextGuidId: StateData = copy(currentGuidId = currentGuidId + 1)
+  private case class StateData[C](context: DeltaIOContext, deltaId: DeltaId, currentGuidId: Long, data: Map[Guid[C], C]) {
+    def withNextGuidId: StateData[C] = copy(currentGuidId = currentGuidId + 1)
+    def putData(id: Guid[C], c: C): StateData[C] = copy(data = data.updated(id, c))
   }
 
   // State monad using StateData
-  private type DeltaContextState[A] = State[StateData, A]
+  private type DeltaContextState[C, A] = State[StateData[C], A]
 
-  private val pureCompiler: DeltaIOA ~> DeltaContextState =
+  private def pureCompiler[C]: DeltaIOA ~> DeltaContextState =
     new (DeltaIOA ~> DeltaContextState) {
-      def apply[A](fa: DeltaIOA[A]): DeltaContextState[A] =
+      def apply[A](fa: DeltaIOA[C, A]): DeltaContextState[C, A] =
         fa match {
           case GetId() => State(s => (s.withNextGuidId, Guid[Any](s.deltaId.clientId, s.deltaId.clientDeltaId, s.currentGuidId)))
 
           case GetContext => State(s => (s, s.context))
+
+          case PutData(id, c) => State(s => (s.putData(id, c), ()))
         }
     }
 

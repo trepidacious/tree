@@ -1,185 +1,194 @@
 package org.rebeam.tree.view
 
 import japgolly.scalajs.react._
-import monocle._
 import org.rebeam.tree._
 import org.rebeam.lenses._
 import io.circe._
+import japgolly.scalajs.react.extra.Reusability
+import org.rebeam.tree.DeltaCodecs.DeltaCodec
 import org.rebeam.tree.ref.Cache
 import org.rebeam.tree.ref.Ref
 
 /**
-  * Cursor giving a "position" in a data model, providing the value at that position
-  * and a parent to be used to run deltas as a callback to update the entire model,
-  * as well as means to zoom into the model (using lenses and similar) to produce
-  * cursors for child data.
-  *
-  * Most commonly used by a view of a position in a model, since it provides the
-  * data to display, and a way of applying deltas to the data at that position.
-  *
-  *
-  * @tparam M     The type of model for the view.
+  * A value, and a parent used to produce callbacks to run deltas on that value
+  * @tparam C The type of data in the cache
+  * @tparam A The type of value
   */
-trait Cursor[M] extends Parent[M] {
-
+trait ValueAndParent[C, A] {
   /**
-    * The parent of the view using this Cursor. Used to convert
-    *               deltas into Callbacks that will "run" the delta.
+    * Used to convert deltas to the value into Callbacks that will run the delta.
     * @return parent
     */
-  def parent: Parent[M]
+  def parent: Parent[C, A]
 
   /**
-    * The actual model value for the child view - the data to display.
-    * @return model
+    * The value
+    * @return value
     */
-  def model: M
-
-  //Just pass through callback to parent for convenience
-  def callback(delta: Delta[M], deltaJs: Json): Callback = parent.callback(delta, deltaJs)
-
-  def act[A <: Delta[M]](actionDelta: A)(implicit encoder: Encoder[A]): Callback =
-    callback(actionDelta, Json.obj("action" -> encoder(actionDelta)))
-
-  def set(newModel: M)(implicit encoder: Encoder[M]): Callback =
-    callback(ValueDelta(newModel), Json.obj("value" -> encoder(newModel)))
-
-  // FIXME Zoomer and zoom in this form are a workaround for not being able to infer
-  // type C from the lens itself in the nicer form:
-  //  def zoom[C, L <: Lens[M, C]: OuterEncoder](lens: L): Cursor[C] =
-  //  Cursor[C](LensParent[M, C, L](parent, lens), lens.get(model))
-  class Zoomer[C] {
-    def apply[L <: Lens[M, C]: OuterEncoder](lens: L): Cursor[C] =
-      CursorBasic[C](LensParent[M, C, L](parent, lens), lens.get(model))
-  }
-  def zoom[C] = new Zoomer[C]()
-
-  def zoomN[C](lensN: LensN[M, C]): Cursor[C] =
-    CursorBasic[C](LensNParent(parent, lensN), lensN.get(model))
-
-  def zoomPrismN[C](prismN: PrismN[M, C]): Option[Cursor[C]] = {
-    prismN.getOption(model).map(c => CursorBasic[C](PrismNParent[M, C](parent, prismN), c))
-  }
-
-  def label(label: String) = CursorL(parent, model, label)
-
-  def withP[P](p: P): CursorP[M, P] = CursorP(parent, model, p)
+  def value: A
 }
 
-private case class CursorBasic[M](parent: Parent[M], model: M) extends Cursor[M]
+case class ValueAndParentBasic[C, A](value: A, parent: Parent[C, A]) extends ValueAndParent[C, A]
+
+object ValueAndParent {
+  def apply[C, A](value: A, parent: Parent[C, A]): ValueAndParentBasic[C, A] = ValueAndParentBasic[C, A](value, parent)
+}
+
+/**
+  * Cursor for a value within a data model, with access to a Cache via a ValueAndParent,
+  * and a location within that model.
+  * Is also itself a ValueAndParent.
+  * @tparam A Type of data
+  * @tparam C Type of data in the Cache
+  * @tparam L Type of location
+  */
+trait Cursor[A, C, L] extends ValueAndParent[C, A] {
+
+  /**
+    * The location to display. This might be something like a path through
+    * the data, or a label for the data. Often provided by a Router.
+    * @return location
+    */
+  def location: L
+
+  /**
+    * A ValueAndParent for the cache
+    * @return cacheVAP
+    */
+  def cacheVAP: ValueAndParent[C, Cache[C]]
+
+  /**
+    * The cache in which to look up references
+    * @return cache
+    */
+  def cache: Cache[C] = cacheVAP.value
+
+  //Just pass through callback to parent for convenience
+  def callback(delta: Delta[C, A], deltaJs: Json): Callback = parent.callback(delta, deltaJs)
+
+  /**
+    * Produce a callback for applying an action Delta on the cursor
+    * @param actionDelta  The Delta to apply as an action
+    * @param encoder      An encoder for the action
+    * @tparam D           The type of action Delta
+    * @return             A Callback that will apply the action
+    */
+  def act[D <: Delta[C, A]](actionDelta: D)(implicit encoder: Encoder[D]): Callback =
+    callback(actionDelta, Json.obj("action" -> encoder(actionDelta)))
+
+  /**
+    * Produce a callback for setting a new value
+    * @param newValue The new value to set
+    * @param encoder  An encoder for the value
+    * @return         A Callback that will set the value
+    */
+  def set(newValue: A)(implicit encoder: Encoder[A]): Callback =
+    callback(ValueDelta(newValue), Json.obj("value" -> encoder(newValue)))
+
+  // Zoom methods pass from the current value to some contained value, reached by a lens, prism etc.
+
+  /**
+    * Zoom the cursor into a contained value, reached from the current value using a LensN
+    * @param lensN    The LensN used to reach the new value from the current value
+    * @tparam B       The type of value in the new cursor
+    * @return         A new cursor
+    */
+  def zoom[B](lensN: LensN[A, B]): Cursor[B, C, L] =
+    CursorBasic[B, C, L](LensNParent(parent, lensN), lensN.get(value), location, cacheVAP)
+
+  /**
+    * Zoom the cursor into a contained value, reached from the current value using a PrismN
+    * @param prismN   The PrismN used to reach the new value from the current value
+    * @tparam B       The type of value in the new cursor
+    * @return         A new cursor, or None if the PrismN returns no value
+    */
+  def zoomPrism[B](implicit prismN: PrismN[A, B]): Option[Cursor[B, C, L]] = {
+    prismN.getOption(value).map(c => CursorBasic[B, C, L](PrismNParent[C, A, B](parent, prismN), c, location, cacheVAP))
+  }
+
+  // Follow methods return to the cache, and look up a reference, to create a new cursor at the root of the
+  // referenced data
+
+  /**
+    * Use the cache to look up a data item from a reference. Produce a new cursor with this data as its value,
+    * with the same location and cache.
+    * @param ref    The reference to follow
+    * @return       A new cursor pointing at the referenced data, or None if that data is not in the cache
+    */
+  def followRef(ref: Ref[C]): Option[Cursor[C, C, L]] = {
+    cacheVAP.value(ref).map { data =>
+      CursorBasic[C, C, L](CacheParent[C, C](cacheVAP.parent, OptionalCache(ref)), data, location, cacheVAP)
+    }
+  }
+
+  /**
+    * Use the cache to look up a data item from a reference, and then zoom into it using a prism.
+    * Produce a new cursor with this data as its value, with the same location and cache.
+    * This is equivalent to followRef then zoomPrism, but may be more concise.
+    * @param ref    The reference to follow
+    * @param prism  The prism to apply to the data retrieved from the Cache
+    * @return       A new cursor pointing at the referenced data, or None if that data is not in the cache
+    */
+  def followRefPrism[D <: C](ref: Ref[D])(implicit prism: PrismN[C, D]): Option[Cursor[D, C, L]] = followRef(ref).flatMap(_.zoomPrism(prism))
+
+  // The following methods affect the location
+
+  /**
+    * Set the location to a String label
+    * @param label  The label
+    * @return       A new Cursor with the label as its location
+    */
+  def label(label: String): Cursor[A, C, String] = move(label)
+
+  /**
+    * Set a new location
+    * @param newLocation  The new location to move to
+    * @return             A new Cursor with the new location
+    */
+  def move[M](newLocation: M): Cursor[A, C, M] = CursorBasic(parent, value, newLocation, cacheVAP)
+
+}
+
+private case class CursorBasic[A, C, L](parent: Parent[C, A], value: A, location: L, cacheVAP: ValueAndParent[C, Cache[C]]) extends Cursor[A, C, L]
 
 object Cursor {
 
-  def apply[M](parent: Parent[M], model: M): Cursor[M] = CursorBasic(parent, model)
+  implicit def cursorReusability[A, C, L]: Reusability[Cursor[A, C, L]] = Reusability.fn{case (a, b) => a.parent == b.parent && a.value == b.value && a.location == b.location}
 
-  implicit class ListCursor[C](cursor: Cursor[List[C]]) {
+  def apply[A, C, L](parent: Parent[C, A], value: A, location: L, cacheVAP: ValueAndParent[C, Cache[C]]): Cursor[A, C, L] = CursorBasic(parent, value, location, cacheVAP)
 
-    def zoomI(index: Int): Option[Cursor[C]] = {
-      val optionalI: OptionalI[C] = OptionalI[C](index)
-      optionalI.getOption(cursor.model).map { c =>
-        Cursor[C](OptionalIParent(cursor.parent, optionalI), c)
+  def emptyCacheVAP[C](implicit codec: DeltaCodec[C, C]): ValueAndParent[C, Cache[C]] = ValueAndParent(Cache.empty[C], new Parent[C, Cache[C]] {
+    override def callback(delta: Delta[C, Cache[C]], deltaJs: Json): Callback = Callback.empty
+  })
+
+  implicit class ListCursor[A, C, L](cursor: Cursor[List[A], C, L]) {
+
+    def zoomI(index: Int): Option[Cursor[A, C, L]] = {
+      val optionalI: OptionalI[A] = OptionalI[A](index)
+      optionalI.getOption(cursor.value).map { a =>
+        CursorBasic[A, C, L](OptionalIParent(cursor.parent, optionalI), a, cursor.location, cursor.cacheVAP)
       }
     }
 
-    lazy val zoomAllI: List[Cursor[C]] = cursor.model.zipWithIndex.flatMap {
-      case (a, i) => cursor.zoomI(i)
-    }
+    lazy val zoomAllI: List[Cursor[A, C, L]] = cursor.value.indices.toList.flatMap(cursor.zoomI(_))
 
-    def zoomMatch[F <: C => Boolean](f: F)(implicit fEncoder: Encoder[F]): Option[Cursor[C]] = {
-      val optionalMatch: OptionalMatch[C, F] = OptionalMatch[C, F](f)
-      optionalMatch.getOption(cursor.model).map { c =>
-        Cursor[C](OptionalMatchParent(cursor.parent, optionalMatch), c)
+    def zoomMatch[F <: A => Boolean](f: F)(implicit fEncoder: Encoder[F]): Option[Cursor[A, C, L]] = {
+      val optionalMatch: OptionalMatch[A, F] = OptionalMatch[A, F](f)
+      optionalMatch.getOption(cursor.value).map { a =>
+        CursorBasic[A, C, L](OptionalMatchParent(cursor.parent, optionalMatch), a, cursor.location, cursor.cacheVAP)
       }
     }
 
-    def zoomAllMatches[F <: C => Boolean](cToF: C => F)(implicit fEncoder: Encoder[F]): List[Cursor[C]] =
-      cursor.model.map(cToF).flatMap(zoomMatch(_))
+    def zoomAllMatches[F <: A => Boolean](aToF: A => F)(implicit fEncoder: Encoder[F]): List[Cursor[A, C, L]] =
+      cursor.value.map(aToF).flatMap(zoomMatch(_))
   }
 
-  implicit class OptionCursor[C](cursor: Cursor[Option[C]]) {
-    def zoomOption: Option[Cursor[C]] = {
-      cursor.model.map { c =>
-        Cursor[C](OptionParent[C](cursor.parent), c)
-      }
-    }
-  }
-
-  implicit class CacheCursor[A](cursor: Cursor[Cache[A]]) {
-    def zoomRef(ref: Ref[A]): Option[Cursor[A]] = {
-      cursor.model(ref).map { data =>
-        Cursor[A](CacheParent[A](cursor.parent, OptionalCache(ref)), data)
-      }
-    }
-
-    def zoomRefPrism[B <: A](ref: Ref[B])(implicit p: PrismN[A, B]): Option[Cursor[B]] = {
-      zoomRef(ref).flatMap(c => c.zoomPrismN[B](p))
-    }
-  }
-
-  implicit class CacheCursorP[A, P](cursor: CursorP[Cache[A], P]) {
-    def zoomRefP(ref: Ref[A]): Option[CursorP[A, P]] = {
-      cursor.model(ref).map { data =>
-        CursorP[A, P](CacheParent[A](cursor.parent, OptionalCache(ref)), data, cursor.p)
-      }
-    }
-
-    def zoomRefPrismP[B <: A](ref: Ref[B])(implicit prism: PrismN[A, B]): Option[CursorP[B, P]] = {
-      zoomRefP(ref).flatMap(c => c.zoomPrismNP[B](prism))
-    }
-  }
-
-  implicit class ListCursorP[C, P](cursor: CursorP[List[C], P]) {
-
-    def zoomIP(index: Int): Option[CursorP[C, P]] = {
-      val optionalI: OptionalI[C] = OptionalI[C](index)
-      optionalI.getOption(cursor.model).map { c =>
-        CursorP[C, P](OptionalIParent(cursor.parent, optionalI), c, cursor.p)
-      }
-    }
-
-    lazy val zoomAllIP: List[CursorP[C, P]] = cursor.model.zipWithIndex.flatMap {
-      case (_, i) => cursor.zoomIP(i)
-    }
-
-    def zoomMatchP[F <: C => Boolean](f: F)(implicit fEncoder: Encoder[F]): Option[CursorP[C, P]] = {
-      val optionalMatch: OptionalMatch[C, F] = OptionalMatch[C, F](f)
-      optionalMatch.getOption(cursor.model).map { c =>
-        CursorP[C, P](OptionalMatchParent(cursor.parent, optionalMatch), c, cursor.p)
-      }
-    }
-
-    def zoomAllMatchesP[F <: C => Boolean](cToF: C => F)(implicit fEncoder: Encoder[F]): List[CursorP[C, P]] =
-      cursor.model.map(cToF).flatMap(zoomMatchP(_))
-  }
-
-  implicit class OptionCursorP[C, P](cursor: CursorP[Option[C], P]) {
-    def zoomOptionP: Option[CursorP[C, P]] = {
-      cursor.model.map { c =>
-        CursorP[C, P](OptionParent[C](cursor.parent), c, cursor.p)
+  implicit class OptionCursor[A, C, L](cursor: Cursor[Option[A], C, L]) {
+    def zoomOption: Option[Cursor[A, C, L]] = {
+      cursor.value.map { a =>
+        CursorBasic[A, C, L](OptionParent[C, A](cursor.parent), a, cursor.location, cursor.cacheVAP)
       }
     }
   }
 
-}
-
-case class CursorL[A](parent: Parent[A], model: A, label: String) extends Cursor[A]
-
-case class CursorP[A, P](parent: Parent[A], model: A, p: P) extends Cursor[A] {
-
-  // FIXME Zoomer and zoom in this form are a workaround for not being able to infer
-  // type C from the lens itself in the nicer form:
-  //  def zoom[C, L <: Lens[M, C]: OuterEncoder](lens: L): Cursor[C] =
-  //  Cursor[C](LensParent[M, C, L](parent, lens), lens.get(model))
-  class ZoomerP[C] {
-    def apply[L <: Lens[A, C]: OuterEncoder](lens: L): Cursor[C] =
-      CursorP[C, P](LensParent[A, C, L](parent, lens), lens.get(model), p)
-  }
-  def zoomP[C] = new ZoomerP[C]()
-
-  def zoomNP[C](lensN: LensN[A, C]): CursorP[C, P] =
-    CursorP[C, P](LensNParent(parent, lensN), lensN.get(model), p)
-
-  def zoomPrismNP[C](prismN: PrismN[A, C]): Option[CursorP[C, P]] = {
-    prismN.getOption(model).map(c => CursorP[C, P](PrismNParent(parent, prismN), c, p))
-  }
 }
