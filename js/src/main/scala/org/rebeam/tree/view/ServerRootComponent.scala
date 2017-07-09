@@ -14,7 +14,7 @@ import io.circe.syntax._
 
 object ServerRootComponent {
 
-  case class Props[R, P](p: P, render: CursorP[R, P] => ReactElement, wsUrl: String, noData: ReactElement)
+  case class Props[R, P](p: P, render: Cursor[R, P] => ReactElement, wsUrl: String, noData: ReactElement)
 
   case class State[R](clientState: Option[ClientState[R]], ws: Option[WebSocket], tick: Option[SetIntervalHandle])
 
@@ -51,7 +51,7 @@ object ServerRootComponent {
 
     def render(props: Props[R, P], state: State[R]) = {
       state.clientState.map { cs =>
-        val cursorP = CursorP(rootParent, cs.model, props.p)
+        val cursorP = Cursor(rootParent, cs.model, props.p)
         props.render(cursorP)
       }.getOrElse(
         props.noData
@@ -151,7 +151,7 @@ object ServerRootComponent {
 
   def factory[R, P]
     (noData: ReactElement, wsUrl: String)
-    (render: CursorP[R, P] => ReactElement)
+    (render: Cursor[R, P] => ReactElement)
     (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource) = {
     val c = ctor[R, P](decoder, deltaDecoder, idGen, contextSource)
     (page: P) => c(Props[R, P](page, render, wsUrl, noData))
@@ -160,11 +160,10 @@ object ServerRootComponent {
 
   def apply[R]
   (noData: ReactElement, wsUrl: String)
-  (render: Cursor[R] => ReactElement)
+  (render: Cursor[R, Unit] => ReactElement)
   (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource) = {
     val c = ctor[R, Unit](decoder, deltaDecoder, idGen, contextSource)
-    val cpRender = (cp: CursorP[R, Unit]) => render.apply(cp)
-    c(Props[R, Unit]((), cpRender, wsUrl, noData))
+    c(Props[R, Unit]((), render, wsUrl, noData))
   }
 
   //Just make the component constructor - props to be supplied later to make a component
