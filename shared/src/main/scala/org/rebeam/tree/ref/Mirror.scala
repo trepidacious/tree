@@ -1,6 +1,7 @@
 package org.rebeam.tree.ref
 
 import io.circe._
+import org.rebeam.tree.Delta
 import org.rebeam.tree.Delta._
 import org.rebeam.tree.DeltaCodecs.{DeltaCodec, RefUpdateResult}
 import org.rebeam.tree.sync.Sync.{Guid, ToId}
@@ -28,10 +29,18 @@ case class MirrorType(name: String) extends AnyVal
   * Typeclass covering everything needed to contain a type of data in a Mirror
   * @tparam A     The type of data
   */
-trait MirrorCodec[A] extends DeltaCodec[A] {
-  def decoderA: Decoder[A]
-  def encoderA: Encoder[A]
+trait MirrorCodec[A] {
+  def deltaCodec: DeltaCodec[A]
+  def decoder: Decoder[A]
+  def encoder: Encoder[A]
   def mirrorType: MirrorType
+}
+
+case class MirrorCodecBasic[A](decoder: Decoder[A], encoder: Encoder[A], deltaCodec: DeltaCodec[A], mirrorType: MirrorType) extends MirrorCodec[A]
+
+object MirrorCodec {
+  def apply[A](mirrorType: String)(implicit decoder: Decoder[A], encoder: Encoder[A], deltaCodec: DeltaCodec[A]): MirrorCodec[A] =
+    MirrorCodecBasic(decoder, encoder, deltaCodec, MirrorType(mirrorType))
 }
 
 object Mirror {
@@ -47,57 +56,60 @@ object Mirror {
 
   private case class MirrorEntry(guid: Guid[_], codec: MirrorCodec[Any], revision: Guid[_], data: Any)
 
-  def mirrorDecoder(codecs: Map[MirrorType, MirrorCodec[_]]): Decoder[Mirror] = Decoder.instance[Mirror](
-    c => c.fields match {
+  def decoder(codecs: MirrorCodec[_]*): Decoder[Mirror] = {
+    val codecMap = codecs.toList.map(codec => (codec.mirrorType, codec)).toMap[MirrorType, MirrorCodec[_]]
+    Decoder.instance[Mirror](
+      c => c.fields match {
 
-      case None => Left[DecodingFailure, Mirror](DecodingFailure("No fields in mirror Json", c.history))
+        case None => Left[DecodingFailure, Mirror](DecodingFailure("No fields in mirror Json", c.history))
 
-      case Some(fields) =>
-        val it = fields.iterator
-        val entries = ArrayBuffer.empty[MirrorEntry]
-        var failed: DecodingFailure = null
+        case Some(fields) =>
+          val it = fields.iterator
+          val entries = ArrayBuffer.empty[MirrorEntry]
+          var failed: DecodingFailure = null
 
-        while (failed.eq(null) && it.hasNext) {
-          val field = it.next
-          val atH = c.downField(field)
+          while (failed.eq(null) && it.hasNext) {
+            val field = it.next
+            val atH = c.downField(field)
 
-          guidKeyDecoder(field) match {
+            guidKeyDecoder(field) match {
 
-            case Some(guid) =>
-              atH.fieldSet match {
-                case Some(set) if set.size == 1 =>
-                  val mirrorType = MirrorType(set.head)
-                  val mirrorCodec = codecs.get(mirrorType)
-                  mirrorCodec match {
-                    case Some(codec) =>
-                      val revAndDataC = atH.downField(set.head)
+              case Some(guid) =>
+                atH.fieldSet match {
+                  case Some(set) if set.size == 1 =>
+                    val mirrorType = MirrorType(set.head)
+                    val mirrorCodec = codecMap.get(mirrorType)
+                    mirrorCodec match {
+                      case Some(codec) =>
+                        val revAndDataC = atH.downField(set.head)
 
-                      Guid.decodeGuid[Any].tryDecode(revAndDataC.downField("revision")) match {
-                        case Right(revision) =>
-                          codec.decoderA.tryDecode(revAndDataC.downField("data")) match {
-                            case Right(data) =>
-                              entries += MirrorEntry(guid, codec.asInstanceOf[MirrorCodec[Any]], revision, data)
-                            case Left(error) => failed = error
-                          }
-                        case Left(error) => failed = error
-                      }
-                    case _ => failed = DecodingFailure("No MirrorCodec for type " + mirrorType, atH.history)
-                  }
-                case _ => failed = DecodingFailure("Mirror should have entries with single field named after data type", atH.history)
-              }
-            case _ => failed = DecodingFailure("Invalid key in mirror", atH.history)
+                        Guid.decodeGuid[Any].tryDecode(revAndDataC.downField("revision")) match {
+                          case Right(revision) =>
+                            codec.decoder.tryDecode(revAndDataC.downField("data")) match {
+                              case Right(data) =>
+                                entries += MirrorEntry(guid, codec.asInstanceOf[MirrorCodec[Any]], revision, data)
+                              case Left(error) => failed = error
+                            }
+                          case Left(error) => failed = error
+                        }
+                      case _ => failed = DecodingFailure("No MirrorCodec for type " + mirrorType, atH.history)
+                    }
+                  case _ => failed = DecodingFailure("Mirror should have entries with single field named after data type", atH.history)
+                }
+              case _ => failed = DecodingFailure("Invalid key in mirror", atH.history)
+            }
           }
-        }
 
-        if (failed.eq(null)) {
-          Right(entries.foldLeft(Mirror.empty) {
-            case (mirror, entry) => mirror.updated(entry.guid, entry.data, entry.revision)(entry.codec)
-          })
-        } else {
-          Left(failed)
-        }
-    }
-  )
+          if (failed.eq(null)) {
+            Right(entries.foldLeft(Mirror.empty) {
+              case (mirror, entry) => mirror.updated(entry.guid, entry.data, entry.revision)(entry.codec)
+            })
+          } else {
+            Left(failed)
+          }
+      }
+    )
+  }
 
 
   /**
@@ -105,17 +117,17 @@ object Mirror {
     * Each field contains an object named after the MirrorType of the data item,
     * containing its revision and data.
     */
-  val mirrorEncoder: Encoder[Mirror] = Encoder.instance[Mirror](
+  val encoder: Encoder[Mirror] = Encoder.instance[Mirror](
     m => {
       val jsonMap = m.map.toList.map {
         case (guid, state) => {
-          val mc = mirrorEncoder.asInstanceOf[MirrorCodec[Any]]
+          val mc = state.mirrorCodec.asInstanceOf[MirrorCodec[Any]]
           (
             guidKeyEncoder(guid),
             Json.obj(
               mc.mirrorType.name -> Json.obj(
                 "revision" -> Guid.encodeGuid(state.revision),
-                "data" -> mc.encoderA(state.data)
+                "data" -> mc.encoder(state.data)
               )
             )
           )
@@ -231,7 +243,7 @@ class Mirror(private val map: Map[Guid[_], MirrorState[_]], private val types: M
     val state = getState(id)
 
     // Update refs in the updated data
-    val updateResult = mCodecA.updateRefs(RefUpdateResult.noRefs(a), this)
+    val updateResult = mCodecA.deltaCodec.updateRefs(RefUpdateResult.noRefs(a), this)
 
     // If data was already in mirror, incoming refs do not change just because data
     // is updated. Otherwise build incoming refs from scratch
@@ -287,7 +299,7 @@ class Mirror(private val map: Map[Guid[_], MirrorState[_]], private val types: M
         )(
           // If data is in mirror, update its references to get our new revision
           state => {
-            val rur = state.mirrorCodec.updateRefs(RefUpdateResult.noRefs(state.data), m)
+            val rur = state.mirrorCodec.deltaCodec.updateRefs(RefUpdateResult.noRefs(state.data), m)
             m.updateMap(m.map.updated(id, state.copy(data = rur.data)))
           }
         )

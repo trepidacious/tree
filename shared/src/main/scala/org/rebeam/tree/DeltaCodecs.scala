@@ -204,7 +204,7 @@ object DeltaCodecs {
       val o = c.downField("mirror").downField(mirrorCodecA.mirrorType.name)
       for {
         ref <- o.downField("ref").as[Ref[A]]
-        delta <- o.downField("delta").as[Delta[A]]
+        delta <- mirrorCodecA.deltaCodec.tryDecode(o.downField("delta"))
       } yield MirrorDelta[A](ref, delta)
     })
 
