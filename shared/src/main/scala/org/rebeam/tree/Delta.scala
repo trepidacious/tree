@@ -7,7 +7,8 @@ import org.rebeam.lenses._
 import monocle._
 import monocle.std.option
 import org.rebeam.tree.Delta._
-import org.rebeam.tree.ref.Cache
+import org.rebeam.tree.ref.{Mirror, MirrorCodec, Ref}
+//import org.rebeam.tree.ref.Cache
 import org.rebeam.tree.sync.Sync.Guid
 
 import scala.reflect.ClassTag
@@ -144,11 +145,16 @@ case class PrismNDelta[S, A](prismN: PrismN[S, A], delta: Delta[A]) extends Delt
     )  //optionalI.modify(delta.apply)(l)
 }
 
-case class CacheDelta[A](optionalCache: OptionalCache[A], delta: Delta[A]) extends Delta[Cache[A]] {
-  def apply(c: Cache[A]): DeltaIO[Cache[A]] =
-    optionalCache.getOption(c).fold(
-      pure(c)
+case class MirrorDelta[A: MirrorCodec](ref: Ref[A], delta: Delta[A]) extends Delta[Mirror] {
+  def apply(mirror: Mirror): DeltaIO[Mirror] =
+    mirror(ref).fold(
+      // Data is not in mirror, nothing to do
+      pure(mirror)
     )(
-      a => delta(a).map(modifiedA => optionalCache.set(modifiedA)(c))
+      // Data is in mirror, apply delta to it
+      a => for {
+        modifiedA <- delta(a)
+        updatedMirror <- mirror.updated(ref.guid, modifiedA)
+      } yield updatedMirror
     )
 }

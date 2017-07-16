@@ -1,19 +1,22 @@
 package org.rebeam.tree.ref
 
 import io.circe._
+import org.rebeam.tree.Delta._
 import org.rebeam.tree.DeltaCodecs.{DeltaCodec, RefUpdateResult}
 import org.rebeam.tree.sync.Sync.{Guid, ToId}
 import org.rebeam.tree.ref.Ref._
 
-//trait RefUpdater {
-//  /**
-//    * Update a ref to the latest version if necessary
-//    * @param ref  The ref to update
-//    * @tparam A   The type of the referent
-//    * @return     Some(updated ref) if update is needed, None otherwise
-//    */
-//  def updateRef[A](ref: Ref[A]): Option[Ref[A]]
-//}
+import scala.collection.mutable.ArrayBuffer
+
+trait RefUpdater {
+  /**
+    * Update a ref to the latest version if necessary
+    * @param ref  The ref to update
+    * @tparam A   The type of the referent
+    * @return     Some(updated ref) if update is needed, None otherwise
+    */
+  def updateRef[A](ref: Ref[A]): Option[Ref[A]]
+}
 
 /**
   * Represents a type of data referenced in a Mirror
@@ -42,22 +45,85 @@ object Mirror {
     override def apply(key: String): Option[Guid[_]] = Guid.fromString(key)
   }
 
-//  // Decode as a plain map from guid to data, then add the entries to an actual Mirror to update refs etc.
-//  def mirrorDecoder(implicit dm: Decoder[M], deltaCodec: DeltaCodec[M]): Decoder[Mirror[M]] =
-//    Decoder.decodeMapLike[Map, Guid[_], M].map(
-//      // Fold over entries in map, accumulating them into a cache
-//      _.foldLeft(Mirror.empty[M]){
-//        // Here we have to assume that the cache was valid when encoded, so that in each entry
-//        // the Guid was for the correct type of data, and also matches any Guid used in the
-//        // future to look up data in the cache.
-//        case (cache, entry) => cache.updated(entry._1.asInstanceOf[Guid[M]], entry._2)
-//      }
-//    )
+  private case class MirrorEntry(guid: Guid[_], codec: MirrorCodec[Any], revision: Guid[_], data: Any)
 
-  // Encode by converting to a plain map from guid to data, and encoding the guids as their string representation
-  // so we can use a normal map Json encoding
-//  def mirrorEncoder(): Encoder[Mirror[M]] =
-//    Encoder.encodeMapLike[Map, Guid[_], M](guidKeyEncoder, em).contramap[Mirror[M]](_.map.mapValues(_.data))
+  def mirrorDecoder(codecs: Map[MirrorType, MirrorCodec[_]]): Decoder[Mirror] = Decoder.instance[Mirror](
+    c => c.fields match {
+
+      case None => Left[DecodingFailure, Mirror](DecodingFailure("No fields in mirror Json", c.history))
+
+      case Some(fields) =>
+        val it = fields.iterator
+        val entries = ArrayBuffer.empty[MirrorEntry]
+        var failed: DecodingFailure = null
+
+        while (failed.eq(null) && it.hasNext) {
+          val field = it.next
+          val atH = c.downField(field)
+
+          guidKeyDecoder(field) match {
+
+            case Some(guid) =>
+              atH.fieldSet match {
+                case Some(set) if set.size == 1 =>
+                  val mirrorType = MirrorType(set.head)
+                  val mirrorCodec = codecs.get(mirrorType)
+                  mirrorCodec match {
+                    case Some(codec) =>
+                      val revAndDataC = atH.downField(set.head)
+
+                      Guid.decodeGuid[Any].tryDecode(revAndDataC.downField("revision")) match {
+                        case Right(revision) =>
+                          codec.decoderA.tryDecode(revAndDataC.downField("data")) match {
+                            case Right(data) =>
+                              entries += MirrorEntry(guid, codec.asInstanceOf[MirrorCodec[Any]], revision, data)
+                            case Left(error) => failed = error
+                          }
+                        case Left(error) => failed = error
+                      }
+                    case _ => failed = DecodingFailure("No MirrorCodec for type " + mirrorType, atH.history)
+                  }
+                case _ => failed = DecodingFailure("Mirror should have entries with single field named after data type", atH.history)
+              }
+            case _ => failed = DecodingFailure("Invalid key in mirror", atH.history)
+          }
+        }
+
+        if (failed.eq(null)) {
+          Right(entries.foldLeft(Mirror.empty) {
+            case (mirror, entry) => mirror.updated(entry.guid, entry.data, entry.revision)(entry.codec)
+          })
+        } else {
+          Left(failed)
+        }
+    }
+  )
+
+
+  /**
+    * Encode as an object with fields from guids.
+    * Each field contains an object named after the MirrorType of the data item,
+    * containing its revision and data.
+    */
+  val mirrorEncoder: Encoder[Mirror] = Encoder.instance[Mirror](
+    m => {
+      val jsonMap = m.map.toList.map {
+        case (guid, state) => {
+          val mc = mirrorEncoder.asInstanceOf[MirrorCodec[Any]]
+          (
+            guidKeyEncoder(guid),
+            Json.obj(
+              mc.mirrorType.name -> Json.obj(
+                "revision" -> Guid.encodeGuid(state.revision),
+                "data" -> mc.encoderA(state.data)
+              )
+            )
+          )
+        }
+      }
+      Json.obj(jsonMap: _*)
+    }
+  )
 
 }
 
@@ -70,7 +136,7 @@ object Mirror {
   * @param mirrorCodec    A MirrorCodec for the data type
   * @tparam A             The data type
   */
-private case class MirrorState[A](data: A, revision: Long, incomingRefs: Set[Guid[_]], outgoingRefs: Set[Guid[_]], mirrorCodec: MirrorCodec[A]) {
+private case class MirrorState[A](data: A, revision: Guid[A], incomingRefs: Set[Guid[_]], outgoingRefs: Set[Guid[_]], mirrorCodec: MirrorCodec[A]) {
   def updatedIncomingRefs(id: Guid[_], add: Boolean): MirrorState[A] = copy(
     incomingRefs = if (add) {
       incomingRefs + id
@@ -92,7 +158,7 @@ class Mirror(private val map: Map[Guid[_], MirrorState[_]], private val types: M
   def updateType[A](mirrorType: MirrorType, mirrorCodec: MirrorCodec[A]) = new Mirror(map, types.updated(mirrorType, mirrorCodec))
 
   /**
-    * Retrieve the data for a reference, if reference is valid and data is present in cache
+    * Retrieve the data for a reference, if reference is valid and data is present in mirror
     * @param ref  The reference
     * @return     The data if present, or None otherwise
     */
@@ -103,10 +169,10 @@ class Mirror(private val map: Map[Guid[_], MirrorState[_]], private val types: M
 //  }
 
   def updateRef[A](ref: Ref[A]): Option[Ref[A]] = getState(ref.guid).fold[Option[Ref[A]]]{
-    // If ref is not in cache, update to unresolved
+    // If ref is not in mirror, update to unresolved
     Some(RefUnresolved(ref.guid))
   }{
-    // If ref is in cache, update to resolved at current revision
+    // If ref is in mirror, update to resolved at current revision
     state => Some(RefResolved(ref.guid, state.revision))
   // Skip update if new ref is equal to old one
   }.filterNot(_ == ref)
@@ -137,10 +203,10 @@ class Mirror(private val map: Map[Guid[_], MirrorState[_]], private val types: M
     val map2 = outgoingRefs.foldLeft(map){
       case (m, outgoingRef) =>
         m.get(outgoingRef).fold {
-          // If data reached by outgoing ref is not in cache, nothing to update
+          // If data reached by outgoing ref is not in mirror, nothing to update
           m
         }{
-          // If data IS in the cache, we update its cache state to add/remove ourselves as an incoming ref
+          // If data IS in the mirror, we update its mirror state to add/remove ourselves as an incoming ref
           (otherMirrorState: MirrorState[_]) =>
             m.updated(
               outgoingRef,
@@ -151,67 +217,88 @@ class Mirror(private val map: Map[Guid[_], MirrorState[_]], private val types: M
     updateMap(map2)
   }
 
-  def updated[A](a: A)(implicit toId: ToId[A], mCodecA: MirrorCodec[A]): Mirror = updated(toId.id(a), a)
+  def updated[A](a: A)(implicit toId: ToId[A], mCodecA: MirrorCodec[A]): DeltaIO[Mirror] = for {
+    revision <- getId[A]
+  } yield updated(a, revision)
 
-  def updated[A](id: Guid[A], a: A)(implicit mCodecA: MirrorCodec[A]): Mirror = {
+  def updated[A](id: Guid[A], a: A)(implicit mCodecA: MirrorCodec[A]): DeltaIO[Mirror] = for {
+    revision <- getId[A]
+  } yield updated(id, a, revision)
+
+  def updated[A](a: A, revision: Guid[A])(implicit toId: ToId[A], mCodecA: MirrorCodec[A]): Mirror = updated(toId.id(a), a, revision)
+
+  def updated[A](id: Guid[A], a: A, revision: Guid[A])(implicit mCodecA: MirrorCodec[A]): Mirror = {
     val state = getState(id)
-
-    // Next revision, or start from 0
-    val updatedRev = state.map(_.revision + 1).getOrElse(0L)
 
     // Update refs in the updated data
     val updateResult = mCodecA.updateRefs(RefUpdateResult.noRefs(a), this)
 
-    // If data was already in cache, incoming refs do not change just because data
+    // If data was already in mirror, incoming refs do not change just because data
     // is updated. Otherwise build incoming refs from scratch
     val incomingRefs = state.map(_.incomingRefs).getOrElse(incomingRefsFor(id))
 
-    // Updated map for this data item, using the results of update, and updated rev
-    val map2 = map.updated(id, MirrorState(updateResult.data, updatedRev, incomingRefs, updateResult.outgoingRefs, mCodecA))
+    // Updated map for this data item, using the results of update, and new revision
+    val map2 = map.updated(id, MirrorState(updateResult.data, revision, incomingRefs, updateResult.outgoingRefs, mCodecA))
 
-    // If data was already in cache, look up previous outgoing refs - otherwise treat as empty
+    // If data was already in mirror, look up previous outgoing refs - otherwise treat as empty
     val previousOutgoingRefs = state.map(_.outgoingRefs).getOrElse(Set.empty)
     val currentOutgoingRefs = updateResult.outgoingRefs
 
     // Updated mirror with the updated map, plus updated incoming refs, and with the MirrorCodec added
     // in case we don't have it already
-    val cache2 = new Mirror(map2, types.updated(mCodecA.mirrorType, mCodecA))
+    val mirror2 = new Mirror(map2, types.updated(mCodecA.mirrorType, mCodecA))
 
     // We look at our previous and current outgoing refs - where we have
     // a new outgoing ref we need to add ourselves to the incoming refs of the
     // newly-referenced data. Similarly where we have lost an outgoing ref we will
     // remove ourselves from the incoming refs of the previously-referenced data.
-    val cache3 = cache2
+    val mirror3 = mirror2
       .updateIncomingRefs(id, currentOutgoingRefs -- previousOutgoingRefs, add = true)
       .updateIncomingRefs(id, previousOutgoingRefs -- currentOutgoingRefs, add = false)
 
     // Finally, we need to update the refs in everything that points at us to get our new revision.
     // This doesn't trigger any further updates, since the actual data in those
     // data items that point at us hasn't changed.
-    incomingRefs.foldLeft(cache3){
-      case (c, incomingId) =>
-        c.getState(incomingId).fold(
-          // If the data that refers to us is not in the cache, no update
+    updateDataForIds(incomingRefs, mirror3)
+  }
+
+  /**
+    * Update a mirror by getting the state for each id in a set. If that id has a state,
+    * update references in the data, then update the mirror with that updated data.
+    * This is used (for example) when the revision of a piece of data in the mirror changes (or
+    * data is removed and so has no revision), in order to update all data that references
+    * the updated/removed data.
+    * @param ids    The set of ids whose data will have references updated
+    * @param mirror The initial mirror
+    * @return       A mirror with the required updates performed
+    */
+  private def updateDataForIds(ids: Set[Guid[_]], mirror: Mirror): Mirror = {
+    // This doesn't trigger any further updates, since the actual data in those
+    // data items that point at us hasn't changed.
+    ids.foldLeft(mirror){
+      case (m, id) =>
+        m.getState(id).fold(
+          // If the data that refers to us is not in the mirror, no update
           // This should not happen, since we only get an incoming reference when the data
-          // is added to the cache, and when it is removed the incoming reference is cleared.
+          // is added to the mirror, and when it is removed the incoming reference is cleared.
           // However dangling incoming references do no harm other than triggering these
           // no-ops.
-          c
+          m
         )(
-          // If data is in cache, update its references to get our new revision
+          // If data is in mirror, update its references to get our new revision
           state => {
-            val rur = state.mirrorCodec.updateRefs(RefUpdateResult.noRefs(state.data), c)
-            c.updateMap(c.map.updated(incomingId, state.copy(data = rur.data)))
+            val rur = state.mirrorCodec.updateRefs(RefUpdateResult.noRefs(state.data), m)
+            m.updateMap(m.map.updated(id, state.copy(data = rur.data)))
           }
         )
     }
   }
 
   /**
-    * Create a new Mirror with a data item not present (same cache if data was
-    * not in the cache)
+    * Create a new Mirror with a data item not present (same mirror if data was
+    * not in the mirror)
     * @param id Id of data to remove
-    * @return   New cache with data item not present
+    * @return   New mirror with data item not present
     */
   def removed[A](id: Guid[A]): Mirror = {
     getState(id).fold{
@@ -221,31 +308,13 @@ class Mirror(private val map: Map[Guid[_], MirrorState[_]], private val types: M
         // First remove the data item from map
         // Then update the incoming refs of everything the data item referred to, to
         // remove the data item.
-        val cache2 = updateMap(map - id).updateIncomingRefs(id, state.outgoingRefs, add = false)
+        val mirror2 = updateMap(map - id).updateIncomingRefs(id, state.outgoingRefs, add = false)
 
         // Finally, we need to update the refs in everything that points at the removed data so that they will have
-        // RefUnresolved, since data is no longer in the cache.
+        // RefUnresolved, since data is no longer in the mirror.
         // This doesn't trigger any further updates, since the actual data in those
         // data items that point at the removed data hasn't changed.
-        state.incomingRefs.foldLeft(cache2){
-          case (c, incomingId) =>
-            c.getState(incomingId).fold(
-              // If the data that refers to removed data is not in the cache, no update
-              // This should not happen, since we only get an incoming reference when the data
-              // is added to the cache, and when it is removed the incoming reference is cleared.
-              // However dangling incoming references do no harm other than triggering these
-              // no-ops.
-              c
-            )(
-              // If data is in cache, update its references to get an unresolved ref for the removed data
-              state => {
-                // FIXME get the codec from state
-                val rur = state.mirrorCodec.updateRefs(RefUpdateResult.noRefs(state.data), c)
-                c.updateMap(c.map.updated(incomingId, state.copy(data = rur.data)))
-              }
-            )
-        }
-
+        updateDataForIds(state.incomingRefs, mirror2)
     }
   }
 

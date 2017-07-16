@@ -3,7 +3,8 @@ package org.rebeam.tree
 import io.circe._
 import org.rebeam.lenses._
 import cats.syntax.either._
-import org.rebeam.tree.ref.{Cache, RefUpdater}
+import org.rebeam.tree.ref.{Mirror, MirrorCodec}
+import org.rebeam.tree.ref.RefUpdater
 import org.rebeam.tree.sync.Sync._
 
 import scala.collection.mutable
@@ -196,20 +197,23 @@ object DeltaCodecs {
     ).map(a => a: Delta[M])
   )
 
-  class DeltaCodecCache[A](implicit dCodecA: DeltaCodec[A]) extends DeltaCodec[Cache[A]] {
+  class DeltaCodecMirror[A](implicit mirrorCodecA: MirrorCodec[A]) extends DeltaCodec[Mirror] {
 
-    val decoder: Decoder[Delta[Cache[A]]] = Decoder.instance(c => {
-      val o = c.downField("optional").downField("optionalCache")
+    val decoder: Decoder[Delta[Mirror]] = Decoder.instance(c => {
+      // Note we require the json to contain the mirror codec's type name
+      val o = c.downField("mirror").downField(mirrorCodecA.mirrorType.name)
       for {
         ref <- o.downField("ref").as[Ref[A]]
         delta <- o.downField("delta").as[Delta[A]]
-      } yield CacheDelta[A](OptionalCache(ref), delta)
+      } yield MirrorDelta[A](ref, delta)
     })
 
-    def updateRefs(rur: RefUpdateResult[Cache[A]], updater: RefUpdater): RefUpdateResult[Cache[A]] = rur
-    def apply(c: HCursor): Decoder.Result[Delta[Cache[A]]] = decoder(c)
+    def updateRefs(rur: RefUpdateResult[Mirror], updater: RefUpdater): RefUpdateResult[Mirror] = rur
+    def apply(c: HCursor): Decoder.Result[Delta[Mirror]] = decoder(c)
   }
 
-  implicit def cache[A](implicit dCodecA: DeltaCodec[A]): DeltaCodec[Cache[A]] = new DeltaCodecCache[A]
+  // Not implicit - this is used from Mirror codec builder to make the delta codec to go with plain
+  // Codec[Mirror]
+  def mirror[A](implicit mirrorCodecA: MirrorCodec[A]): DeltaCodec[Mirror] = new DeltaCodecMirror[A]
 
 }

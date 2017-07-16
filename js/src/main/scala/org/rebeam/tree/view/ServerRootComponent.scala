@@ -51,7 +51,8 @@ object ServerRootComponent {
 
     def render(props: Props[R, P], state: State[R]) = {
       state.clientState.map { cs =>
-        val cursorP = Cursor(rootParent, cs.model, props.p)
+        //FIXME actual root!
+        val cursorP = Cursor(rootParent, cs.model, props.p, Cursor.RootNone)
         props.render(cursorP)
       }.getOrElse(
         props.noData
