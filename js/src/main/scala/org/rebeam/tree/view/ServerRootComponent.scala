@@ -11,15 +11,37 @@ import scala.util.{Failure, Success}
 import io.circe._
 import io.circe.parser._
 import io.circe.syntax._
-
+import org.rebeam.tree.ref.{Mirror, MirrorCodec}
 object ServerRootComponent {
+
+  trait RootSource[R] {
+    def rootFor(rootModel: R, parent: Parent[R]): Root
+  }
+
+  private class MirrorRootSource extends RootSource[Mirror] {
+    def rootFor(rootModel: Mirror, parent: Parent[Mirror]): Root = new Root {
+      def cursorAt[A, L](ref: org.rebeam.tree.ref.Ref[A], location: L)(implicit mca: MirrorCodec[A]): Option[Cursor[A, L]] = {
+        rootModel.apply(ref).map { data =>
+          Cursor[A, L](MirrorParent[A](parent, ref), data, location, this)
+        }
+      }
+    }
+  }
+
+  implicit val mirrorRootSource: RootSource[Mirror] = new MirrorRootSource
+
+  private class NoRootSource[R] extends RootSource[R] {
+    def rootFor(rootModel: R, parent: Parent[R]): Root = Cursor.RootNone
+  }
+
+  def noRootSource[R]: RootSource[R] = new NoRootSource[R]
 
   case class Props[R, P](p: P, render: Cursor[R, P] => ReactElement, wsUrl: String, noData: ReactElement)
 
   case class State[R](clientState: Option[ClientState[R]], ws: Option[WebSocket], tick: Option[SetIntervalHandle])
 
   class Backend[R, P](scope: BackendScope[Props[R, P], State[R]])
-    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource) {
+    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R]) {
 
     implicit val cme = clientMsgEncoder[R]
 
@@ -52,7 +74,7 @@ object ServerRootComponent {
     def render(props: Props[R, P], state: State[R]) = {
       state.clientState.map { cs =>
         //FIXME actual root!
-        val cursorP = Cursor(rootParent, cs.model, props.p, Cursor.RootNone)
+        val cursorP = Cursor(rootParent, cs.model, props.p, rootSource.rootFor(cs.model, rootParent))
         props.render(cursorP)
       }.getOrElse(
         props.noData
@@ -153,8 +175,8 @@ object ServerRootComponent {
   def factory[R, P]
     (noData: ReactElement, wsUrl: String)
     (render: Cursor[R, P] => ReactElement)
-    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource) = {
-    val c = ctor[R, P](decoder, deltaDecoder, idGen, contextSource)
+    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R]) = {
+    val c = ctor[R, P](decoder, deltaDecoder, idGen, contextSource, rootSource)
     (page: P) => c(Props[R, P](page, render, wsUrl, noData))
   }
 
@@ -162,15 +184,15 @@ object ServerRootComponent {
   def apply[R]
   (noData: ReactElement, wsUrl: String)
   (render: Cursor[R, Unit] => ReactElement)
-  (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource) = {
-    val c = ctor[R, Unit](decoder, deltaDecoder, idGen, contextSource)
+  (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R]) = {
+    val c = ctor[R, Unit](decoder, deltaDecoder, idGen, contextSource, rootSource)
     c(Props[R, Unit]((), render, wsUrl, noData))
   }
 
   //Just make the component constructor - props to be supplied later to make a component
-  def ctor[R, P](implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource) = ReactComponentB[Props[R, P]]("ServerRootComponent")
+  def ctor[R, P](implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R]) = ReactComponentB[Props[R, P]]("ServerRootComponent")
     .initialState(State[R](None, None, None))
-    .backend(new Backend[R, P](_)(decoder, deltaDecoder, idGen, contextSource))
+    .backend(new Backend[R, P](_)(decoder, deltaDecoder, idGen, contextSource, rootSource))
     .render(s => s.backend.render(s.props, s.state))
     .componentDidMount(_.backend.start)
     .componentWillUnmount(_.backend.end)

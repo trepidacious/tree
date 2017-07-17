@@ -8,7 +8,7 @@ import japgolly.scalajs.react.extra.Reusability
 import org.rebeam.tree.ref.{Mirror, MirrorCodec, Ref}
 
 trait Root {
-  def cursorAt[A, L](ref: Ref[A], location: L): Option[Cursor[A, L]]
+  def cursorAt[A, L](ref: Ref[A], location: L)(implicit mca: MirrorCodec[A]): Option[Cursor[A, L]]
 }
 
 /**
@@ -83,7 +83,7 @@ trait Cursor[M, L] extends Parent[M] {
 
   def move[N](newLocation: N): Cursor[M, N] = CursorBasic(parent, model, newLocation, root)
 
-  def followRef[A](ref: Ref[A]): Option[Cursor[A, L]] = root.cursorAt(ref, location)
+  def followRef[A](ref: Ref[A])(implicit mca: MirrorCodec[A]): Option[Cursor[A, L]] = root.cursorAt(ref, location)
 
 }
 
@@ -92,7 +92,7 @@ private case class CursorBasic[M, L](parent: Parent[M], model: M, location: L, r
 object Cursor {
 
   object RootNone extends Root {
-    override def cursorAt[A, L](ref: Ref[A], location: L): Option[Cursor[A, L]] = None
+    override def cursorAt[A, L](ref: Ref[A], location: L)(implicit mca: MirrorCodec[A]): Option[Cursor[A, L]] = None
   }
 
   def apply[M, L](parent: Parent[M], model: M, location: L, root: Root): Cursor[M, L] = CursorBasic(parent, model, location, root)
