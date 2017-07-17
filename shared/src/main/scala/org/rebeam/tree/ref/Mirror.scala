@@ -180,6 +180,10 @@ class Mirror(private val map: Map[Guid[_], MirrorState[_]], private val types: M
 //    case RefResolved(guid, revision) => getState(guid).filter(_.revision == revision).map(_.data)
 //  }
 
+  def revisionOf[A](ref: Ref[A]): Option[Guid[A]] = getState(ref.guid).map(_.revision)
+
+  def revisionOf[A](guid: Guid[A]): Option[Guid[A]] = getState(guid).map(_.revision)
+
   def updateRef[A](ref: Ref[A]): Option[Ref[A]] = getState(ref.guid).fold[Option[Ref[A]]]{
     // If ref is not in mirror, update to unresolved
     Some(RefUnresolved(ref.guid))

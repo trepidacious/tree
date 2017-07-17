@@ -2,7 +2,6 @@ package org.rebeam.tree.sync
 
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.JsonCodec
-import org.rebeam.lenses.PrismN
 import org.rebeam.lenses.macros.Lenses
 import org.rebeam.tree.Delta._
 import org.rebeam.tree.DeltaCodecs._
@@ -14,7 +13,6 @@ import org.scalatest.prop.Checkers
 import scala.language.higherKinds
 import org.rebeam.tree.BasicDeltaDecoders._
 import org.rebeam.tree.ref.{Mirror, MirrorCodec, Ref}
-import org.rebeam.tree.ref.Ref._
 
 class RefSpec extends WordSpec with Matchers with Checkers {
 
@@ -101,35 +99,87 @@ class RefSpec extends WordSpec with Matchers with Checkers {
 
   val examplePost: (Post, Mirror) = DeltaIORun.runDeltaIO(examplePostIO, DeltaIOContext(Moment(100)), DeltaId(ClientId(1), ClientDeltaId(1)))
 
+  def checkRefsGraph(post: Post, mirror: Mirror): Unit = {
+    assert(mirror.incomingRefs(post.id) == Set.empty)
+    assert(mirror.outgoingRefs(post.id) == Set(post.userRef.guid) ++ post.tagRefs.map(_.guid))
+
+    val r = for {
+      user <- mirror(post.userRef)
+      address <- mirror(user.addressRef)
+      tag1 <- mirror(post.tagRefs.head)
+      tag2 <- mirror(post.tagRefs(1))
+    } yield {
+      assert(mirror.incomingRefs(user.id) == Set(post.id))
+      assert(mirror.outgoingRefs(user.id) == Set(address.id))
+
+      assert(mirror.incomingRefs(address.id) == Set(user.id))
+      assert(mirror.outgoingRefs(address.id) == Set())
+
+      assert(mirror.incomingRefs(tag1.id) == Set(post.id))
+      assert(mirror.outgoingRefs(tag1.id) == Set())
+
+      assert(mirror.incomingRefs(tag2.id) == Set(post.id))
+      assert(mirror.outgoingRefs(tag2.id) == Set())
+      true
+    }
+
+    assert(r.isDefined)
+  }
+
+  def checkMirrorContents(post: Post, mirror: Mirror): Unit = {
+    assert(mirror.incomingRefs(post.id) == Set.empty)
+    assert(mirror.outgoingRefs(post.id) == Set(post.userRef.guid) ++ post.tagRefs.map(_.guid))
+
+    val mo = examplePost._2
+
+    val r = for {
+      postAgain <- mirror.get(post.id)
+      userAgain <- mirror(postAgain.userRef)
+      addressAgain <- mirror(userAgain.addressRef)
+      tag1Again <- mirror(postAgain.tagRefs.head)
+      tag2Again <- mirror(postAgain.tagRefs(1))
+
+      postAgainR <- mirror.revisionOf(post.id)
+      userAgainR <- mirror.revisionOf(postAgain.userRef)
+      addressAgainR <- mirror.revisionOf(userAgain.addressRef)
+      tag1AgainR <- mirror.revisionOf(postAgain.tagRefs.head)
+      tag2AgainR <- mirror.revisionOf(postAgain.tagRefs(1))
+
+      user <- mo(post.userRef)
+      address <- mo(user.addressRef)
+      tag1 <- mo(post.tagRefs.head)
+      tag2 <- mo(post.tagRefs(1))
+
+      postR <- mo.revisionOf(post.id)
+      userR <- mo.revisionOf(post.userRef)
+      addressR <- mo.revisionOf(user.addressRef)
+      tag1R <- mo.revisionOf(post.tagRefs.head)
+      tag2R <- mo.revisionOf(post.tagRefs(1))
+
+    } yield {
+      assert(postAgain === post)
+      assert(userAgain === user)
+      assert(addressAgain === address)
+      assert(tag1Again === tag1)
+      assert(tag2Again === tag2)
+
+      assert(postAgainR === postR)
+      assert(userAgainR === userR)
+      assert(addressAgainR === addressR)
+      assert(tag1AgainR === tag1R)
+      assert(tag2AgainR === tag2R)
+
+      true
+    }
+
+    assert(r.isDefined)
+  }
+
   "Mirror" should {
     "produce correct refs graph" in {
-      val cache = examplePost._2
+      val mirror = examplePost._2
       val post = examplePost._1
-
-      assert(cache.incomingRefs(post.id) == Set.empty)
-      assert(cache.outgoingRefs(post.id) == Set(post.userRef.guid) ++ post.tagRefs.map(_.guid))
-
-      val r = for {
-        user <- cache(post.userRef)
-        address <- cache(user.addressRef)
-        tag1 <- cache(post.tagRefs.head)
-        tag2 <- cache(post.tagRefs(1))
-      } yield {
-        assert(cache.incomingRefs(user.id) == Set(post.id))
-        assert(cache.outgoingRefs(user.id) == Set(address.id))
-
-        assert(cache.incomingRefs(address.id) == Set(user.id))
-        assert(cache.outgoingRefs(address.id) == Set())
-
-        assert(cache.incomingRefs(tag1.id) == Set(post.id))
-        assert(cache.outgoingRefs(tag1.id) == Set())
-
-        assert(cache.incomingRefs(tag2.id) == Set(post.id))
-        assert(cache.outgoingRefs(tag2.id) == Set())
-        true
-      }
-
-      assert(r.isDefined)
+      checkRefsGraph(post, mirror)
     }
   }
 
@@ -139,17 +189,27 @@ class RefSpec extends WordSpec with Matchers with Checkers {
       mirrorDecoder.decodeJson(encoded) match {
         case Left(error) => fail(error)
         case Right(md) =>
-          println(examplePost._2)
-          println(md)
-          assert(md === examplePost._2)
           val reEncode = mirrorEncoder(md)
           assert(encoded === reEncode)
       }
     }
+
+    "encode and decode to same contents and revisions" in {
+      val post = examplePost._1
+      val encoded = mirrorEncoder(examplePost._2)
+      mirrorDecoder.decodeJson(encoded) match {
+        case Left(error) => fail(error)
+        case Right(md) =>
+          checkRefsGraph(post, md)
+          checkMirrorContents(post, md)
+      }
+    }
+
   }
 
   "DeltaCodecs" should {
-//    "update refs" in {
+    "update refs" in {
+      pending
 //      val post = examplePost._1
 //      val postUpdated = postDeltaDecoder.updateRefsDataOnly(examplePost._1, examplePost._2)
 //
@@ -165,7 +225,7 @@ class RefSpec extends WordSpec with Matchers with Checkers {
 //      )
 //
 //      assert(postUpdated == postExpected)
-//    }
+    }
 
     "find outgoing refs" in {
       val post = examplePost._1
@@ -174,7 +234,8 @@ class RefSpec extends WordSpec with Matchers with Checkers {
       assert(rur.outgoingRefs == Set(post.userRef.guid) ++ post.tagRefs.map(_.guid))
     }
 
-//    "update refs incrementally" in {
+    "update refs incrementally" in {
+      pending
 //      val post = examplePost._1
 //      val cache = examplePost._2
 //
@@ -208,7 +269,7 @@ class RefSpec extends WordSpec with Matchers with Checkers {
 //      assert(cacheUpdated(postUpdated.userRef).contains(userUpdated))
 //      assert(cacheUpdated(postUpdated2.userRef).contains(userUpdated))
 //
-//    }
+    }
 
   }
 
