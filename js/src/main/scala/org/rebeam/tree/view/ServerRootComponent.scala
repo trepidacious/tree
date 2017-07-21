@@ -52,7 +52,7 @@ object ServerRootComponent {
           _ <- s.clientState match {
             case None =>
               // TODO implement
-              Callback{"Delta before we have a clientState! Should queue deltas?"}
+              println("Delta before we have a clientState! Should queue deltas?")
             case Some(cs) => {
               //SIDE-EFFECT: Note this is the point at which we generate the context
               val (newCS, id) = cs.apply(delta, contextSource.getContext)
