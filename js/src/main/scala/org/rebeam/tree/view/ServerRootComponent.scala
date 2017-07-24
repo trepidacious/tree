@@ -2,7 +2,7 @@ package org.rebeam.tree.view
 
 import japgolly.scalajs.react._
 import org.rebeam.tree._
-import org.rebeam.tree.sync.ClientState
+import org.rebeam.tree.sync.{ClientState, RefAdder}
 import org.rebeam.tree.sync.Sync._
 import org.scalajs.dom._
 
@@ -41,7 +41,7 @@ object ServerRootComponent {
   case class State[R](clientState: Option[ClientState[R]], ws: Option[WebSocket], tick: Option[SetIntervalHandle])
 
   class Backend[R, P](scope: BackendScope[Props[R, P], State[R]])
-    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R]) {
+    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R]) {
 
     implicit val cme = clientMsgEncoder[R]
 
@@ -52,7 +52,7 @@ object ServerRootComponent {
           _ <- s.clientState match {
             case None =>
               // TODO implement
-              println("Delta before we have a clientState! Should queue deltas?")
+              Callback{println("Delta before we have a clientState! Should queue deltas?")}
             case Some(cs) => {
               //SIDE-EFFECT: Note this is the point at which we generate the context
               val (newCS, id) = cs.apply(delta, contextSource.getContext)
@@ -175,8 +175,8 @@ object ServerRootComponent {
   def factory[R, P]
     (noData: ReactElement, wsUrl: String)
     (render: Cursor[R, P] => ReactElement)
-    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R]) = {
-    val c = ctor[R, P](decoder, deltaDecoder, idGen, contextSource, rootSource)
+    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R]) = {
+    val c = ctor[R, P](decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder)
     (page: P) => c(Props[R, P](page, render, wsUrl, noData))
   }
 
@@ -184,15 +184,15 @@ object ServerRootComponent {
   def apply[R]
   (noData: ReactElement, wsUrl: String)
   (render: Cursor[R, Unit] => ReactElement)
-  (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R]) = {
-    val c = ctor[R, Unit](decoder, deltaDecoder, idGen, contextSource, rootSource)
+  (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R]) = {
+    val c = ctor[R, Unit](decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder)
     c(Props[R, Unit]((), render, wsUrl, noData))
   }
 
   //Just make the component constructor - props to be supplied later to make a component
-  def ctor[R, P](implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R]) = ReactComponentB[Props[R, P]]("ServerRootComponent")
+  def ctor[R, P](implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R]) = ReactComponentB[Props[R, P]]("ServerRootComponent")
     .initialState(State[R](None, None, None))
-    .backend(new Backend[R, P](_)(decoder, deltaDecoder, idGen, contextSource, rootSource))
+    .backend(new Backend[R, P](_)(decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder))
     .render(s => s.backend.render(s.props, s.state))
     .componentDidMount(_.backend.start)
     .componentWillUnmount(_.backend.end)

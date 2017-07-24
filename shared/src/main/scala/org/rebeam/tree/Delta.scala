@@ -33,6 +33,7 @@ trait Delta[A] {
 sealed trait DeltaIOA[A]
 case class GetId[T]() extends DeltaIOA[Guid[T]]
 case object GetContext extends DeltaIOA[DeltaIOContext]
+case class Put[T](create: Guid[T] => DeltaIO[T], codec: MirrorCodec[T]) extends DeltaIOA[T]
 
 /**
   * Provides the context within which an individual run of a DeltaIO can
@@ -83,6 +84,19 @@ object Delta {
     */
   val getContext: DeltaIO[DeltaIOContext] =
     liftF[DeltaIOA, DeltaIOContext](GetContext)
+
+  /**
+    * Put a new data item into the Mirror, where that data item
+    * can be created by a DeltaIO using a new Guid.
+    * This atomically produces a new Guid for a data item, creates
+    * that data item, and registers the data item to the Mirror.
+    * @tparam T       The type of data item
+    * @param create   A function accepting a new Guid for the data item,
+    *                 and returning a DeltaIO that will make the data item.
+    * @return         A DeltaIO yielding the new item
+    */
+  def put[T](create: Guid[T] => DeltaIO[T])(implicit codec: MirrorCodec[T]): DeltaIO[T] =
+    liftF[DeltaIOA, T](Put(create, codec))
 
   def pure[T](t: T): DeltaIO[T] = Free.pure(t)
 

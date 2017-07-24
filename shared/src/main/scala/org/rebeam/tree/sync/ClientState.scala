@@ -40,10 +40,13 @@ object ClientState {
 
   // Temporary class used to manage a model and deltas
   private case class ModelAndDeltas[A](model: A, deltas: Seq[DeltaWithIC[A]]) {
-    def applyDelta(delta: Delta[A], deltaId: DeltaId, context: DeltaIOContext): ModelAndDeltas[A] =
-      copy(model = delta.runWith(model, context, deltaId))
+    def applyDelta(delta: Delta[A], deltaId: DeltaId, context: DeltaIOContext)(implicit refAdder: RefAdder[A]): ModelAndDeltas[A] =
+      copy(model = {
+        val result = delta.runWith(model, context, deltaId)
+        refAdder.addRefs(result)
+      })
 
-    lazy val modelWithDeltas: A = deltas.foldLeft(model) { case (m, d) => d.runWith(m) }
+    def modelWithDeltas(implicit refAdder: RefAdder[A]): A = deltas.foldLeft(model) { case (m, d) => refAdder.addRefs(d.runWith(m)) }
   }
 
 }
@@ -74,10 +77,10 @@ case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, server
     *                the delta appropriately.
     * @return A new ClientState
     */
-  def apply(delta: Delta[A], context: DeltaIOContext): (ClientState[A], DeltaId) = {
+  def apply(delta: Delta[A], context: DeltaIOContext)(implicit refAdder: RefAdder[A]): (ClientState[A], DeltaId) = {
     val deltaId = DeltaId(id, nextClientDeltaId)
 
-    val nextModel = delta.runWith(model, context, deltaId)
+    val nextModel = refAdder.addRefs(delta.runWith(model, context, deltaId))
 
     val deltaWithIC = DeltaWithIC(delta, deltaId, context)
     val state = copy(nextClientDeltaId = nextClientDeltaId.next, model = nextModel, pendingDeltas = pendingDeltas :+ deltaWithIC)
@@ -89,7 +92,7 @@ case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, server
     * @param update The update to apply
     * @return An error xor a new ClientState
     */
-  def update(update: ModelUpdate[A])(implicit idGen: ModelIdGen[A]): Either[String, ClientState[A]] = update match {
+  def update(update: ModelUpdate[A])(implicit idGen: ModelIdGen[A], refAdder: RefAdder[A]): Either[String, ClientState[A]] = update match {
     case i@ModelIncrementalUpdate(_,_,_) => incrementalUpdate(i)
     case f@ModelFullUpdate(_,_)  => fullUpdate(f)
   }
@@ -107,7 +110,7 @@ case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, server
     * @param update The update to apply
     * @return An error xor a new ClientState
     */
-  def incrementalUpdate(update: ModelIncrementalUpdate[A])(implicit idGen: ModelIdGen[A]): Either[String, ClientState[A]] = {
+  def incrementalUpdate(update: ModelIncrementalUpdate[A])(implicit idGen: ModelIdGen[A], refAdder: RefAdder[A]): Either[String, ClientState[A]] = {
     if (update.baseModelId != serverModel.id) {
       Left("Server update expected base model id " + update.baseModelId + " but we have server model id " + serverModel.id)
 
@@ -124,7 +127,7 @@ case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, server
       // 3. We can't apply a LocalDelta unless we know what it is - the server saves bandwidth by just referencing them by id.
       // 4. We keep hold of any pendingDeltas AFTER the most recent LocalDelta since the server may not have received them yet, so
       //    we need to retain them until they are either applied or we see that they are rejected because they are skipped
-      //    (or rejected if implemented in future).
+      //    (or explicitly rejected if implemented in future).
       // 5. The reduced pending delta list can then be used to build our new client model, optimistically applying deltas we
       //    believe are still pending (on their way to the server and back).
 
@@ -147,7 +150,7 @@ case class ClientState[A](id: ClientId, nextClientDeltaId: ClientDeltaId, server
               case delta +: tail => Right(
                 mad.copy(
                   // Make sure to use the new context from server!
-                  model = delta.runWithNewContext(mad.model, context),
+                  model = refAdder.addRefs(delta.runWithNewContext(mad.model, context)),
                   deltas = tail
                 )
               )
