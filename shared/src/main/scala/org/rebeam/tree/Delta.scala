@@ -7,7 +7,8 @@ import org.rebeam.lenses._
 import monocle._
 import monocle.std.option
 import org.rebeam.tree.Delta._
-import org.rebeam.tree.ref.Cache
+import org.rebeam.tree.ref.{Mirror, MirrorCodec, Ref}
+//import org.rebeam.tree.ref.Cache
 import org.rebeam.tree.sync.Sync.Guid
 
 import scala.reflect.ClassTag
@@ -32,6 +33,7 @@ trait Delta[A] {
 sealed trait DeltaIOA[A]
 case class GetId[T]() extends DeltaIOA[Guid[T]]
 case object GetContext extends DeltaIOA[DeltaIOContext]
+case class Put[T](create: Guid[T] => DeltaIO[T], codec: MirrorCodec[T]) extends DeltaIOA[T]
 
 /**
   * Provides the context within which an individual run of a DeltaIO can
@@ -82,6 +84,19 @@ object Delta {
     */
   val getContext: DeltaIO[DeltaIOContext] =
     liftF[DeltaIOA, DeltaIOContext](GetContext)
+
+  /**
+    * Put a new data item into the Mirror, where that data item
+    * can be created by a DeltaIO using a new Guid.
+    * This atomically produces a new Guid for a data item, creates
+    * that data item, and registers the data item to the Mirror.
+    * @tparam T       The type of data item
+    * @param create   A function accepting a new Guid for the data item,
+    *                 and returning a DeltaIO that will make the data item.
+    * @return         A DeltaIO yielding the new item
+    */
+  def put[T](create: Guid[T] => DeltaIO[T])(implicit codec: MirrorCodec[T]): DeltaIO[T] =
+    liftF[DeltaIOA, T](Put(create, codec))
 
   def pure[T](t: T): DeltaIO[T] = Free.pure(t)
 
@@ -144,11 +159,16 @@ case class PrismNDelta[S, A](prismN: PrismN[S, A], delta: Delta[A]) extends Delt
     )  //optionalI.modify(delta.apply)(l)
 }
 
-case class CacheDelta[A](optionalCache: OptionalCache[A], delta: Delta[A]) extends Delta[Cache[A]] {
-  def apply(c: Cache[A]): DeltaIO[Cache[A]] =
-    optionalCache.getOption(c).fold(
-      pure(c)
+case class MirrorDelta[A: MirrorCodec](ref: Ref[A], delta: Delta[A]) extends Delta[Mirror] {
+  def apply(mirror: Mirror): DeltaIO[Mirror] =
+    mirror(ref).fold(
+      // Data is not in mirror, nothing to do
+      pure(mirror)
     )(
-      a => delta(a).map(modifiedA => optionalCache.set(modifiedA)(c))
+      // Data is in mirror, apply delta to it
+      a => for {
+        modifiedA <- delta(a)
+        updatedMirror <- mirror.updated(ref.guid, modifiedA)
+      } yield updatedMirror
     )
 }

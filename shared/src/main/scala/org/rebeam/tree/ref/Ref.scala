@@ -21,7 +21,14 @@ sealed trait Ref[+A] {
     */
   def guid: Guid[A]
 
-  def optionRevision: Option[Long]
+  /**
+    * The revision of the referenced data item, if known.
+    * We use an additional Guid, which is generated using the
+    * delta that produces the revision. This ensures that whenever
+    * the data changes, we have a new, unique revision.
+    * @return Revision
+    */
+  def optionRevision: Option[Guid[A]]
 }
 
 object Ref {
@@ -35,7 +42,7 @@ object Ref {
     * @tparam A The type of data item
     */
   case class RefUnresolved[A](guid: Guid[A]) extends Ref[A] {
-    lazy val optionRevision: Option[Long] = None
+    lazy val optionRevision: Option[Guid[A]] = None
 
     override def toString: String = Ref.toString(this) + "-u"
   }
@@ -48,8 +55,8 @@ object Ref {
     * @param revision The revision of the data we are referencing
     * @tparam A The type of data item
     */
-  case class RefResolved[A](guid: Guid[A], revision: Long) extends Ref[A]{
-    lazy val optionRevision: Option[Long] = Some(revision)
+  case class RefResolved[A](guid: Guid[A], revision: Guid[A]) extends Ref[A]{
+    lazy val optionRevision: Option[Guid[A]] = Some(revision)
     override def toString: String = Ref.toString(this) + "-rev" + revision
   }
 
@@ -59,6 +66,7 @@ object Ref {
   private def hex(x: String): Long = java.lang.Long.parseUnsignedLong(x, 16)
 
   def fromString[A](s: String): Option[Ref[A]] = s match {
+    // FIXME also encode the revision?
     case regexGrouped(clientId, clientDeltaId, id) =>
       Try {
         RefUnresolved[A](Guid[A](ClientId(hex(clientId)), ClientDeltaId(hex(clientDeltaId)), hex(id)))

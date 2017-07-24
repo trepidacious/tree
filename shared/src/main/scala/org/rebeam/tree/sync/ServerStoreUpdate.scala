@@ -4,7 +4,7 @@ import org.rebeam.tree.sync.Sync._
 import DeltaIORun._
 
 sealed trait ServerStoreUpdate[A] {
-  def append(e: ServerStoreUpdate[A]): ServerStoreUpdate[A]
+  def append(e: ServerStoreUpdate[A])(implicit refAdder: RefAdder[A]): ServerStoreUpdate[A]
 }
 
 object ServerStoreUpdate {
@@ -14,7 +14,7 @@ object ServerStoreUpdate {
     * @param modelAndId Model and id
     */
   case class ServerStoreFullUpdate[A](modelAndId: ModelAndId[A]) extends ServerStoreUpdate[A] {
-    def append(e: ServerStoreUpdate[A]): ServerStoreUpdate[A] = {
+    def append(e: ServerStoreUpdate[A])(implicit refAdder: RefAdder[A]): ServerStoreUpdate[A] = {
       e match {
         // Full 1 + full 2 = full 2
         case f@ServerStoreFullUpdate(_) => f
@@ -22,7 +22,10 @@ object ServerStoreUpdate {
         // Full 1 + inc 1 = new full update with model from full 1 update with deltas from inc 1
         case i@ServerStoreIncrementalUpdate(_, _, _) =>
           val updatedModel = i.deltas.foldLeft(modelAndId.model){
-            case (m, dijc) => dijc.runWith(m)
+            case (m, dijc) => {
+              val result = dijc.runWith(m)
+              refAdder.addRefs(result)
+            }
           }
           ServerStoreFullUpdate(ModelAndId(updatedModel, i.updatedModelId))
       }
@@ -40,7 +43,7 @@ object ServerStoreUpdate {
   case class ServerStoreIncrementalUpdate[A](baseModelId: ModelId,
                                              deltas: Seq[DeltaWithIJC[A]],
                                              updatedModelId: ModelId) extends ServerStoreUpdate[A] {
-    def append(e: ServerStoreUpdate[A]): ServerStoreUpdate[A] = {
+    def append(e: ServerStoreUpdate[A])(implicit refAdder: RefAdder[A]): ServerStoreUpdate[A] = {
       e match {
         //Inc 1 + full 1 = full 1
         case f@ServerStoreFullUpdate(_) => f

@@ -5,7 +5,8 @@ import org.rebeam.tree._
 import org.rebeam.lenses._
 import io.circe._
 import monocle.Lens
-import org.rebeam.tree.ref.Cache
+import org.rebeam.tree.ref.{Mirror, MirrorCodec}
+//import org.rebeam.tree.ref.Cache
 import org.rebeam.tree.ref.Ref
 
 /**
@@ -187,24 +188,24 @@ case class LensParent[P, C, L <: Lens[P, C] : OuterEncoder](parent: Parent[P], l
 }
 
 /**
-  * Produce a Parent for a data item in a Cache, from a Parent for that Cache. This uses
-  * an OptionalCache to move between the Cache and the data item at a given Ref.
-  * @param parent         The parent of the cache
-  * @param optionalCache  The Optional from the Cache to the correct data item (if any)
-  * @tparam A             The type of data item in the Cache
+  * Produce a Parent for a data item in a Mirror, from a Parent for that Mirror. This uses
+  * an Ref to move between the Mirror and a data item
+  * @param parent         The parent of the Mirror
+  * @param ref            The Ref to use to look up data in Mirror
+  * @tparam A             The type of data item in the Mirror
   */
-case class CacheParent[A](parent: Parent[Cache[A]], optionalCache: OptionalCache[A]) extends Parent[A] {
+case class MirrorParent[A: MirrorCodec](parent: Parent[Mirror], ref: Ref[A]) extends Parent[A] {
 
   def callback(delta: Delta[A], deltaJs: Json): Callback = {
-    //Produce an OptionalCacheDelta from the provided child delta, to make it into a delta
-    //of the parent (i.e. convert child's Delta[A] to parent's Delta[Cache[M]
-    val parentDelta = CacheDelta(optionalCache, delta)
+    //Produce a MirrorDelta from the provided child delta, to make it into a delta
+    //of the parent (i.e. convert child's Delta[A] to parent's Delta[Mirror]
+    val parentDelta = MirrorDelta(ref, delta)
 
     //Add this delta to the JSON
     val parentDeltaJs = Json.obj(
-      "optional" -> Json.obj(
-        "optionalCache" -> Json.obj(
-          "ref" -> Ref.encodeRef[A](optionalCache.ref),
+      "mirror" -> Json.obj(
+        implicitly[MirrorCodec[A]].mirrorType.name -> Json.obj(
+          "ref" -> Ref.encodeRef[A](ref),
           "delta" -> deltaJs
         )
       )

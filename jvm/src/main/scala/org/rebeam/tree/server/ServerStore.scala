@@ -5,6 +5,7 @@ import org.rebeam.tree.server.util._
 import org.rebeam.tree.sync.{DeltaIORun, ServerStoreUpdate}
 import org.rebeam.tree.sync.ServerStoreUpdate._
 import org.rebeam.tree.sync.Sync._
+import org.rebeam.tree.sync.RefAdder
 import DeltaIORun._
 
 import scalaz.Scalaz._
@@ -38,10 +39,13 @@ class ServerStore[A: ModelIdGen](initialModel: A) {
     mId
   }
 
-  def applyDelta(d: DeltaWithIJ[A], context: DeltaIOContext): Unit = lock {
+  def applyDelta(d: DeltaWithIJ[A], context: DeltaIOContext)(implicit refAdder: RefAdder[A]): Unit = lock {
     val baseModelId = m.id
 
-    val newModel = d.runWith(m.model, context)
+    val result = d.runWith(m.model, context)
+
+    //Use RefAdder to actually add the refs to our model (if possible)
+    val newModel = refAdder.addRefs(result)
 
     val newId = makeId(newModel)
     m = ModelAndId(newModel, newId)
@@ -63,7 +67,7 @@ class ServerStore[A: ModelIdGen](initialModel: A) {
   * Uses DeltaWithIJs encoded as JSON for incoming messages, and ModelUpdates encoded to JSON for
   * outgoing messages.
   */
-private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clientId: ClientId, contextSource: DeltaIOContextSource)(implicit encoder: Encoder[T], deltaDecoder: DeltaCodec[T]) extends Dispatcher[ServerStoreUpdate[T], Json, Json] {
+private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clientId: ClientId, contextSource: DeltaIOContextSource)(implicit encoder: Encoder[T], deltaDecoder: DeltaCodec[T], refAdder: RefAdder[T]) extends Dispatcher[ServerStoreUpdate[T], Json, Json] {
 
   private var pendingUpdateToClient = none[ServerStoreUpdate[T]]
 
@@ -110,7 +114,7 @@ private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clien
 }
 
 object ServerStoreValueExchange {
-  def apply[M](store: ServerStore[M], clientId: ClientId, contextSource: DeltaIOContextSource)(implicit encoder: Encoder[M], decoder: Decoder[M], deltaDecoder: DeltaCodec[M]): Exchange[WebSocketFrame, WebSocketFrame] = {
+  def apply[M](store: ServerStore[M], clientId: ClientId, contextSource: DeltaIOContextSource)(implicit encoder: Encoder[M], decoder: Decoder[M], deltaDecoder: DeltaCodec[M], refAdder: RefAdder[M]): Exchange[WebSocketFrame, WebSocketFrame] = {
 
     val dispatcher = new ServerStoreValueDispatcher(store, clientId, contextSource)
     val observer = new DispatchObserver(dispatcher)
