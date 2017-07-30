@@ -98,6 +98,25 @@ object Delta {
   def put[T](create: Guid[T] => DeltaIO[T])(implicit codec: MirrorCodec[T]): DeltaIO[T] =
     liftF[DeltaIOA, T](Put(create, codec))
 
+  /**
+    * Put a new data item into the Mirror, where that data item
+    * can be created directly using a new Guid.
+    * This atomically produces a new Guid for a data item, creates
+    * that data item, and registers the data item to the Mirror.
+    * @tparam T       The type of data item
+    * @param create   A function accepting a new Guid for the data item,
+    *                 and returning a data item.
+    * @return         The new item
+    */
+  def putPure[T](create: Guid[T] => T)(implicit codec: MirrorCodec[T]): DeltaIO[T] =
+    put[T]((id: Guid[T]) => pure(create(id)))
+
+  /**
+    * Pure DeltaIO value
+    * @param t    The value
+    * @tparam T   The type of value
+    * @return     DeltaIO returning value directly
+    */
   def pure[T](t: T): DeltaIO[T] = Free.pure(t)
 
 }
