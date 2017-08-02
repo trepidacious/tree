@@ -101,7 +101,7 @@ class RefSpec extends WordSpec with Matchers with Checkers {
 
   def checkRefsGraph(post: Post, mirror: Mirror): Unit = {
     assert(mirror.incomingRefs(post.id) == Set.empty)
-    assert(mirror.outgoingRefs(post.id) == Set(post.userRef.guid) ++ post.tagRefs.map(_.guid))
+    assert(mirror.outgoingRefs(post.id) == Set(post.userRef.id) ++ post.tagRefs.map(_.id))
 
     val r = for {
       user <- mirror(post.userRef)
@@ -128,7 +128,7 @@ class RefSpec extends WordSpec with Matchers with Checkers {
 
   def checkMirrorContents(post: Post, mirror: Mirror): Unit = {
     assert(mirror.incomingRefs(post.id) == Set.empty)
-    assert(mirror.outgoingRefs(post.id) == Set(post.userRef.guid) ++ post.tagRefs.map(_.guid))
+    assert(mirror.outgoingRefs(post.id) == Set(post.userRef.id) ++ post.tagRefs.map(_.id))
 
     val mo = examplePost._2
 
@@ -231,7 +231,7 @@ class RefSpec extends WordSpec with Matchers with Checkers {
       val post = examplePost._1
       val rur = postDeltaDecoder.updateRefs(RefUpdateResult.noRefs(post), examplePost._2)
 
-      assert(rur.outgoingRefs == Set(post.userRef.guid) ++ post.tagRefs.map(_.guid))
+      assert(rur.outgoingRefs == Set(post.userRef.id) ++ post.tagRefs.map(_.id))
     }
 
     "update refs incrementally" in {

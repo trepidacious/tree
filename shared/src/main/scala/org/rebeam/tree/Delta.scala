@@ -187,7 +187,7 @@ case class MirrorDelta[A: MirrorCodec](ref: Ref[A], delta: Delta[A]) extends Del
       // Data is in mirror, apply delta to it
       a => for {
         modifiedA <- delta(a)
-        updatedMirror <- mirror.updated(ref.guid, modifiedA)
+        updatedMirror <- mirror.updated(ref.id, modifiedA)
       } yield updatedMirror
     )
 }

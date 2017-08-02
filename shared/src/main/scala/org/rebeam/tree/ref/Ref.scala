@@ -1,10 +1,9 @@
 package org.rebeam.tree.ref
 
-import org.rebeam.tree.sync.Sync.{ClientDeltaId, ClientId, Guid}
+import org.rebeam.tree.sync.Sync.{ClientDeltaId, ClientId, Guid, HasId}
 
 import scala.util.Try
 import scala.util.matching.Regex
-
 import io.circe._
 import cats.syntax.either._
 
@@ -14,12 +13,12 @@ import cats.syntax.either._
   *
   * @tparam A The type of data item
   */
-sealed trait Ref[+A] {
+sealed trait Ref[+A] extends HasId[A] {
   /**
     * The Guid of the referenced data item
     * @return Guid
     */
-  def guid: Guid[A]
+  def id: Guid[A]
 
   /**
     * The revision of the referenced data item, if known.
@@ -38,10 +37,10 @@ object Ref {
     * Will be replaced by a RefResolved when the cache contains the referenced
     * data.
     * As for all Refs, will look up the most recent revision of data in a Cache.
-    * @param guid The guid of the referenced data item
+    * @param id The guid of the referenced data item
     * @tparam A The type of data item
     */
-  case class RefUnresolved[A](guid: Guid[A]) extends Ref[A] {
+  case class RefUnresolved[A](id: Guid[A]) extends Ref[A] {
     lazy val optionRevision: Option[Guid[A]] = None
 
     override def toString: String = Ref.toString(this) + "-u"
@@ -51,11 +50,11 @@ object Ref {
     * A reference to data of a specific revision. Can be used to attempt to look up that
     * data.
     * As for all Refs, will look up the most recent revision of data in a Cache.
-    * @param guid The guid of the referenced data item
+    * @param id The guid of the referenced data item
     * @param revision The revision of the data we are referencing
     * @tparam A The type of data item
     */
-  case class RefResolved[A](guid: Guid[A], revision: Guid[A]) extends Ref[A]{
+  case class RefResolved[A](id: Guid[A], revision: Guid[A]) extends Ref[A]{
     lazy val optionRevision: Option[Guid[A]] = Some(revision)
     override def toString: String = Ref.toString(this) + "-rev" + revision
   }
@@ -74,7 +73,7 @@ object Ref {
     case _ => None
   }
 
-  def toString[A](r: Ref[A]): String = f"ref-${r.guid.clientId.id}%x-${r.guid.clientDeltaId.id}%x-${r.guid.id}%x"
+  def toString[A](r: Ref[A]): String = f"ref-${r.id.clientId.id}%x-${r.id.clientDeltaId.id}%x-${r.id.id}%x"
 
   //Encoder and decoder using plain string format for guid
 

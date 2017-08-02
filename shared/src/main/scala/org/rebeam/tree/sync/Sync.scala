@@ -7,6 +7,7 @@ import io.circe.generic.JsonCodec
 import org.rebeam.tree.sync.ServerStoreUpdate.{ServerStoreFullUpdate, ServerStoreIncrementalUpdate}
 import cats.syntax.either._
 import org.rebeam.tree.DeltaCodecs.DeltaCodec
+import org.rebeam.tree.ref.Ref
 
 import scala.util.Try
 import scala.util.matching.Regex
@@ -116,6 +117,17 @@ object Sync {
   @JsonCodec
   case class FindById[A <: HasId[A]](id: Guid[A]) extends (A => Boolean) {
     def apply(a: A): Boolean = a.id == id
+  }
+
+  /**
+    * Find Ref instances by their id.
+    * Works with Cursor.zoomMatch and related methods to zoom to a particular element of a list of refs by id
+    * @param id   The id to find
+    * @tparam A   The type of item referenced by the Ref
+    */
+  @JsonCodec
+  case class FindRefById[A](id: Guid[A]) extends (Ref[A] => Boolean) {
+    def apply(a: Ref[A]): Boolean = a.id == id
   }
 
   /**

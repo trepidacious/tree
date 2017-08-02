@@ -55,7 +55,7 @@ object DeltaCodecs {
       c.downField("value").as[Ref[M]].map(ValueDelta(_))
     )
     def updateRefs(rur: RefUpdateResult[Ref[M]], updater: RefUpdater): RefUpdateResult[Ref[M]] =
-      RefUpdateResult(updater.updateRef(rur.data).getOrElse(rur.data), rur.outgoingRefs + rur.data.guid)
+      RefUpdateResult(updater.updateRef(rur.data).getOrElse(rur.data), rur.outgoingRefs + rur.data.id)
 
     def apply(c: HCursor): Decoder.Result[Delta[Ref[M]]] = decoder(c)
   }
