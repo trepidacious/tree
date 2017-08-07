@@ -171,7 +171,7 @@ class Mirror(private val map: Map[Guid[_], MirrorState[_]], private val types: M
 
   //FIXME using wrong revision should probably fail - this is going to be the best
   //way to see that we have failed to update a ref in a model to match data revision,
-  //otherwise we will jsut get stale data in React...
+  //otherwise we will just get stale data in React...
   /**
     * Retrieve the data for a reference, if reference is valid and data is present in mirror
     * @param ref  The reference

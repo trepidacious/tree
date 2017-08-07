@@ -83,6 +83,8 @@ trait Cursor[M, L] extends Parent[M] {
 
   def move[N](newLocation: N): Cursor[M, N] = CursorBasic(parent, model, newLocation, root)
 
+  def withoutLocation: Cursor[M, Unit] = move(())
+
   def followRef[A](ref: Ref[A])(implicit mca: MirrorCodec[A]): Option[Cursor[A, L]] = root.cursorAt(ref, location)
 
 }
