@@ -12,7 +12,8 @@ scalacOptions in ThisBuild ++= Seq(
   "-encoding", "UTF-8",
   "-unchecked",
   "-Xfatal-warnings",
-  "-Xlint"
+  "-Xlint",
+  "-Xcheckinit"
 )
 
 lazy val http4sVersion              = "0.15.5a"
