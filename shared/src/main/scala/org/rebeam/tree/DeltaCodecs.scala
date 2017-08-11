@@ -30,6 +30,8 @@ object DeltaCodecs {
     final def or(d: => DeltaCodec[A]): DeltaCodec[A] = new DeltaCodecOr(this, d)
   }
 
+  def empty[A] = new DeltaCodecNoRefs[A](Decoder.instance(c => Left(DecodingFailure("Empty delta codec", c.history))))
+
   class DeltaCodecOr[A](val deltaCodec1: DeltaCodec[A], val deltaCodec2: DeltaCodec[A]) extends DeltaCodec[A] {
     val decoder: Decoder[Delta[A]] = deltaCodec1.decoder or deltaCodec2.decoder
     def updateRefs(a: RefUpdateResult[A], updater: RefUpdater): RefUpdateResult[A] = deltaCodec2.updateRefs(deltaCodec1.updateRefs(a, updater), updater)
