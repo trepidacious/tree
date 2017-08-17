@@ -399,22 +399,38 @@ object MaterialColor {
   // shades suitable as a background for white text. In each case
   // we use the lightest shade suitable for use with white text.
   val backgrounds: Seq[Color] = Seq(
-    MaterialColor.Red(500),
-    MaterialColor.Pink(500),
-    MaterialColor.Purple(500),
-    MaterialColor.DeepPurple(500),
-    MaterialColor.Indigo(500),
-    MaterialColor.Blue(500),
-//    MaterialColor.LightBlue(600),
-    MaterialColor.Cyan(700),
-//    MaterialColor.Teal(500),
-    MaterialColor.Green(600),
-    MaterialColor.LightGreen(600),
-//    MaterialColor.Lime(700),
-//    MaterialColor.Yellow(800),
-//    MaterialColor.Amber(500),
-    MaterialColor.Orange(800)
-//    MaterialColor.DeepOrange(500)
+//    MaterialColor.Red(500),
+//    MaterialColor.Pink(500),
+//    MaterialColor.Purple(500),
+//    MaterialColor.DeepPurple(500),
+//    MaterialColor.Indigo(500),
+//    MaterialColor.Blue(500),
+////    MaterialColor.LightBlue(600),
+//    MaterialColor.Cyan(700),
+////    MaterialColor.Teal(500),
+//    MaterialColor.Green(600),
+//    MaterialColor.LightGreen(600),
+////    MaterialColor.Lime(700),
+////    MaterialColor.Yellow(800),
+////    MaterialColor.Amber(500),
+//    MaterialColor.Orange(800)
+////    MaterialColor.DeepOrange(500)
+    MaterialColor.Red(600),
+    MaterialColor.Pink(600),
+    MaterialColor.Purple(600),
+    MaterialColor.DeepPurple(600),
+    MaterialColor.Indigo(600),
+    MaterialColor.Blue(600),
+    //    MaterialColor.LightBlue(600),
+    MaterialColor.Cyan(800),
+    //    MaterialColor.Teal(500),
+    MaterialColor.Green(700),
+    MaterialColor.LightGreen(700),
+    //    MaterialColor.Lime(700),
+    //    MaterialColor.Yellow(800),
+    //    MaterialColor.Amber(500),
+    MaterialColor.Orange(900)
+    //    MaterialColor.DeepOrange(500)
   )
 
   def backgroundForIndex(i: Int) = backgrounds(i % backgrounds.size)
