@@ -31,10 +31,12 @@ object ServerRootComponent {
   implicit val mirrorRootSource: RootSource[Mirror] = new MirrorRootSource
 
   private class MirrorAndIdRootSource[M] extends RootSource[MirrorAndId[M]] {
+    // Keep the same lens instance - reduces changes in cursor data, reducing redraws
+    private val lens = MirrorAndId.mirror[M]
     def rootFor(rootModel: MirrorAndId[M], parent: Parent[MirrorAndId[M]]): Root = new Root {
       def cursorAt[A, L](ref: org.rebeam.tree.ref.Ref[A], location: L)(implicit mca: MirrorCodec[A]): Option[Cursor[A, L]] = {
         rootModel.mirror.apply(ref).map { data =>
-          val lensParent = LensNParent[MirrorAndId[M], Mirror](parent, MirrorAndId.mirror)
+          val lensParent = LensNParent[MirrorAndId[M], Mirror](parent, lens)
           Cursor[A, L](MirrorParent[A](lensParent, ref), data, location, this)
         }
       }
