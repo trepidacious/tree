@@ -11,7 +11,7 @@ import scala.util.{Failure, Success}
 import io.circe._
 import io.circe.parser._
 import io.circe.syntax._
-import org.rebeam.tree.ref.{Mirror, MirrorCodec}
+import org.rebeam.tree.ref.{Mirror, MirrorAndId, MirrorCodec}
 object ServerRootComponent {
 
   trait RootSource[R] {
@@ -29,6 +29,19 @@ object ServerRootComponent {
   }
 
   implicit val mirrorRootSource: RootSource[Mirror] = new MirrorRootSource
+
+  private class MirrorAndIdRootSource[M] extends RootSource[MirrorAndId[M]] {
+    def rootFor(rootModel: MirrorAndId[M], parent: Parent[MirrorAndId[M]]): Root = new Root {
+      def cursorAt[A, L](ref: org.rebeam.tree.ref.Ref[A], location: L)(implicit mca: MirrorCodec[A]): Option[Cursor[A, L]] = {
+        rootModel.mirror.apply(ref).map { data =>
+          val lensParent = LensNParent[MirrorAndId[M], Mirror](parent, MirrorAndId.mirror)
+          Cursor[A, L](MirrorParent[A](lensParent, ref), data, location, this)
+        }
+      }
+    }
+  }
+
+  implicit def mirrorAndIdRootSource[M]: RootSource[MirrorAndId[M]] = new MirrorAndIdRootSource
 
   private class NoRootSource[R] extends RootSource[R] {
     def rootFor(rootModel: R, parent: Parent[R]): Root = Cursor.RootNone

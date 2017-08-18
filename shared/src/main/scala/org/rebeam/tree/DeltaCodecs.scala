@@ -64,6 +64,8 @@ object DeltaCodecs {
 
   implicit def refValueDeltaCodec[M] = new DeltaCodecValueRef[M]
 
+  implicit def guidDeltaCodec[M]: DeltaCodec[Guid[M]] = value[Guid[M]]
+
   class DeltaCodecLensN[M, A](namedLens: LensN[M, A])(implicit dCodecA: DeltaCodec[A]) extends DeltaCodec[M] {
 
     val decoder: Decoder[Delta[M]] = Decoder.instance(c =>

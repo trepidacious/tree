@@ -1,6 +1,6 @@
 package org.rebeam.tree.sync
 
-import org.rebeam.tree.ref.{Mirror, MirrorCodec}
+import org.rebeam.tree.ref.{Mirror, MirrorAndId, MirrorCodec}
 import org.rebeam.tree.sync.DeltaIORun.{AddedRef, DeltaRunResult}
 
 trait RefAdder[A] {
@@ -8,14 +8,25 @@ trait RefAdder[A] {
 }
 
 object RefAdder {
-  implicit val mirrorRefAdder: RefAdder[Mirror] = new RefAdder[Mirror] {
-    override def addRefs(deltaRunResult: DeltaRunResult[Mirror]): Mirror = {
-      deltaRunResult.addedRefs.foldLeft(deltaRunResult.data){
-        case (mirror, addedRef) => {
-          val ar = addedRef//.asInstanceOf[AddedRef[Any]]
-          mirror.updated(ar.id, ar.data, ar.revision)(ar.codec)
-        }
+
+  private def addRefsToMirror(mirror: Mirror, addedRefs: List[AddedRef[_]]) = {
+    addedRefs.foldLeft(mirror){
+      case (m, addedRef) => {
+        val ar = addedRef
+        m.updated(ar.id, ar.data, ar.revision)(ar.codec)
       }
+    }
+  }
+
+  implicit val mirrorRefAdder: RefAdder[Mirror] = new RefAdder[Mirror] {
+    override def addRefs(deltaRunResult: DeltaRunResult[Mirror]): Mirror =
+      addRefsToMirror(deltaRunResult.data, deltaRunResult.addedRefs)
+  }
+
+  implicit def mirrorAndIdRefAdder[A]: RefAdder[MirrorAndId[A]] = new RefAdder[MirrorAndId[A]] {
+    override def addRefs(deltaRunResult: DeltaRunResult[MirrorAndId[A]]): MirrorAndId[A] = {
+      val newMirror = addRefsToMirror(deltaRunResult.data.mirror, deltaRunResult.addedRefs)
+      deltaRunResult.data.copy(mirror = newMirror)
     }
   }
 
