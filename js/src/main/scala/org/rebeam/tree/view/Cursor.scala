@@ -11,6 +11,22 @@ trait Root {
   def cursorAt[A, L](ref: Ref[A], location: L)(implicit mca: MirrorCodec[A]): Option[Cursor[A, L]]
 }
 
+private case class ParentAction[M](parent: Parent[M], delta: Delta[M], deltaJs: Json) extends Action {
+  def callback: Callback = parent.callback(delta, deltaJs)
+}
+
+// Note that these will be compared using encoder as well, but we really expect encoder to be the
+// same for actions that need to be compared
+private case class ActAction[M, A <: Delta[M]](parent: Parent[M], actionDelta: A, encoder: Encoder[A]) extends Action {
+  def callback: Callback = parent.callback(actionDelta, Json.obj("action" -> encoder(actionDelta)))
+}
+
+// Note that these will be compared using encoder as well, but we really expect encoder to be the
+// same for actions that need to be compared
+private case class SetAction[M](parent: Parent[M], value: M, encoder: Encoder[M]) extends Action {
+  def callback: Callback = parent.callback(ValueDelta(value), Json.obj("value" -> encoder(value)))
+}
+
 /**
   * Cursor giving a "position" in a data model, providing the value at that position
   * and a parent to be used to run deltas as a callback to update the entire model,
@@ -54,13 +70,17 @@ trait Cursor[M, L] extends Parent[M] {
   def root: Root
 
   //Just pass through callback to parent for convenience
-  def callback(delta: Delta[M], deltaJs: Json): Callback = parent.callback(delta, deltaJs)
+  def callback(delta: Delta[M], deltaJs: Json): Callback = action(delta, deltaJs).callback
 
-  def act[A <: Delta[M]](actionDelta: A)(implicit encoder: Encoder[A]): Callback =
-    callback(actionDelta, Json.obj("action" -> encoder(actionDelta)))
+  def action(delta: Delta[M], deltaJs: Json): Action = ParentAction(parent, delta, deltaJs)
 
-  def set(newModel: M)(implicit encoder: Encoder[M]): Callback =
-    callback(ValueDelta(newModel), Json.obj("value" -> encoder(newModel)))
+  def act[A <: Delta[M]](actionDelta: A)(implicit encoder: Encoder[A]): Action =
+    ActAction(parent, actionDelta, encoder)
+//    callback(actionDelta, Json.obj("action" -> encoder(actionDelta)))
+
+  def set(value: M)(implicit encoder: Encoder[M]): Action =
+    SetAction(parent, value, encoder)
+//    callback(ValueDelta(newModel), Json.obj("value" -> encoder(newModel)))
 
   // FIXME Zoomer and zoom in this form are a workaround for not being able to infer
   // type C from the lens itself in the nicer form:
