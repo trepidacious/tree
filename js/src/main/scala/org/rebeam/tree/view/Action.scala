@@ -15,4 +15,7 @@ trait Action {
 
 object Action {
   implicit def toCallback(a: Action): Callback = a.callback
+  val empty: Action = new Action {
+    def callback: Callback = Callback.empty
+  }
 }
