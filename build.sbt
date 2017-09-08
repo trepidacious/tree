@@ -16,6 +16,8 @@ scalacOptions in ThisBuild ++= Seq(
   "-Xcheckinit"
 )
 
+testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-verbosity", "2")
+
 lazy val http4sVersion              = "0.15.5a"
 lazy val circeVersion               = "0.7.0"
 lazy val catsVersion                = "0.9.0"
