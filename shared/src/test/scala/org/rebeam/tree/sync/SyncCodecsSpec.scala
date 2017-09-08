@@ -129,7 +129,7 @@ class SyncCodecsSpec extends WordSpec with Matchers with Checkers{
       val context = DeltaIOContext(Moment(42))
       val id = DeltaId(ClientId(123), ClientDeltaId(456))
 
-      val p2 = delta.runWith(p, context, id)
+      val p2 = delta.runWith(p, context, id).data
 
       assert(p2 == Person("Ada", Address("New Street", 1)))
 

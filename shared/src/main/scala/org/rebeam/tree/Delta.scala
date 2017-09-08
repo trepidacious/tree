@@ -8,8 +8,7 @@ import monocle._
 import monocle.std.option
 import org.rebeam.tree.Delta._
 import org.rebeam.tree.ref.{Mirror, MirrorCodec, Ref}
-//import org.rebeam.tree.ref.Cache
-import org.rebeam.tree.sync.Sync.Guid
+import org.rebeam.tree.sync.Sync._
 
 import scala.reflect.ClassTag
 
@@ -33,6 +32,7 @@ trait Delta[A] {
 sealed trait DeltaIOA[A]
 case class GetId[T]() extends DeltaIOA[Guid[T]]
 case object GetContext extends DeltaIOA[DeltaIOContext]
+case object GetDeltaId extends DeltaIOA[DeltaId]
 case class Put[T](create: Guid[T] => DeltaIO[T], codec: MirrorCodec[T]) extends DeltaIOA[T]
 
 /**
@@ -84,6 +84,12 @@ object Delta {
     */
   val getContext: DeltaIO[DeltaIOContext] =
     liftF[DeltaIOA, DeltaIOContext](GetContext)
+
+  /**
+    * Get the DeltaId the DeltaIO will produce
+    */
+  val getDeltaId: DeltaIO[DeltaId] =
+    liftF[DeltaIOA, DeltaId](GetDeltaId)
 
   /**
     * Put a new data item into the Mirror, where that data item

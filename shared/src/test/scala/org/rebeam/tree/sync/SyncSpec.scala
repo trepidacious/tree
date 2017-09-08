@@ -11,9 +11,11 @@ import org.rebeam.tree.ref.Ref
 
 class SyncSpec extends WordSpec with Matchers with Checkers {
 
-  implicit val intIdGen = new ModelIdGen[Int] {
+  implicit val intIdGen: ModelIdGen[Int] = new ModelIdGen[Int] {
     def genId(l: Int) = Some(ModelId(l))
   }
+
+  implicit val intRefAdder: RefAdder[Int] = RefAdder.noOpRefAdder
 
   val clientId = ClientId(42)
 

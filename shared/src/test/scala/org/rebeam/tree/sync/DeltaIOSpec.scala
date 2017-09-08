@@ -24,7 +24,7 @@ class DeltaIOSpec extends WordSpec with Matchers {
       val l = runDeltaIO(dc, context, DeltaId(cid, cdid))
 
       assert(
-        l == List(0, 1, 2).map(Guid[String](cid, cdid, _))
+        l.data == List(0, 1, 2).map(Guid[String](cid, cdid, _))
       )
     }
 
@@ -39,8 +39,8 @@ class DeltaIOSpec extends WordSpec with Matchers {
       val context = DeltaIOContext(Moment(94))
       val l = runDeltaIO(dc, context, DeltaId(cid, cdid))
 
-      l(0) === context
-      l(1) === context
+      l.data(0) === context
+      l.data(1) === context
     }
 
   }

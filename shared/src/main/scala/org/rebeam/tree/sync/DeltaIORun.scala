@@ -28,6 +28,8 @@ object DeltaIORun {
 
           case GetContext => State(s => (s, s.context))
 
+          case GetDeltaId => State(s => (s, s.deltaId))
+
           case Put(create, codec) => State(s => {
             val guid = Guid[A](s.deltaId.clientId, s.deltaId.clientDeltaId, s.currentGuidId)
             val revision = Guid[A](s.deltaId.clientId, s.deltaId.clientDeltaId, s.currentGuidId + 1)

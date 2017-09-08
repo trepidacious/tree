@@ -97,7 +97,11 @@ class RefSpec extends WordSpec with Matchers with Checkers {
     )
   }
 
-  val examplePost: (Post, Mirror) = DeltaIORun.runDeltaIO(examplePostIO, DeltaIOContext(Moment(100)), DeltaId(ClientId(1), ClientDeltaId(1)))
+  val examplePost: (Post, Mirror) =
+    DeltaIORun.runDeltaIO(
+      examplePostIO,
+      DeltaIOContext(Moment(100)), DeltaId(ClientId(1), ClientDeltaId(1))
+    ).data
 
   def checkRefsGraph(post: Post, mirror: Mirror): Unit = {
     assert(mirror.incomingRefs(post.id) == Set.empty)
