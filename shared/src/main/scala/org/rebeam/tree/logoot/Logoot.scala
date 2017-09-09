@@ -112,7 +112,6 @@ object Logoot {
   type Position = List[Identifier]
 
   object Position {
-    def apply(xs: Identifier*) = List.apply()
     def apply(xs: Identifier*): Position = List.apply(xs:_*)
     def empty: Position = Nil
   }
