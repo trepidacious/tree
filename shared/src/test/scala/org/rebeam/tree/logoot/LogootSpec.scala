@@ -153,7 +153,7 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
 //      // There are no 2 digit positions between p and q, so we end up
 //      // adding a new digit, at 1
 //      assert (
-//        run(positionsBetween(p, q, 1))
+//        run(Position.between(p, q, 1))
 //          ===
 //        List(
 //          Position(List(
@@ -166,7 +166,7 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
 //
 //      // There is a single 1 digit position between p and r, 02
 //      assert (
-//        run(positionsBetween(p, r, 1))
+//        run(Position.between(p, r, 1))
 //          ===
 //          List(
 //            Position(List(
@@ -184,7 +184,7 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
 //      // Test a gap for 4 new 2 digit codes (from 01 to 06), requesting 4
 //      // Will use a step of 1, giving exactly each code
 //      assert(
-//        run(positionsBetween(p, s, 4))
+//        run(Position.between(p, s, 4))
 //          ===
 //        List(
 //          Position(List(Identifier(0,ClientId(0)), Identifier(2,ClientId(99)))),    //02
@@ -197,7 +197,7 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
 //      // Test a gap for 4 new 2 digit codes (from 01 to 06), requesting 3
 //      // 3 codes from 4 options means step size 1, so we get the first 3 options
 //      assert(
-//        run(positionsBetween(p, s, 3))
+//        run(Position.between(p, s, 3))
 //          ===
 //          List(
 //            Position(List(Identifier(0,ClientId(0)), Identifier(2,ClientId(99)))),    //02
@@ -209,7 +209,7 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
 //      // Test a gap for 4 new 2 digit codes (from 01 to 06), requesting 2
 //      // 2 codes from 4 options means step size 2, so we get the 1st and 3rd option
 //      assert(
-//        run(positionsBetween(p, s, 2))
+//        run(Position.between(p, s, 2))
 //          ===
 //          List(
 //            Position(List(Identifier(0,ClientId(0)), Identifier(2,ClientId(99)))),    //02
@@ -220,7 +220,7 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
 //      // Test a gap for 4 new 2 digit codes (from 01 to 06), requesting 1
 //      // 1 codes from 4 options means step size 4, so we get the 1st option only
 //      assert(
-//        run(positionsBetween(p, s, 1))
+//        run(Position.between(p, s, 1))
 //          ===
 //          List(
 //            Position(List(Identifier(0,ClientId(0)), Identifier(2,ClientId(99))))    //02
@@ -237,7 +237,7 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
 //      // then each subsequent code is at i steps of 2147483647 from this.
 //      // 2147483647 is the base - 1, the maximum int value m, so we get 011, then 020, then 02m, then 03(m-1) and so on
 //      assert(
-//        run(positionsBetween(p, s, 5))
+//        run(Position.between(p, s, 5))
 //          ===
 //        List(
 //          Position(List(Identifier(0,ClientId(0)), Identifier(1,ClientId(1)), Identifier(1,ClientId(99)))),           //011
@@ -254,7 +254,7 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
 //      // we get 2147483647.5 rounding down to 2147483647, so as above
 //      // we get 011 then 020
 //      assert (
-//        run(positionsBetween(p, r, 2))
+//        run(Position.between(p, r, 2))
 //          ===
 //        List(
 //          Position(List(Identifier(0,ClientId(0)), Identifier(1,ClientId(1)), Identifier(1,ClientId(99)))), //011
@@ -283,7 +283,7 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
 //        Identifier(7, ClientId(15)),
 //        Identifier(8, ClientId(16))
 //      ))
-////      run(positionsBetween(q, p, 2))
+////      run(Position.between(q, p, 2))
 //      println(s"$p compare to $q is ${Logoot.positionOrdering.compare(p, q)}")
     }
 
@@ -294,7 +294,7 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
       val q = List(Identifier(1, ClientId(0)))
 
       assert (
-        run(positionBetween(p, q))
+        run(Position.between(p, q))
           ===
         List(Identifier(0,ClientId(0)), Identifier(1,ClientId(99)))
       )
@@ -307,7 +307,7 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
       // second ident from q doesn't matter since after we incorporate the first ident from
       // p into the result we cannot be > q regardless of subsequent idents.
       assert (
-        run(positionBetween(
+        run(Position.between(
           List(Identifier(0,ClientId(0)), Identifier(1692726032,ClientId(0)), Identifier(1,ClientId(0))),
           List(Identifier(1,ClientId(0)), Identifier(109895862,ClientId(0)))
         ))
@@ -335,7 +335,7 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
 //            println(s"Inserting ${n.i} positions, p $p, q $q")
 
             val po = Logoot.positionOrdering
-            val r = run(positionBetween(p, q))
+            val r = run(Position.between(p, q))
 
             // Position must be strictly between p and q
             val afterP = po.compare(p, r) == -1
