@@ -66,22 +66,34 @@ object Logoot {
   val maxPosValue: Int = Int.MaxValue
 
   /**
-    * The first/minimum position. Logically considered to be present in sequence when
-    * inserting before the first element. The single identifier is also used
-    * to pad positions we are inserting after.
+    * A default lower ident for defining firstPosition, and for use as a default lower
+    * limit when choosing new identifiers. Not actually the minimum identifier - we
+    * could have minPosValue with a negative client id, although we don't generate this.
     * ClientId value is not important for the valid operation of the Logoot. However 0
     * is conventionally used for initial data, and >= 1 for actual clients.
     */
-  val firstPosition = Position(Identifier(minPosValue, ClientId(0)))
+  val lowerIdent: Identifier = Identifier(minPosValue, ClientId(0))
+
+  /**
+    * A default lower ident for defining lastPosition, and for use as a default upper
+    * limit when choosing new identifiers. Not actually the maximum identifier - we
+    * can have maxPosValue with a negative client id.
+    * ClientId value is not important for the valid operation of the Logoot. However 0
+    * is conventionally used for initial data, and >= 1 for actual clients.
+    */
+  val upperIdent: Identifier = Identifier(maxPosValue, ClientId(0))
+
+  /**
+    * The first/minimum position. Logically considered to be present in sequence when
+    * inserting before the first element.
+    */
+  val firstPosition = Position(lowerIdent)
 
   /**
     * The last/maximum position. Logically considered to be present in sequence when
-    * inserting after the first element. The single identifier is also used
-    * to pad positions we are inserting before.
-    * ClientId value is not important for the valid operation of the Logoot. However 0
-    * is conventionally used for initial data, and >= 1 for actual clients.
+    * inserting after the first element.
     */
-  val lastPosition = Position(Identifier(maxPosValue, ClientId(0)))
+  val lastPosition = Position(upperIdent)
 
   /**
     * An identifier
@@ -292,10 +304,11 @@ object Logoot {
     *
     *   3. Only positions of class G, which we will call generated positions, are ever present in Sequences directly.
     *   There is one position of class F which is implicitly at the start of all sequences, and used for inserting
-    *   new positions before the first generated position. Similarly there is one of class L implicitly at the
-    *   end of each sequence.
+    *   new positions before all generated positions. Similarly there is one of class L implicitly at the
+    *   end of each sequence, for inserting after all generated positions.
     *   4. All generated positions have a final identifier with a clientId from the client that generated them.
-    *   5. All generated positions have a final identifier with a pos strictly > minPosValue and < maxPosValue.
+    *   5. All generated positions have a final identifier with a pos strictly > minPosValue. (Note that L
+    *      also has this property, so all positions that can be "q" in requirement 2 have this property)
     *
     * Requirements:
     *
@@ -324,166 +337,59 @@ object Logoot {
     *
     *
     * Based on the above, the only challenging task is to produce a function (this one) that can produce a generated
-    * position meeting the invariants and requirements, to allow a new entry to be inserted into a Sequence.
+    * position meeting the invariants and requirements to insert a new entry.
     *
-    * This can be expressed recursively. At each recursion we term the previous recursion's result l
-    * (empty on first recursion), and choose a new ident ri to form the result of this recursion, r = l + ri. On
-    * the final recursion this yields the final position f.
+    * This can be expressed recursively. At each recursion stage i we term the previous recursion's result l
+    * (empty on first recursion), and choose a new ident ri (generated at the ith recursion, and also becomes the
+    * ith ident in the generated position) to form the result of this recursion, r = l + ri. On the final recursion
+    * this yields the final position f.
     *
-    * Lets define an operator <|, where p <| r means that either p < r, or r is a prefix of p (including the option of
-    * being empty, or the same length as and so identical to p).
+    * We will now consider all cases for p and q, to show that in each case the algorithm will produce a result f
+    * s.t. p < f < q.
     *
-    * To produce the final result, we need r to meet all invariants and the condition p < r < q. When we cannot do
-    * this in an intermediate recursion, we instead ensure we meet an easier condition p <| r <= q. This obviously
-    * means that for all recursions, we have p <| l <= q.
+    * ## p shorter than q.
     *
-    * Note that when we choose to recurse, we know that ri will not be the final identifier in a generated position,
-    * and so invariants 4 and 5 do not apply, which also eases the choice of ri.
+    * p < q, so pi <= qi for all i. Note p may be a just a prefix of q.
     *
-    * At each recursion step we perform three steps:
+    * While i is inside p, we may pick ri = pi for all digits where there is no ri s.t. pi < ri < qi,
+    * otherwise we pick ri.pos randomly from the values that meet that condition, to produce f and terminate.
     *
-    *   1. Produce a top identifier ti and bottom identifier bi satisfying invariant 1; i.e. they are not necessarily
-    *      suitable as final identifiers in a generated sequence. These are chosen so that:
+    * We know that pi is a valid choice since a prefix of p followed by ri s.t. pi < ri < qi will yield p < f < q.
     *
-    *        a. ri == bi      => p <| r <= q    // i.e. we can recurse with ri = bi
-    *        b. bi < ri < ti  => p < r < q      // i.e. we can use bi and ti to find ri that produces final result f
+    * We additionally know that if at any i we observe pi < qi, but there is no ri s.t. pi < ri < qi, we may from
+    * the next recursion on substitute upperIdent for qi. This is because we will have an l s.t. l + ri < q
+    * for all subsequent recursions - there is no upper limit on idents to comply with r < q, and upperIdent is
+    * sufficient to give the upper limit part of invariant 1.
     *
-    *      where => is implication. (Since we don't have access to pi and qi after we have recursed outside the
-    *      range of indices of the respective position, we instead use a proxy for pi and qi that DOES exist at all i).
+    * If we do not terminate while inside p, we will reach the end of p with l = p. On subsequent iterations we know
+    * that any r will be p ++ n, for some non-empty n, and so is greater than p. Thus we have no remaining requirement
+    * on minimum ri, and use min(lowerIdent, qi). This will obviously always yield r < q as long as l < q. We will then
+    * definitely terminate since pIdent is <= qi so we can proceed until we reach the final ident of qi which is
+    * guaranteed to have pos > 0, allowing use of pos 0 to produce a strictly lower r - this will either be f or the
+    * next ident will produce f since it can lie anywhere in lowerIdent < ri < upperIdent.
     *
-    *   2. Check whether there exists ri s.t. bi < ri < ti and satisfying invariants for the the ident itself and
-    *      the sequence produced. If so this implies p < r < q and we are finished.
+    * ## p and q equal length
     *
-    *   3. If 2 fails, choose ri = bi, so that a. implies p <| r <= q, and so we will reach a solution at later
-    *      recursion.
+    * Only the differences from "p shorter than q" will be described.
     *
-//    * We now need to show that p <| r <= q (and p < q) is sufficient to ensure that there is a longer
-//    * position r ++ n for some possibly empty list of idents n, where p < r ++ n < q, and that the algorithm above
-//    * will actually choose it.
-//    *
-//    * We start from knowing that p < q. This implies that either
-//    *   1. There is an index i where pi < qi.
-//    *      At this index we will choose bi = pi and ti = qi (see step 1 below)
-//    *     a. If we have any of the terminating cases A to D from step 2, we will choose ri s.t. pi < ri < qi.
-//    *        We know p <| l =< q so either l is a prefix of p and l + ri > p, or l > p, so l + ri > p.
-//    *        We know l <= q, so l + ri < q.
-//    *        Therefore in this case we know that we have a valid solution f.
-//    *     b. If we do NOT have any of the terminating cases (i.e. pi < qi, but with no identifier between pi and qi)
-//    *        then we will recurse, using ri = bi (see step 3), and we know bi = pi from step 1 below.
-//    *        Hence r = l + pi. But since pi < qi, this means that any position having r as a prefix is < q; we
-//    *        have ensured that all remaining recursions will fulfil r < q.
-//    *        Therefore we only require that remaining recursions fulfil r > p; any identifiers will do this, they
-//    *        just need to be valid.
-//    *
-//    *
-//    *        We know that p <| r <= q for the next step, but actually in this case we know more -
-//    *        we now know that r and any position with it as a prefix is strictly < q, regardless of length, since
-//    *        the identifier pi is < qi.
-//    *
-//    *
-//    *
-//    *   2. p is a prefix of q, and q is longer.
-//    *
-//    * CONTINUE
-//    *
-//      * This is the necessary and sufficient condition for there to exist a sequence r + n that fulfils p < r ++ n,
-//      * where n may be empty.
-//      *   p <| r is sufficient because either r is already > p, or it is a prefix to which we can add the remainder of p
-//      *   and then any valid identifier to give a sequence > p.
-//      *   p <| r is necessary. Consider if p <| r is not true. In that case p >= r, and r is not a prefix of p. If r is
-//      *   not a prefix of p then there exists some first index i where pi != ri. But p >= r, so we know that we cannot
-//      *   have ri > pi, so the only remaining inequality is that ri < pi, and so r < p, and for all n, r + n < p as well.
-//      *
-//      * r <= q is necessary for there to exist n s.t. r ++ n < q, if r > q then all r ++ n are also greater than q.
-//      * p <| r <= q and p < q is sufficient for there to exist n s.t. p < r ++ n < q.
+    * p < q, so there is a first i where pi < qi. On this i we will either have some ri s.t. pi < ri < qi
+    * and we terminate, or we will choose ri = pi so that upper limit of ri is unconstrained for later recursions.
+    * As above, we now know we can keep adding ri until we reach the final digit of qi where we can either terminate
+    * or append ri with pos = minValue and then terminate on the next recursion.
     *
+    * ## p longer than q
     *
-    * ## Step 1 - produce bi and ti
+    * Only the differences from "p and q equal length" will be described.
     *
-    * At each recursion i, there are three interesting booleans:
-    *   inP = i < p.size (i.e pi exists)
-    *   inQ = i < q.size (i.e. qi exists)
-    *   lessThanQ, which is true iff the prefix l passed to this recursion is less than Q with any suffix (because it
-    *   contains some identifier less than the corresponding identifier in q)
+    * p < q, so again there is a first i where pi < qi, and at this point upper limit qIdent becomes unconstrained.
+    * From this point while we are within p, pIdent will be pi, and qIdent will be upperIdent. If we don't terminate
+    * (i.e. if pi is too close to or even greater than upperIdent) we will choose p, retaining the option of being > p
+    * in future, until eventually we either terminate with pi, or terminate on the first recursion after p is exhausted,
+    * where we can choose any ident meeting invariants.
     *
-    * We choose bi and ti according to:
+    * //TODO can/should we use the clientId parameter instead of default clientId(0) in pIdent and qIdent?
     *
-    * if (inQ && !lessThanQ) ti = qi else ti = lastPosition.head
-    * if (inP) bi = pi else bi = min(firstPosition.head, ti)
-    *
-    * We need to show that conditions a and b from above apply, note we have rewritten the conditions in terms of bi
-    * and ti:
-    *
-    * Condition a is that p <| l + bi <= q
-    *
-    * First we show p <| l + bi. We know that p <| l, so either:
-    *   1. p < l so that we must have p < l + bi for any bi, satisfying p <| l + bi
-    *   2. l is a prefix of p, and either
-    *      a. inP is true, then bi = pi, so l + bi is also a prefix of p, satisfying p <| l + bi
-    *      b. inP is false, then l must be the whole of p, so l + bi > p, satisfying p <| l + bi
-    *
-    * Then we show l + bi <= q. We know that l <= q, and either:
-    *   1. inP is true, and bi = pi. Note also that inP must have been true for all previous
-    *      recursions, and since we reached stage i they did not return results - they recursed
-    *      by appending bj at each stage j. So we know l is just the prefix of p up to i-1. Therefore
-    *      l + bi is just the prefix of p up to i. This must be <= q, otherwise we would have p > q.
-    *   2. inP is false, and bi = min(firstPosition.head, ti). Either:
-    *      a. (inQ && !lessThanQ), so ti = qi, and bi = min(firstPosition.head, qi)
-    *         TODO
-    *      b. !(inQ && !lessThanQ), so ti = lastPosition.head, and bi = min(firstPosition.head, lastPosition.head),
-    *         so bi = firstPosition.head.
-    *         The condition means that either or both of the below apply:
-    *         i. !inQ. So neither pi nor qi exists at this i. Therefore l contains all the digits chosen for indices j
-    *            where pj and/or qj existed. Either:
-    *              One. p is shorter than q. There was a first integer j where inP was false and inQ was true.
-    *         ii. or lessThanQ. This means that l plus any suffix is less than q, satisfying l + bi <= q
-    *
-    *
-    *
-    * If inP is true:
-    *   We will choose bi = pi. Now skip ahead to step 3 - this states that when we recurse, we always choose
-    *   ri = bi ( = pi). This implies that the prefix at any recursion where inP is true is just the prefix of p.
-    *   So we can see that if ri > bi (=pi) implies that r will be a prefix of p then a
-    *   If inQ is also true, we choose ti = qi. This gives
-    *
-    * ## Step 2 - check for solution f
-    *
-    * We are producing a final identifier of a generated position, so we must comply with invariants 4 and 5.
-    * Invariant 1 must be fulfilled by all identifiers including this one.
-    *
-    * Invariants 2 and 3 are fulfilled automatically, and Invariant 4 is fulfilled just by using the provided
-    * clientId in all cases. Fulfilling invariant 5 gives invariant 1 for free, so we only need to worry about
-    * invariant 5 and ensuring that bi < ri < ti.
-    *
-    * Note that when considering bi and ti, we can only rely on Invariant 1, but this is sufficient.
-    *
-    * We recognise 4 situations where such a final identifier exists (which may not be exhaustive), and which
-    * are used in this order of preference:
-    *   A. bi.pos and ti.pos are not consecutive, i.e. there is at least pos value strictly between them.
-    *      We know from invariant 1 that bi.pos >= minPosValue and ti.pos <= maxPosValue, so all pos values
-    *      between them meet invariant 5. We pick a pos s.t. bi.pos < pos < ti.pos according to a pseudo-random
-    *      sequence that is provided to the function (TODO). This gives bi < ri < ti since identifiers are compared
-    *      first by pos.
-    *   B. bi.pos == ti.pos, bi.pos fulfils invariant 5, and bi.clientId < clientId < ti.clientId. In this case
-    *      we can use pos = bi.pos (fulfilling invariant 5). This gives bi < ri < ti since the comparisons
-    *      on pos are all equal, so we then compare by clientId giving desired result.
-    *   C. bi.pos and ti.pos are consecutive, bi.pos fulfils invariant 5, and clientId > bi.clientId. In this case
-    *      we can use pos = bi (fulfilling invariant 5). This gives bi < ri since bi.pos == ri.pos and
-    *      bi.clientId < ri.clientId. We have ri < ti since ri.pos is one less than ti.pos (bi.pos and ti.pos
-    *      consecutive)
-    *   D. bi.pos and ti.pos are consecutive, ti.pos fulfils invariant 5, and clientId < ti.clientId. This is the same
-    *      as C, except that we use pos = ti.pos (fulfilling invariant 5). This gives bi < ri since
-    *      bi.pos < ri.pos == ti.pos. We have ri < ti since ri.pos == ti.pos and ri.clientId < ti.clientId.
-    *
-    * Therefore all cases A to D produce an ri meeting invariants and bi < ri < ti. These inequalities in turn imply
-    * that p < r < q as required to yield a result.
-    * If A - D all fail we will move on to step 3 and recurse.
-    *
-    *
-    * ## Step 3 - recurse
-    *
-    * Already described - just choose ri = bi.
-    *
+
     * @param p          We will generate a position > p
     * @param q          We will generate a position < q
     * @param r          The prefix of result already generated - we will add identifier(s) to this to produce result.
@@ -498,11 +404,12 @@ object Logoot {
     def rest(pos: Position): Position = if (pos.isEmpty) Nil else pos.tail
 
     // Use the head of p and q, if they are empty then pad with firstPosition or lastPosition respectively,
-    // except that we use qIdent instead of the firstPosition iff it is lower.
+    // except that we use qIdent instead of the firstPosition iff it is lower. This can happen if p has
+    // an entry strictly lower than one in q, and is shorter than q.
     // These are used as the limits on the range of the new ident added to r to produce a result or to
     // recurse.
-    val qIdent = q.headOption.getOrElse(lastPosition.head)
-    val pIdent = p.headOption.getOrElse(minIdent(firstPosition.head, qIdent))
+    val qIdent = q.headOption.getOrElse(upperIdent)
+    val pIdent = p.headOption.getOrElse(minIdent(lowerIdent, qIdent))
 
     //println(s"r now $r, pIdent $pIdent, qIdent $qIdent")
 
@@ -581,13 +488,6 @@ object Logoot {
       case _ =>   //case 0 if we have 1 separately below
         //println(s"Idents equal, proceeding to prefix ${r :+ pIdent}")
         positionBetweenRec(rest(p), rest(q), r :+ pIdent, clientId)
-
-//      // Code error - on the first ident where p is < q we stop using q's idents
-//      // directly and instead move to max idents. This means that p's idents cannot
-//      // be > q's idents after this. So for this case to occur we need p to have an ident
-//      // higher than q's BEFORE it has one lower than q's, implying p > q.
-//      case 1 =>
-//        sys.error("p's ident > q's ident when generating position, implying p > q")
     }
   }
 
