@@ -33,6 +33,7 @@ sealed trait DeltaIOA[A]
 case class GetId[T]() extends DeltaIOA[Guid[T]]
 case object GetContext extends DeltaIOA[DeltaIOContext]
 case object GetDeltaId extends DeltaIOA[DeltaId]
+//case class GetRandom
 case class Put[T](create: Guid[T] => DeltaIO[T], codec: MirrorCodec[T]) extends DeltaIOA[T]
 
 /**

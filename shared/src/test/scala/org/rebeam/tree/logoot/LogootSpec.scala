@@ -315,14 +315,6 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
         List(Identifier(0,ClientId(0)), Identifier(1692726033,ClientId(99)))
       )
 
-      // This is an example of a pair that breaks if we permit identifiers that are less than
-      // Logoot.firstPosition's identifier (the padding identifier) - the 0 (minimum) pos and
-      // negative client id mean that the second ident in q is lower than the padding identifier,
-      // and so when we move past this ident by adding padding we actually produce a new
-      // position above q.
-//          List(),
-//          List(Identifier(0,ClientId(0)), Identifier(0,ClientId(-1328222)))
-
       //TODO a test case for each of the paths through positionBetweenRec
     }
 
@@ -363,6 +355,10 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
           case _ => test(b, a)
         }
       }, MinSuccessful(100000))
+    }
+
+    "repeatedly perform arbitrary insertions maintaining invariants" in {
+      pending
     }
 
   }
