@@ -234,10 +234,10 @@ object Logoot {
       * @param q          We will generate a position < q
       * @param r          The prefix of result already generated - we will add identifier(s) to this to produce result.
       * @param clientId   The clientId to be used for the final identifier in the result
-      * @return           A Position > p and < q and meeting invariants
+      * @return           A DeltaIO producing a Position > p and < q and meeting invariants
       */
     @tailrec
-    private[logoot] def positionBetweenRec(p: Position, q: Position, r: Position, clientId: ClientId): Position = {
+    private[logoot] def positionBetweenRec(p: Position, q: Position, r: Position, clientId: ClientId): DeltaIO[Position] = {
 
       // We need a permissive tail that is empty if list is empty, so we can
       // trim down p and q as we recurse
@@ -251,7 +251,7 @@ object Logoot {
       val qIdent = q.headOption.getOrElse(upperIdent)
       val pIdent = p.headOption.getOrElse(Identifier.min(lowerIdent, qIdent))
 
-      //println(s"r now $r, pIdent $pIdent, qIdent $qIdent")
+//      println(s"r now $r, pIdent $pIdent, qIdent $qIdent")
 
       identifierOrdering.compare(pIdent, qIdent) match {
 
@@ -263,13 +263,18 @@ object Logoot {
           // We lie between p and q based on pos only, so can use our own site
           if (posDiff > 1) {
 
-            val random = 1 // TODO random value from 1 to diff - 1, inclusive
             // A: Gap in pos, so make sure new pos is at least old pos + 1
             // This ensures pos > minPosValue since we know pIdent.pos is a valid
             // pos and so must be >= minPosValue.
-            r :+ Identifier(pIdent.pos + random, clientId)
+            for {
+              ri <- getPRIntUntil(posDiff - 1)  // From 0 (incl.) to posDiff - 1 (excl.)
+            } yield {
+              val random = ri + 1 // Add 1 since we need a random value from 1 (incl.) to posDiff - 1 (incl.)
 
-            // No gap, try based on client id differences
+              r :+ Identifier(pIdent.pos + random, clientId)
+            }
+
+          // No gap, try based on client id differences
           } else {
 
             // Note that the cases below except "else" allow for reusing a pos value
@@ -286,19 +291,19 @@ object Logoot {
             // strictly between p's and q's clients, AND pIdent.pos is > minPosValue,
             // since we require that new Identifiers fulfil this requirement.
             if (posDiff == 0 && pInvariant5 && pHasLowerClient && qHasHigherClient) {
-              r :+ Identifier(pIdent.pos, clientId)
+              pure(r :+ Identifier(pIdent.pos, clientId))
 
               // C: There is a gap of 1 in pos, so we can use p's position if our
               // client is higher, AND pIdent.pos is > minPosValue,
               // since we require that new Identifiers fulfil this requirement...
             } else if (posDiff == 1 && pInvariant5 && pHasLowerClient) {
-              r :+ Identifier(pIdent.pos, clientId)
+              pure(r :+ Identifier(pIdent.pos, clientId))
 
               // D: ...or use q's position if our client is lower than q's. We know that
               // qIdent.pos > minPosValue since posDiff is one, so
               // qIdent.pos = pIdent.pos + 1, and pIdent.pos >= minPosValue
             } else if (posDiff == 1 && qIdent.pos > minPosValue && qIdent.pos < maxPosValue && qHasHigherClient) {
-              r :+ Identifier(qIdent.pos, clientId)
+              pure(r :+ Identifier(qIdent.pos, clientId))
 
               // No space to insert a new ident at this position
               // so recurse with pIdent appended to r. We know this gives r >= p since
@@ -330,11 +335,13 @@ object Logoot {
       * @return   New position r s.t. p < r < q
       */
     private[logoot] def between(p: Position, q: Position): DeltaIO[Position] = {
-      for (
+//      println(s">>> between $p and $q")
+      for {
         deltaId <- getDeltaId
-      ) yield {
-        val clientId = deltaId.clientId
-        positionBetweenRec(p, q, Nil, clientId)
+        position <- positionBetweenRec(p, q, Nil, deltaId.clientId)
+      } yield {
+//        println(s"...got $position")
+        position
       }
     }
 

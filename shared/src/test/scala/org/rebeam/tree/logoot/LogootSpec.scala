@@ -287,6 +287,8 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
 //      println(s"$p compare to $q is ${Logoot.positionOrdering.compare(p, q)}")
     }
 
+    // Note these tests use the generated values from a test run, which were checked for correctness,
+    // they use pseudo-random values but these are seeded from the DeltaId making them repeatable.
     "construct valid positions between other positions" in {
 
       // We wouldn't normally have an empty position, but it should work
@@ -296,7 +298,7 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
       assert (
         run(Position.between(p, q))
           ===
-        List(Identifier(0,ClientId(0)), Identifier(1,ClientId(99)))
+        List(Identifier(0,ClientId(0)), Identifier(1544347933, ClientId(99)))
       )
 
       //Some cases that failed on early implementation with scalacheck
@@ -312,7 +314,7 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
           List(Identifier(1,ClientId(0)), Identifier(109895862,ClientId(0)))
         ))
           ===
-        List(Identifier(0,ClientId(0)), Identifier(1692726033,ClientId(99)))
+        List(Identifier(0,ClientId(0)), Identifier(1872801123,ClientId(99)))
       )
 
       //TODO a test case for each of the paths through positionBetweenRec
@@ -324,17 +326,12 @@ class LogootSpec extends WordSpec with Matchers with Checkers {
         def test(p: Position, q: Position): Boolean = {
           try {
 
-//            println(s"Inserting ${n.i} positions, p $p, q $q")
-
             val po = Logoot.positionOrdering
             val r = run(Position.between(p, q))
 
             // Position must be strictly between p and q
             val afterP = po.compare(p, r) == -1
             val beforeQ = po.compare(r, q) == -1
-
-            //println(s"p = $p, q = $q, r = $r")
-            //println(s"afterP $afterP, beforeQ $beforeQ")
 
             afterP && beforeQ
 
