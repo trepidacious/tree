@@ -56,7 +56,7 @@ private[this] case class PRandomDefault(seed: Long) extends PRandom {
 
       var r = u % bound
       while (u - r + m < 0) {
-        val (np, nu) = next(31)
+        val (np, nu) = p.next(31)
         p = np
         u = nu
         r = u % bound

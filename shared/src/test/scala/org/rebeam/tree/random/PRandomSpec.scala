@@ -5,8 +5,9 @@ import org.scalatest.prop.Checkers
 import java.util.Random
 
 import cats.implicits._
-
 import PRandomState._
+import org.scalacheck.Gen
+import org.scalacheck.Prop.forAll
 
 class PRandomSpec extends WordSpec with Matchers with Checkers {
 
@@ -16,7 +17,7 @@ class PRandomSpec extends WordSpec with Matchers with Checkers {
       // Might as well do this imperatively - Random is mutable anyway
       val r = new java.util.Random(seed)
       var pr = PRandom(seed)
-      1 until 100 foreach {
+      1 to 100 foreach {
         i =>
           val pNext = g(pr)
           val rNext = f(r)
@@ -28,7 +29,7 @@ class PRandomSpec extends WordSpec with Matchers with Checkers {
     sameResult(_.nextInt(), _.int)
 
     // Note includes powers of 2
-    1 until 100 foreach {
+    1 to 100 foreach {
       i => sameResult(_.nextInt(i), _.intUntil(i))
     }
 
@@ -42,7 +43,7 @@ class PRandomSpec extends WordSpec with Matchers with Checkers {
     def makeValues(bound: Int) = (int, intUntil(bound), long, boolean, float, double).map6((_,_,_,_,_,_))
 
     // Mix some calls for fun
-    1 until 100 foreach {
+    1 to 100 foreach {
       i => sameResult(
         r => (r.nextInt(), r.nextInt(i), r.nextLong(), r.nextBoolean(), r.nextFloat(), r.nextDouble()),
         p => makeValues(i).run(p).value
@@ -52,11 +53,39 @@ class PRandomSpec extends WordSpec with Matchers with Checkers {
   }
 
   "PRandom" should {
-    "generate the same results as java.util.Random" in {
-      1 until 100 foreach {
+    "generate the same results as java.util.Random for seeds 0 to 99, and for first 100 values produced" in {
+      0 until 100 foreach {
         seed => sameResults(seed)
       }
     }
+
+    "generate an intUntil 772104623 based on seed 99 ^ 999 (case where we must loop in intUntil)" in {
+      val pr = PRandom(99 ^ 999)
+      val r: Int = pr.intUntil(772104623)._2
+      val random = new Random(99 ^ 999)
+      val e: Int = random.nextInt(772104623)
+      assert(r == e)
+    }
+
+    "generate the same results as java.util.Random for arbitrary seeds and bounds" in {
+      val gen = for {
+        seed <- Gen.choose(Long.MinValue, Long.MaxValue)
+        bound <- Gen.choose(1, Int.MaxValue)
+      } yield (seed, bound)
+
+      check {
+        forAll(gen){
+          case (seed, bound) =>
+            val pr = PRandom(seed)
+            val r: Int = pr.intUntil(bound)._2
+            val random = new Random(seed)
+            val e: Int = random.nextInt(bound)
+            sameResults(seed)
+            r == e
+        }
+      }
+    }
+
   }
 
 }
