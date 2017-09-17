@@ -4,6 +4,7 @@ import cats.data.State
 import cats.~>
 import org.rebeam.tree.Delta._
 import org.rebeam.tree._
+import org.rebeam.tree.random.PRandom
 import org.rebeam.tree.ref.MirrorCodec
 import org.rebeam.tree.sync.Sync._
 
@@ -13,8 +14,19 @@ object DeltaIORun {
 
   case class DeltaRunResult[A](data: A, addedRefs: List[AddedRef[_]])
 
-  private case class StateData(context: DeltaIOContext, deltaId: DeltaId, currentGuidId: Long, addedRefs: List[AddedRef[_]]) {
+  private case class StateData(context: DeltaIOContext, deltaId: DeltaId, currentGuidId: Long, addedRefs: List[AddedRef[_]], pr: PRandom) {
     def withNextGuidId: StateData = copy(currentGuidId = currentGuidId + 1)
+    def random[A](f: PRandom => (PRandom, A)): (StateData, A) = {
+      val (prNew, a) = f(pr)
+      (copy(pr = prNew), a)
+    }
+  }
+
+  private object StateData {
+    def initial(context: DeltaIOContext, deltaId: DeltaId): StateData = {
+      val pr = PRandom(deltaId.clientId.id ^ deltaId.clientDeltaId.id)
+      StateData(context, deltaId, 0, Nil, pr)
+    }
   }
 
   // State monad using StateData
@@ -30,6 +42,14 @@ object DeltaIORun {
 
           case GetDeltaId => State(s => (s, s.deltaId))
 
+          // Random values
+          case GetPRInt => State(_.random(_.int))
+          case GetPRIntUntil(bound) => State(_.random(_.intUntil(bound)))
+          case GetPRLong => State(_.random(_.long))
+          case GetPRBoolean => State(_.random(_.boolean))
+          case GetPRFloat => State(_.random(_.float))
+          case GetPRDouble => State(_.random(_.double))
+
           case Put(create, codec) => State(s => {
             val guid = Guid[A](s.deltaId.clientId, s.deltaId.clientDeltaId, s.currentGuidId)
             val revision = Guid[A](s.deltaId.clientId, s.deltaId.clientDeltaId, s.currentGuidId + 1)
@@ -44,7 +64,7 @@ object DeltaIORun {
     }
 
   def runDeltaIO[A](dc: DeltaIO[A], context: DeltaIOContext, deltaId: DeltaId): DeltaRunResult[A] = {
-    val s = dc.foldMap(pureCompiler).run(StateData(context, deltaId, 0, Nil)).value
+    val s = dc.foldMap(pureCompiler).run(StateData.initial(context, deltaId)).value
     DeltaRunResult(s._2, s._1.addedRefs)
   }
 

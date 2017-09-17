@@ -33,7 +33,12 @@ sealed trait DeltaIOA[A]
 case class GetId[T]() extends DeltaIOA[Guid[T]]
 case object GetContext extends DeltaIOA[DeltaIOContext]
 case object GetDeltaId extends DeltaIOA[DeltaId]
-//case class GetRandom
+case object GetPRInt extends DeltaIOA[Int]
+case class GetPRIntUntil(bound: Int) extends DeltaIOA[Int]
+case object GetPRLong extends DeltaIOA[Long]
+case object GetPRBoolean extends DeltaIOA[Boolean]
+case object GetPRFloat extends DeltaIOA[Float]
+case object GetPRDouble extends DeltaIOA[Double]
 case class Put[T](create: Guid[T] => DeltaIO[T], codec: MirrorCodec[T]) extends DeltaIOA[T]
 
 /**
@@ -91,6 +96,61 @@ object Delta {
     */
   val getDeltaId: DeltaIO[DeltaId] =
     liftF[DeltaIOA, DeltaId](GetDeltaId)
+
+  /**
+    * Get a pseudo-random Int. Produced as if by Random
+    * initialised using delta id and then used for all
+    * `getPR` calls in that delta. This means the sequence
+    * of values will be deterministic for a given DeltaId.
+    */
+  val getPRInt: DeltaIO[Int] =
+    liftF[DeltaIOA, Int](GetPRInt)
+
+  /**
+    * Get a pseudo-random Int between 0 and bound - 1.
+    * Produced as if by Random initialised using delta id
+    * and then used for all `getPR` calls in that delta.
+    * This means the sequence of values will be deterministic
+    * for a given DeltaId.
+    */
+  def getPRIntUntil(bound: Int): DeltaIO[Int] =
+    liftF[DeltaIOA, Int](GetPRIntUntil(bound))
+
+  /**
+    * Get a pseudo-random Int. Produced as if by Random
+    * initialised using delta id and then used for all
+    * `getPR` calls in that delta. This means the sequence
+    * of values will be deterministic for a given DeltaId.
+    */
+  val getPRLong: DeltaIO[Long] =
+    liftF[DeltaIOA, Long](GetPRLong)
+
+  /**
+    * Get a pseudo-random Boolean. Produced as if by Random
+    * initialised using delta id and then used for all
+    * `getPR` calls in that delta. This means the sequence
+    * of values will be deterministic for a given DeltaId.
+    */
+  val getPRBoolean: DeltaIO[Boolean] =
+    liftF[DeltaIOA, Boolean](GetPRBoolean)
+
+  /**
+    * Get a pseudo-random Float. Produced as if by Random
+    * initialised using delta id and then used for all
+    * `getPR` calls in that delta. This means the sequence
+    * of values will be deterministic for a given DeltaId.
+    */
+  val getPRFloat: DeltaIO[Float] =
+    liftF[DeltaIOA, Float](GetPRFloat)
+
+  /**
+    * Get a pseudo-random Double. Produced as if by Random
+    * initialised using delta id and then used for all
+    * `getPR` calls in that delta. This means the sequence
+    * of values will be deterministic for a given DeltaId.
+    */
+  val getPRDouble: DeltaIO[Double] =
+    liftF[DeltaIOA, Double](GetPRDouble)
 
   /**
     * Put a new data item into the Mirror, where that data item
