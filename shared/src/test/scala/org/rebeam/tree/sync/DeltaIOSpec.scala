@@ -43,6 +43,53 @@ class DeltaIOSpec extends WordSpec with Matchers {
       l.data(1) === context
     }
 
+    "provide deterministic, repeatable pseudo-random values like java.util.Random" in {
+
+      def check(bound: Int, clientId: Long, clientDeltaId: Long, moment: Long): Unit = {
+        val dc = for {
+          i <- getPRInt
+          iu <- getPRIntUntil(bound)
+          l <- getPRLong
+          b <- getPRBoolean
+          f <- getPRFloat
+          d <- getPRDouble
+        } yield (i, iu, l, b, f, d)
+
+        val cid = ClientId(42)
+        val cdid = ClientDeltaId(76)
+        val context = DeltaIOContext(Moment(94))
+        val r = runDeltaIO(dc, context, DeltaId(cid, cdid)).data
+
+        val random = new java.util.Random(cid.id ^ cdid.id)
+        val e = (random.nextInt(), random.nextInt(bound), random.nextLong, random.nextBoolean(), random.nextFloat(), random.nextDouble())
+
+        assert(r === e)
+      }
+
+      check(
+        bound = 23,
+        clientId = 42,
+        clientDeltaId = 76,
+        moment = 94
+      )
+
+      check(
+        bound = 23,
+        clientId = 42,
+        clientDeltaId = 76,
+        moment = 94
+      )
+
+      //Shouldn't depend on moment
+      check(
+        bound = 23,
+        clientId = 42,
+        clientDeltaId = 76,
+        moment = 95
+      )
+
+    }
+
   }
 
 }
