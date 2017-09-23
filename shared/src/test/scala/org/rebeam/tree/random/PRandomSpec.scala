@@ -8,6 +8,7 @@ import cats.implicits._
 import PRandomState._
 import org.scalacheck.Gen
 import org.scalacheck.Prop.forAll
+import org.scalacheck.Arbitrary._
 
 class PRandomSpec extends WordSpec with Matchers with Checkers {
 
@@ -69,8 +70,8 @@ class PRandomSpec extends WordSpec with Matchers with Checkers {
 
     "generate the same results as java.util.Random for arbitrary seeds and bounds" in {
       val gen = for {
-        seed <- Gen.choose(Long.MinValue, Long.MaxValue)
-        bound <- Gen.choose(1, Int.MaxValue)
+        seed <- arbitrary[Long]
+        bound <- Gen.posNum[Int]
       } yield (seed, bound)
 
       check {
