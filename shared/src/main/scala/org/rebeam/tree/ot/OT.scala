@@ -182,66 +182,71 @@ case class Operation[A](atoms: List[Atom[A]]) {
     */
   def apply(input: List[A]): List[A] = {
     require(input.size == inputSize)
-    Operation.applyRec(input, Nil, atoms)
+
+    val (remainingInput, output) =
+      atoms.foldLeft((input, List.empty[A])) {
+
+        // i is remaining input, o is our output, a is the current atom
+        case ((i, o), a) => a match {
+
+          // Copy n elements from input to output, checking we have enough
+          case Retain(n) =>
+            require(i.size >= n)
+            (i.drop(n), o ++ i.take(n))
+
+          // Append elements to output
+          case Insert(l) =>
+            (i, o ++ l)
+
+          // Skip n elements from input, checking we have enough
+          case Delete(n) =>
+            require(i.size >= n)
+            (i.drop(n), o)
+        }
+      }
+
+    // Require that operation has used the entire input
+    require(remainingInput.isEmpty)
+
+    output
   }
 
   def inverse(input: List[A]): Operation[A] = {
     require(input.size == inputSize)
-    Operation.inverseRec(input, Operation.empty, atoms)
+
+    val (remainingInput, inverse) =
+      atoms.foldLeft((input, Operation.empty[A])) {
+
+        // i is remaining input, o is our output - the inverse, a is the current atom
+        case ((i, o), a) => a match {
+
+          // Retaining is the same in operation and inverse
+          case Retain(n) =>
+            require(i.size >= n)
+            (i.drop(n), o.retain(n))
+
+          // Invert inserting by deleting the same number of elements
+          case Insert(l) =>
+            (i, o.delete(l.size))
+
+          // Invert deleting by reinserting the deleted elements
+          case Delete(n) =>
+            require(i.size >= n)
+            (i.drop(n), o.insert(i.take(n)))
+
+        }
+      }
+
+    // Require that operation has used the entire input
+    require(remainingInput.isEmpty)
+
+    inverse
   }
 
 }
 
 object Operation {
-  import Atom._
-
   def empty[A]: Operation[A] = Operation(Nil)
-
-  @tailrec
-  private def inverseRec[A](input: List[A], inverse: Operation[A], atoms: List[Atom[A]]): Operation[A] = {
-    atoms match {
-      case Nil => inverse
-      case a :: as => a match {
-        case Retain(n) =>
-          require(input.size >= n)
-          inverseRec(input.drop(n), inverse.retain(n), as)
-        case Insert(l) =>
-          inverseRec(input, inverse.delete(l.size), as)
-        case Delete(n) =>
-          require(input.size >= n)
-          inverseRec(input.drop(n), inverse.insert(input.take(n)), as)
-      }
-    }
-  }
-
-  @tailrec
-  private def applyRec[A](input: List[A], output: List[A], atoms: List[Atom[A]]): List[A] = {
-    atoms match {
-
-      // No more operations. Requires that we have processed the entire input.
-      case Nil =>
-        require(input.isEmpty)
-        output
-
-      case a :: as => a match {
-
-        // Copy n elements from input to output, checking we have enough
-        case Retain(n) =>
-          require(input.size >= n)
-          applyRec(input.drop(n), output ++ input.take(n), as)
-
-        // Append elements to output
-        case Insert(l) =>
-          applyRec(input, output ++ l, as)
-
-        // Skip n elements from input, checking we have enough
-        case Delete(n) =>
-          require(input.size >= n)
-          applyRec(input.drop(n), output, as)
-      }
-    }
-  }
-
 }
 
 object OT {
