@@ -36,7 +36,7 @@ object Atom {
     * @tparam A   The type of element in the list
     */
   case class Retain[A] (n: Int) extends Atom[A] {
-    require(n > 0)
+    require(n > 0, "retain must have n > 0")
 
     // Retaining requires n more elements in input, and produces n elements in output
     override def inputLengthDelta: Int = n
@@ -51,7 +51,7 @@ object Atom {
     * @tparam A   The type of element in the list
     */
   case class Delete[A] (n: Int) extends Atom[A]{
-    require(n > 0)
+    require(n > 0, "delete must have n > 0")
 
     // Deleting require n more elements in input, and leaves output unaltered
     override def inputLengthDelta: Int = n
@@ -66,7 +66,7 @@ object Atom {
     * @tparam A   The type of element in the list
     */
   case class Insert[A] (l: List[A]) extends Atom[A] {
-    require(l.nonEmpty)
+    require(l.nonEmpty, "insert must have elements")
 
     // Inserting requires no more elements in input, and adds l.size elements to output
     override def inputLengthDelta: Int = 0
