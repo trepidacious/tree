@@ -82,7 +82,7 @@ class OTSpec extends WordSpec with Matchers with Checkers {
           val newOp = Operation.empty[A].retainIfPositive(pos).insert(l).retainIfPositive(op.outputSize - pos)
           op.compose(newOp)
 
-        case Delete(d) if op.outputSize > 0=>
+        case Delete(d) if op.outputSize > 0 =>
           // Delete can happen from 0 to length of input - 1, inclusive (i.e. we need at least one input
           // element left to delete) - we will truncate delete length as necessary
           val pos = atomAndPos.pos % op.outputSize
