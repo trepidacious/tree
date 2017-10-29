@@ -229,6 +229,18 @@ case class Operation[A](atoms: List[Atom[A]]) {
     Operation.composeRec(this.atoms, b.atoms, Operation.empty)
   }
 
+  /**
+    * This is just the first element in the pair returned by Operation.transform(this, b).
+    * So if we call this `a`, we have:
+    *
+    * a.after(b)(b(s)) == b.after(a)(a(s)) for any input list s. This is useful for transforming
+    * on the server.
+    *
+    * @param b The operation we wish to apply before this one.
+    * @return  This operation transformed so it can be applied after b.
+    */
+  def after(b: Operation[A]): Operation[A] = Operation.transform(this, b)._1
+
 }
 
 object Operation {
