@@ -1,6 +1,6 @@
 package org.rebeam.tree
 
-import io.circe.generic.JsonCodec
+
 import org.rebeam.lenses.macros.Lenses
 import Delta._
 import org.rebeam.lenses.LensN
@@ -9,6 +9,8 @@ import scala.language.higherKinds
 import monocle.Lens
 
 import io.circe._, io.circe.parser._, io.circe.syntax._
+import io.circe.generic.semiauto._
+import io.circe.generic.JsonCodec
 
 import org.rebeam.tree.sync.DeltaIORun._
 import org.rebeam.tree.sync.Sync._
@@ -39,21 +41,8 @@ object DeltaCodecProto {
   object ListDelta {
 
     object ListIndexDelta {
-      implicit final def encoder[A](implicit encoderA: Encoder[A]): Encoder[ListIndexDelta[A]] = new Encoder[ListIndexDelta[A]] {
-        final def apply(l: ListIndexDelta[A]): Json = Json.obj(
-          "i" -> Json.fromInt(l.i),
-          "a" -> encoderA(l.a)
-        )
-      }
-      implicit final def decoder[A](implicit decoderA: Decoder[A]): Decoder[ListIndexDelta[A]] = new Decoder[ListIndexDelta[A]] {
-        final def apply(c: HCursor): Decoder.Result[ListIndexDelta[A]] =
-          for {
-            i <- c.downField("i").as[Int]
-            a <- c.downField("a").as[A]
-          } yield {
-            ListIndexDelta(i, a)
-          }
-      }
+      implicit final def encoder[A: Encoder]: Encoder[ListIndexDelta[A]] = deriveEncoder
+      implicit final def decoder[A: Decoder]: Decoder[ListIndexDelta[A]] = deriveDecoder
     }
 
     case class ListIndexDelta[A](i: Int, a: A) extends ListDelta[A] {
@@ -64,6 +53,13 @@ object DeltaCodecProto {
           pure(l)
         }
       }
+    }
+
+    import org.rebeam.tree.sync.Sync.Guid._
+
+    object ListGuidDelta {
+      implicit final def encoder[A: ToId: Encoder]: Encoder[ListGuidDelta[A]] = deriveEncoder
+      implicit final def decoder[A: ToId: Decoder]: Decoder[ListGuidDelta[A]] = deriveDecoder
     }
 
     case class ListGuidDelta[A: ToId](id: Guid[A], a: A) extends ListDelta[A] {
