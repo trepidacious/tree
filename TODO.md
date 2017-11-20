@@ -1,5 +1,12 @@
 # TODO
 
+1. Make Guid have no parametric type. Make its id a value class.
+2. Make new IdOf[A] that just contains a Guid. Then we can distinguish untyped Guids from typed IdOf.
+3. Make RefTo[A]. Decide whether this contains a Guid or an IdOf?
+4. This then solves problem of having `Ref[_]` and `Guid[_]` scattered around, and helps with Searchable.
+5. Remove the ref update stuff, and replace with a Reusable implementation for cursor that uses Searchable to find Refs in old and new model, and reports equal only if they are the same set, AND all revisions of all referenced data are the same.
+6. Make all deltas encodable, and remove the deltaJS stuff.
+7. Get back to thinking about OT deltas as below.
 1. Websocket re-open on close with exponential backoff.
 2. If possible, make all deltas directly serialisable - currently we require conversion to JSON inside-out as callback is built from original delta up through parent's deltas. This is messy because we need to retain JSON, we can't reserialise from just the delta. This would be useful for history on server, so we could retain just the deltas for efficiency.
 2. Batching of deltas from client to server. Allows for atomic transactions, may be more efficient, and in particular should allow for OT support, since we can guarantee that all deltas are applied as one run on a known server revision.
