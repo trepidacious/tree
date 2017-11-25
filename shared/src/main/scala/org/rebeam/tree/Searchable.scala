@@ -1,8 +1,11 @@
 package org.rebeam.tree
 
-import scala.language.implicitConversions
+import org.rebeam.tree.sync.{Guid, Ref}
 
+import scala.language.implicitConversions
 import shapeless._
+
+import scala.collection.immutable.Set
 
 // Evidence that an A is something that we can look around in for Qs that
 // satisfy some predicate, where we will collect all found Q's in a Set
@@ -84,9 +87,16 @@ object Searchable extends LowPrioritySearchable {
       // Option(hs).fold(Set.empty[Q])(_.find(p)(a.head)) ++ ts.find(p)(a.tail)
   }
 
+  implicit def refSearchableForGuid[A]: Searchable[Ref[A], Guid] = new Searchable[Ref[A], Guid] {
+    def find(p: Guid => Boolean)(a: Ref[A]): Set[Guid] = if (p(a.id.guid)) Set(a.id.guid) else Set.empty
+  }
+
   case class SearchableWrapper[A](a: A) {
-    def deepFind[Q](p: Q => Boolean)(implicit s: Searchable[A, Q]) =
+    def deepFind[Q](p: Q => Boolean)(implicit s: Searchable[A, Q]): Set[Q] =
       s.find(p)(a)
+
+    def allRefGuids(implicit s: Searchable[A, Guid]): Set[Guid] =
+      s.find(_ => true)(a)
   }
 
   implicit def wrapSearchable[A](a: A): SearchableWrapper[A] = SearchableWrapper(a)

@@ -1,7 +1,8 @@
 package org.rebeam.tree.logoot
 
 import org.rebeam.tree.Delta.{DeltaIO, _}
-import org.rebeam.tree.sync.Sync.{ClientId, Guid, HasId}
+import org.rebeam.tree.sync.Sync._
+import org.rebeam.tree.sync._
 
 import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
@@ -378,9 +379,9 @@ object Logoot {
     * we only really need its clientDeltaId and id  - we already have the clientId
     * from the Position itself, but for consistency we use the whole thing.
     * @param position   The position
-    * @param id         Guid
+    * @param id         Id
     */
-  case class PositionId(position: Position, id: Guid[PositionId]) extends HasId[PositionId]
+  case class PositionId(position: Position, id: Id[PositionId]) extends Identified[PositionId]
 
   /**
     * Compare PositionIdentifiers by their position only.
@@ -486,7 +487,7 @@ object Logoot {
       * @param guid The guid of the PositionId for the entry
       * @return     A sequence with any matching entry removed
       */
-    def deleted(guid: Guid[PositionId]): Sequence[A] =
+    def deleted(guid: Id[PositionId]): Sequence[A] =
       copy(map -- map.keySet.filter(_.id == guid))
 
     /**

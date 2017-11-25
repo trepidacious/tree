@@ -16,18 +16,12 @@ import org.rebeam.tree.sync.DeltaIORun._
 import org.rebeam.tree.sync.Sync._
 import cats.syntax.either._
 import scala.collection.immutable.Set
+import org.rebeam.tree.sync._
+
 
 import Searchable._
 
 object DeltaCodecProto {
-
-  /**
-  * A reference to a data item with a known Guid.
-  *
-  * @param id The Guid
-  * @tparam A The type of data item
-  */
-  case class Ref[+A](id: Guid[A]) extends HasId[A]
 
   @JsonCodec
   case class StringValueDelta(v: String) extends Delta[String] {
@@ -70,16 +64,14 @@ object DeltaCodecProto {
       }
     }
 
-    import org.rebeam.tree.sync.Sync.Guid._
-
     object ListGuidDelta {
-      implicit final def encoder[A: ToId: Encoder]: Encoder[ListGuidDelta[A]] = deriveEncoder
-      implicit final def decoder[A: ToId: Decoder]: Decoder[ListGuidDelta[A]] = deriveDecoder
+      implicit final def encoder[A: Identifiable: Encoder]: Encoder[ListGuidDelta[A]] = deriveEncoder
+      implicit final def decoder[A: Identifiable: Decoder]: Decoder[ListGuidDelta[A]] = deriveDecoder
     }
 
-    case class ListGuidDelta[A: ToId](id: Guid[A], a: A) extends ListDelta[A] {
+    case class ListGuidDelta[A: Identifiable](id: Id[A], a: A) extends ListDelta[A] {
       def apply(l: List[A]): DeltaIO[List[A]] = {
-        val i = l.indexWhere(implicitly[ToId[A]].id(_) == id)
+        val i = l.indexWhere(implicitly[Identifiable[A]].id(_) == id)
         if (i >= 0 && i < l.size) {
           pure(l.updated(i, a))
         } else {
@@ -116,13 +108,11 @@ object DeltaCodecProto {
 
   def main(args: Array[String]): Unit = {
 
-    implicit def refNotSearchable[A, Q]: Searchable[Ref[A], Q] = Searchable.notSearchable
+//    implicit def refNotSearchable[A, Q]: Searchable[Ref[A], Q] = Searchable.notSearchable
   
-    implicit def refSearchable[A]: Searchable[Ref[A], Long] = new Searchable[Ref[A], Long] {
-      def find(p: Long => Boolean)(a: Ref[A]): Set[Long] = if (p(a.id.id)) Set(a.id.id) else Set.empty
-    }
 
-    val a = Person("Alice", 100, Ref(Guid[Person](ClientId(0), ClientDeltaId(1), 2)))
+    val a = Person("Alice", 100, Ref(Id[Person](Guid(ClientId(0), ClientDeltaId(1), WithinDeltaId(2)))))
+
     // val rename: PersonDelta = PersonDelta.Name(StringValueDelta("Bob"))
     // println(rename.asJson)
     // println(decode[PersonDelta](rename.asJson.noSpaces))
@@ -138,7 +128,7 @@ object DeltaCodecProto {
 
     // println(a.deepFind[Ref[Person]](_ => true))
 
-    println(a.deepFind[Long](_ => true))
+    println(a.allRefGuids)
 
   }
 
