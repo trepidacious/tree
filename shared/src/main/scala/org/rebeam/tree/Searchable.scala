@@ -40,38 +40,37 @@ trait LowPrioritySearchable {
 }
 
 object Searchable extends LowPrioritySearchable {
-
   /**
     * Defines a Searchable that finds nothing
     */
   def notSearchable[A, Q]: Searchable[A, Q] = new Searchable[A, Q] {
-    def find(p: Q => Boolean)(a: A) = Set.empty
+    def find(p: Q => Boolean)(a: A): Set[Q] = Set.empty
   }
 
   // This ensures that the actual type we are searching for is used directly with predicate,
   // this overrides the low priority implementations if we are looking for e.g. a String.
   implicit def elemSearchable[A]: Searchable[A, A] = new Searchable[A, A] {
-    def find(p: A => Boolean)(a: A) = if (p(a)) Set(a) else Set.empty
+    def find(p: A => Boolean)(a: A): Set[A] = if (p(a)) Set(a) else Set.empty
   }
 
   implicit def listSearchable[A, Q](implicit s: Searchable[A, Q]): Searchable[List[A], Q] =
     new Searchable[List[A], Q] {
-      def find(p: Q => Boolean)(a: List[A]) = a.flatMap(s.find(p)).toSet
+      def find(p: Q => Boolean)(a: List[A]): Set[Q] = a.flatMap(s.find(p)).toSet
     }
 
   implicit def setSearchable[A, Q](implicit s: Searchable[A, Q]): Searchable[Set[A], Q] =
     new Searchable[Set[A], Q] {
-      def find(p: Q => Boolean)(a: Set[A]) = a.flatMap(s.find(p)).toSet
+      def find(p: Q => Boolean)(a: Set[A]): Set[Q] = a.flatMap(s.find(p))
     }
 
   implicit def hnilSearchable[Q]: Searchable[HNil, Q] = new Searchable[HNil, Q] {
-    def find(p: Q => Boolean)(a: HNil) = Set.empty
+    def find(p: Q => Boolean)(a: HNil): Set[Q] = Set.empty
   }
 
   implicit def hlistSearchable[H, T <: HList, Q](
     implicit hs: Searchable[H, Q], ts: Searchable[T, Q]
   ): Searchable[H :: T, Q] = new Searchable[H :: T, Q] {
-    def find(p: Q => Boolean)(a: H :: T) =
+    def find(p: Q => Boolean)(a: H :: T): Set[Q] =
       hs.find(p)(a.head) ++ ts.find(p)(a.tail)
       // If we want to allow compilation with missing typeclasses for types occurring in HLists, we
       // can add a default value of null to hs parameter above, and then use the less safe 

@@ -2,7 +2,7 @@ package org.rebeam.tree.view
 
 import japgolly.scalajs.react._
 import org.rebeam.tree._
-import org.rebeam.tree.sync.{ClientState, RefAdder}
+import org.rebeam.tree.sync.{ClientState, Guid, RefAdder, Ref => TreeRef}
 import org.rebeam.tree.sync.Sync._
 import org.scalajs.dom._
 
@@ -12,18 +12,24 @@ import io.circe._
 import io.circe.parser._
 import io.circe.syntax._
 import org.rebeam.tree.ref.{Mirror, MirrorAndId, MirrorCodec}
+
 object ServerRootComponent {
 
   trait RootSource[R] {
     def rootFor(rootModel: R, parent: Parent[R]): Root
   }
 
+
   private class MirrorRootSource extends RootSource[Mirror] {
     def rootFor(rootModel: Mirror, parent: Parent[Mirror]): Root = new Root {
-      def cursorAt[A, L](ref: org.rebeam.tree.ref.Ref[A], location: L)(implicit mca: MirrorCodec[A]): Option[Cursor[A, L]] = {
+      def cursorAt[A, L](ref: TreeRef[A], location: L)
+                        (implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, L]] = {
         rootModel.apply(ref).map { data =>
           Cursor[A, L](MirrorParent[A](parent, ref), data, location, this)
         }
+      }
+      def refRevisions(refGuids: Set[Guid]): Map[Guid, Guid] = {
+        refGuids.flatMap(refGuid => rootModel.revisionOf(refGuid).map(refGuid -> _)).toMap
       }
     }
   }
@@ -34,11 +40,15 @@ object ServerRootComponent {
     // Keep the same lens instance - reduces changes in cursor data, reducing redraws
     private val lens = MirrorAndId.mirror[M]
     def rootFor(rootModel: MirrorAndId[M], parent: Parent[MirrorAndId[M]]): Root = new Root {
-      def cursorAt[A, L](ref: org.rebeam.tree.ref.Ref[A], location: L)(implicit mca: MirrorCodec[A]): Option[Cursor[A, L]] = {
+      def cursorAt[A, L](ref: TreeRef[A], location: L)
+                        (implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, L]] = {
         rootModel.mirror.apply(ref).map { data =>
           val lensParent = LensNParent[MirrorAndId[M], Mirror](parent, lens)
           Cursor[A, L](MirrorParent[A](lensParent, ref), data, location, this)
         }
+      }
+      def refRevisions(refGuids: Set[Guid]): Map[Guid, Guid] = {
+        refGuids.flatMap(refGuid => rootModel.mirror.revisionOf(refGuid).map(refGuid -> _)).toMap
       }
     }
   }
@@ -56,7 +66,7 @@ object ServerRootComponent {
   case class State[R](clientState: Option[ClientState[R]], ws: Option[WebSocket], tick: Option[SetIntervalHandle])
 
   class Backend[R, P](scope: BackendScope[Props[R, P], State[R]])
-    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R]) {
+    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) {
 
     implicit val cme = clientMsgEncoder[R]
 
@@ -88,8 +98,7 @@ object ServerRootComponent {
 
     def render(props: Props[R, P], state: State[R]) = {
       state.clientState.map { cs =>
-        //FIXME actual root!
-        val cursorP = Cursor(rootParent, cs.model, props.p, rootSource.rootFor(cs.model, rootParent))
+        val cursorP: Cursor[R, P] = Cursor(rootParent, cs.model, props.p, rootSource.rootFor(cs.model, rootParent))
         props.render(cursorP)
       }.getOrElse(
         props.noData
@@ -190,8 +199,8 @@ object ServerRootComponent {
   def factory[R, P]
     (noData: ReactElement, wsUrl: String)
     (render: Cursor[R, P] => ReactElement)
-    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R]) = {
-    val c = ctor[R, P](decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder)
+    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) = {
+    val c = ctor[R, P](decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder, searchable)
     (page: P) => c(Props[R, P](page, render, wsUrl, noData))
   }
 
@@ -199,15 +208,15 @@ object ServerRootComponent {
   def apply[R]
   (noData: ReactElement, wsUrl: String)
   (render: Cursor[R, Unit] => ReactElement)
-  (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R]) = {
-    val c = ctor[R, Unit](decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder)
+  (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) = {
+    val c = ctor[R, Unit](decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder, searchable)
     c(Props[R, Unit]((), render, wsUrl, noData))
   }
 
   //Just make the component constructor - props to be supplied later to make a component
-  def ctor[R, P](implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R]) = ReactComponentB[Props[R, P]]("ServerRootComponent")
+  def ctor[R, P](implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) = ReactComponentB[Props[R, P]]("ServerRootComponent")
     .initialState(State[R](None, None, None))
-    .backend(new Backend[R, P](_)(decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder))
+    .backend(new Backend[R, P](_)(decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder, searchable))
     .render(s => s.backend.render(s.props, s.state))
     .componentDidMount(_.backend.start)
     .componentWillUnmount(_.backend.end)
