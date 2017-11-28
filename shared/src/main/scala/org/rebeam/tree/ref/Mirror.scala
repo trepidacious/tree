@@ -3,6 +3,7 @@ package org.rebeam.tree.ref
 import io.circe._
 import org.rebeam.tree.Delta._
 import org.rebeam.tree.DeltaCodecs.DeltaCodec
+import org.rebeam.tree.Searchable
 import org.rebeam.tree.sync._
 
 import scala.collection.mutable.ArrayBuffer
@@ -34,6 +35,9 @@ case class MirrorCodecBasic[A](mirrorType: MirrorType, encoder: Encoder[A], deco
 
 object Mirror {
   val empty = new Mirror(Map.empty, Map.empty)
+
+  // There is no meaning to searching for refs in a mirror
+  implicit val mirrorNotSearchableForGuid: Searchable[Mirror, Guid] = Searchable.notSearchable
 
   /**
     * An entry in the Mirror.

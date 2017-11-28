@@ -1,6 +1,6 @@
 package org.rebeam.tree
 
-import org.rebeam.tree.sync.{Guid, Ref}
+import org.rebeam.tree.sync.{Guid, Id, Ref}
 
 import scala.language.implicitConversions
 import shapeless._
@@ -14,10 +14,12 @@ trait Searchable[A, Q] {
 }
 
 trait LowPrioritySearchable {
-  implicit def hlistishSearchable[A, L <: HList, Q](
-    implicit gen: Generic.Aux[A, L], s: Searchable[L, Q]
+  implicit def hlistLikeSearchable[A, L <: HList, Q](
+    implicit
+    gen: Generic.Aux[A, L],
+    s: Lazy[Searchable[L, Q]]
   ): Searchable[A, Q] = new Searchable[A, Q] {
-    def find(p: Q => Boolean)(a: A) = s.find(p)(gen to a)
+    def find(p: Q => Boolean)(a: A): Set[Q] = s.value.find(p)(gen to a)
   }
 
   import Searchable.notSearchable
@@ -37,6 +39,9 @@ trait LowPrioritySearchable {
   implicit def charSearchable[Q]: Searchable[Char, Q] = notSearchable
   implicit def stringSearchable[Q]: Searchable[String, Q] = notSearchable
   implicit def symbolSearchable[Q]: Searchable[Symbol, Q] = notSearchable
+
+  implicit def idNotSearchableForGuid[A]: Searchable[Id[A], Guid] = notSearchable
+
 }
 
 object Searchable extends LowPrioritySearchable {
@@ -68,10 +73,12 @@ object Searchable extends LowPrioritySearchable {
   }
 
   implicit def hlistSearchable[H, T <: HList, Q](
-    implicit hs: Searchable[H, Q], ts: Searchable[T, Q]
+    implicit
+    hs: Lazy[Searchable[H, Q]],
+    ts: Searchable[T, Q]
   ): Searchable[H :: T, Q] = new Searchable[H :: T, Q] {
     def find(p: Q => Boolean)(a: H :: T): Set[Q] =
-      hs.find(p)(a.head) ++ ts.find(p)(a.tail)
+      hs.value.find(p)(a.head) ++ ts.find(p)(a.tail)
       // If we want to allow compilation with missing typeclasses for types occurring in HLists, we
       // can add a default value of null to hs parameter above, and then use the less safe 
       // version below.
