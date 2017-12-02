@@ -7,7 +7,6 @@ import org.scalatest._
 import org.scalatest.prop.Checkers
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Prop._
-import org.rebeam.tree.ref.Ref
 
 class SyncSpec extends WordSpec with Matchers with Checkers {
 
@@ -347,25 +346,25 @@ class SyncSpec extends WordSpec with Matchers with Checkers {
 
   "Guid" should {
     "produce valid string representation" in {
-      val g: Guid[Unit] = Guid(ClientId(1), ClientDeltaId(10), 255)
+      val g: Guid = Guid(ClientId(1), ClientDeltaId(10), WithinDeltaId(255))
       assert(g.toString == "guid-1-a-ff")
     }
 
     "parse valid string representation" in {
-      val g: Option[Guid[Unit]] = Guid.fromString("guid-1-a-ff")
-      assert(g.contains(Guid[Unit](ClientId(1), ClientDeltaId(10), 255)))
+      val g: Option[Guid] = Guid.fromString("guid-1-a-ff")
+      assert(g.contains(Guid(ClientId(1), ClientDeltaId(10), WithinDeltaId(255))))
     }
 
     "parse ignoring case" in {
-      assert(Guid.fromString[Unit]("guid-1-a-ff") == Guid.fromString[Unit]("gUiD-1-A-fF"))
+      assert(Guid.fromString("guid-1-a-ff") == Guid.fromString("gUiD-1-A-fF"))
     }
 
     "recovers arbitrary guid from encoding in string" in {
       check((clientId: Long, clientDeltaId: Long, id: Long) => {
-        val g: Guid[Unit] = Guid(ClientId(clientId), ClientDeltaId(clientDeltaId), id)
+        val g: Guid = Guid(ClientId(clientId), ClientDeltaId(clientDeltaId), WithinDeltaId(id))
         val s = g.toString
         val regexMatches = Guid.regex.findFirstIn(s).contains(s)
-        val parseRecovers = Guid.fromString[Unit](s).contains(g)
+        val parseRecovers = Guid.fromString(s).contains(g)
         regexMatches && parseRecovers
       })
     }
@@ -374,13 +373,13 @@ class SyncSpec extends WordSpec with Matchers with Checkers {
 
   "Ref" should {
     "produce valid string representation" in {
-      val r: Ref[Unit] = Ref(Guid(ClientId(1), ClientDeltaId(10), 255))
+      val r: Ref[Unit] = Ref(Id(Guid(ClientId(1), ClientDeltaId(10), WithinDeltaId(255))))
       assert(Ref.toString(r) == "ref-1-a-ff")
     }
 
     "parse valid string representation" in {
       val r: Option[Ref[Unit]] = Ref.fromString("ref-1-a-ff")
-      assert(r.contains(Ref[Unit](Guid[Unit](ClientId(1), ClientDeltaId(10), 255))))
+      assert(r.contains(Ref[Unit](Id(Guid(ClientId(1), ClientDeltaId(10), WithinDeltaId(255))))))
     }
 
     "parse ignoring case" in {
@@ -389,7 +388,7 @@ class SyncSpec extends WordSpec with Matchers with Checkers {
 
     "recovers arbitrary ref from encoding in string" in {
       check((clientId: Long, clientDeltaId: Long, id: Long) => {
-        val r: Ref[Unit] = Ref(Guid(ClientId(clientId), ClientDeltaId(clientDeltaId), id))
+        val r: Ref[Unit] = Ref(Id(Guid(ClientId(clientId), ClientDeltaId(clientDeltaId), WithinDeltaId(id))))
         val s = Ref.toString(r)
         val regexMatches = Ref.regex.findFirstIn(s).contains(s)
         val parseRecovers = Ref.fromString[Unit](s).contains(r)
