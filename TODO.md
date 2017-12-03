@@ -1,7 +1,5 @@
 # TODO
 
-1. Add a reasonable non-secure hash to guid
-1. Check that Ref demo still only updates when necessary (with overlay)
 2. Make all deltas encodable, and remove the deltaJS stuff.
 3. Get back to thinking about OT deltas as below.
 4. Websocket re-open on close with exponential backoff.
