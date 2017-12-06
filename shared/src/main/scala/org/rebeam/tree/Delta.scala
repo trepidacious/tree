@@ -13,21 +13,21 @@ import org.rebeam.tree.sync._
 
 import scala.reflect.ClassTag
 
-class WidenedDelta[A, B >: A](aDelta: Delta[A], f: B => Option[A]) extends Delta[B] {
-  def apply(b: B): DeltaIO[B] = f(b).fold(
-    pure(b)
-  )(
-    a => aDelta(a).map(r => r: B)
-  )
-}
+//class WidenedDelta[A, B >: A](aDelta: Delta[A], f: B => Option[A]) extends Delta[B] {
+//  def apply(b: B): DeltaIO[B] = f(b).fold(
+//    pure(b)
+//  )(
+//    a => aDelta(a).map(r => r: B)
+//  )
+//}
 
 trait Delta[A] {
   def apply(a: A): DeltaIO[A]
 
-  def widen[B >: A](f: B => Option[A]): Delta[B] = new WidenedDelta[A, B](this, f)
-  def widenPF[B >: A](f: PartialFunction[B, A]): Delta[B] = new WidenedDelta[A, B](this, f.lift)
-  def widenCT[B >: A](implicit ct: ClassTag[A]): Delta[B] = new WidenedDelta[A, B](this, ct.unapply)
-
+//  def widen[B >: A](f: B => Option[A]): Delta[B] = new WidenedDelta[A, B](this, f)
+//  def widenPF[B >: A](f: PartialFunction[B, A]): Delta[B] = new WidenedDelta[A, B](this, f.lift)
+//  def widenCT[B >: A](implicit ct: ClassTag[A]): Delta[B] = new WidenedDelta[A, B](this, ct.unapply)
+//
 }
 
 sealed trait DeltaIOA[A]
@@ -197,11 +197,19 @@ object Delta {
 
 }
 
-case class LensDelta[A, B](lens: Lens[A, B], delta: Delta[B]) extends Delta[A] {
+object LensDelta {
+  def byLens[A, B](a: A, lens: Lens[A, B], delta: Delta[B]): DeltaIO[A] = delta(lens.get(a)).map(lens.set(_)(a))
+}
+
+//abstract class LensDelta[A, B, D <: Delta[B]](lens: Lens[A, B], d: D) extends Delta[A] {
+//  def apply(a: A): DeltaIO[A] = LensDelta.byLens(a, lens, d)
+//}
+
+abstract class LensDelta[A, B](lens: Lens[A, B], delta: Delta[B]) extends Delta[A] {
   def apply(a: A): DeltaIO[A] = delta(lens.get(a)).map(lens.set(_)(a)) //  lens.modify(delta.apply)(a)
 }
 
-case class OptionalDelta[A, B](optional: Optional[A, B], delta: Delta[B]) extends Delta[A] {
+abstract class OptionalDelta[A, B](optional: Optional[A, B], delta: Delta[B]) extends Delta[A] {
   def apply(a: A): DeltaIO[A] =
     optional.getOption(a).fold(
       pure(a)
@@ -210,15 +218,15 @@ case class OptionalDelta[A, B](optional: Optional[A, B], delta: Delta[B]) extend
     )  //optional.modify(delta.apply)(a)
 }
 
-case class LensNDelta[A, B](lensN: LensN[A, B], delta: Delta[B]) extends Delta[A] {
+abstract class LensNDelta[A, B](lensN: LensN[A, B], delta: Delta[B]) extends Delta[A] {
   def apply(a: A): DeltaIO[A] = delta(lensN.get(a)).map(lensN.set(_)(a)) //lensN.modify(delta.apply)(a)
 }
 
-case class ValueDelta[A](v: A) extends Delta[A] {
+abstract class ValueDelta[A](v: A) extends Delta[A] {
   def apply(a: A): DeltaIO[A] = pure(v)  //v
 }
 
-case class OptionalIDelta[A](optionalI: OptionalI[A], delta: Delta[A]) extends Delta[List[A]] {
+abstract class OptionalIDelta[A](optionalI: OptionalI[A], delta: Delta[A]) extends Delta[List[A]] {
   def apply(a: List[A]): DeltaIO[List[A]] =
     optionalI.getOption(a).fold(
       pure(a)
@@ -227,7 +235,7 @@ case class OptionalIDelta[A](optionalI: OptionalI[A], delta: Delta[A]) extends D
     )  //optionalI.modify(delta.apply)(l)
 }
 
-case class OptionalMatchDelta[A, F <: A => Boolean](optionalMatch: OptionalMatch[A, F], delta: Delta[A]) extends Delta[List[A]] {
+abstract class OptionalMatchDelta[A, F <: A => Boolean](optionalMatch: OptionalMatch[A, F], delta: Delta[A]) extends Delta[List[A]] {
   def apply(a: List[A]): DeltaIO[List[A]] =
     optionalMatch.getOption(a).fold(
       pure(a)
@@ -236,7 +244,7 @@ case class OptionalMatchDelta[A, F <: A => Boolean](optionalMatch: OptionalMatch
     )  //optionalMatch.modify(delta.apply)(l)
 }
 
-case class OptionDelta[A](delta: Delta[A]) extends Delta[Option[A]] {
+abstract class OptionDelta[A](delta: Delta[A]) extends Delta[Option[A]] {
 //  private lazy val mod: Option[A] => Option[A] = option.some[A].modify(delta.apply)
   def apply(a: Option[A]): DeltaIO[Option[A]] = option.some[A].getOption(a).fold(
     pure(a)
@@ -245,7 +253,7 @@ case class OptionDelta[A](delta: Delta[A]) extends Delta[Option[A]] {
   )  //mod(o)
 }
 
-case class PrismNDelta[S, A](prismN: PrismN[S, A], delta: Delta[A]) extends Delta[S] {
+abstract class PrismNDelta[S, A](prismN: PrismN[S, A], delta: Delta[A]) extends Delta[S] {
   def apply(s: S): DeltaIO[S] =
     prismN.getOption(s).fold(
       pure(s)
@@ -254,7 +262,7 @@ case class PrismNDelta[S, A](prismN: PrismN[S, A], delta: Delta[A]) extends Delt
     )  //optionalI.modify(delta.apply)(l)
 }
 
-case class MirrorDelta[A: MirrorCodec](ref: Ref[A], delta: Delta[A]) extends Delta[Mirror] {
+abstract class MirrorDelta[A: MirrorCodec](ref: Ref[A], delta: Delta[A]) extends Delta[Mirror] {
   def apply(mirror: Mirror): DeltaIO[Mirror] =
     mirror(ref).fold(
       // Data is not in mirror, nothing to do
@@ -267,3 +275,30 @@ case class MirrorDelta[A: MirrorCodec](ref: Ref[A], delta: Delta[A]) extends Del
       } yield updatedMirror
     )
 }
+
+@JsonCodec
+case class BooleanValueDelta(a: String) extends ValueDelta[String](a)
+
+@JsonCodec
+case class ByteValueDelta(a: Byte) extends ValueDelta[Byte](a)
+
+@JsonCodec
+case class ShortValueDelta(a: Short) extends ValueDelta[Short](a)
+
+@JsonCodec
+case class IntValueDelta(a: Int) extends ValueDelta[Int](a)
+
+@JsonCodec
+case class LongValueDelta(a: Long) extends ValueDelta[Long](a)
+
+@JsonCodec
+case class FloatValueDelta(a: Float) extends ValueDelta[Float](a)
+
+@JsonCodec
+case class DoubleValueDelta(a: Double) extends ValueDelta[Double](a)
+
+@JsonCodec
+case class CharValueDelta(a: Char) extends ValueDelta[Char](a)
+
+@JsonCodec
+case class StringValueDelta(a: String) extends ValueDelta[String](a)

@@ -81,19 +81,11 @@ object DeltaIORun {
     def runWith(context: DeltaIOContext, deltaId: DeltaId): DeltaRunResult[A] = runDeltaIO(dio, context, deltaId)
   }
 
-  implicit class DeltaAndIdRun[A](deltaAndId: DeltaAndId[A]) {
+  implicit class DeltaAndIdRun[A, D <: Delta[A]](deltaAndId: DeltaAndId[A, D]) {
     def runWith(a: A, context: DeltaIOContext): DeltaRunResult[A] = runDeltaIO(deltaAndId.delta.apply(a), context, deltaAndId.id)
   }
 
-  implicit class DeltaWithIJRun[A](dij: DeltaWithIJ[A]) {
-    def runWith(a: A, context: DeltaIOContext): DeltaRunResult[A] = runDeltaIO(dij.delta.apply(a), context, dij.id)
-  }
-
-  implicit class DeltaWithIJCRun[A](dijc: DeltaWithIJC[A]) {
-    def runWith(a: A): DeltaRunResult[A] = runDeltaIO(dijc.delta.apply(a), dijc.context, dijc.id)
-  }
-
-  implicit class DeltaWithICRun[A](dic: DeltaWithIC[A]) {
+  implicit class DeltaWithICRun[A, D <: Delta[A]](dic: DeltaWithIC[A, D]) {
     def runWith(a: A): DeltaRunResult[A] = runDeltaIO(dic.delta.apply(a), dic.context, dic.id)
     def runWithNewContext(a: A, context: DeltaIOContext): DeltaRunResult[A] = runDeltaIO(dic.delta.apply(a), context, dic.id)
   }

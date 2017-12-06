@@ -3,47 +3,20 @@ package org.rebeam.tree
 
 import org.rebeam.lenses.macros.Lenses
 import Delta._
-import org.rebeam.lenses.LensN
 
 import scala.language.higherKinds
-import monocle.Lens
 
-import io.circe._, io.circe.parser._, io.circe.syntax._
+import io.circe._
 import io.circe.generic.semiauto._
-import io.circe.generic.JsonCodec
 
-import org.rebeam.tree.sync.DeltaIORun._
 import org.rebeam.tree.sync.Sync._
-import cats.syntax.either._
-import scala.collection.immutable.Set
 import org.rebeam.tree.sync._
 
+import BasicDeltas._
 
 import Searchable._
 
 object DeltaCodecProto {
-
-  @JsonCodec
-  case class StringValueDelta(v: String) extends Delta[String] {
-    def apply(a: String): DeltaIO[String] = pure(v)
-  }
-
-  @JsonCodec
-  case class IntValueDelta(v: Int) extends Delta[Int] {
-    def apply(a: Int): DeltaIO[Int] = pure(v)
-  }
-
-  object LensDelta {
-    def byLens[A, B](a: A, lens: Lens[A, B], delta: Delta[B]): DeltaIO[A] = delta(lens.get(a)).map(lens.set(_)(a))
-  }
-
-  abstract class LensDelta[A, B](lens: Lens[A, B], d: Delta[B]) extends Delta[A] {
-    def apply(a: A): DeltaIO[A] = LensDelta.byLens(a, lens, d)
-  }
-
-  abstract class ValueDelta[A](a: A) extends Delta[A] {
-    def apply(a: A): DeltaIO[A] = pure(a)
-  }
 
   sealed trait ListDelta[A] extends Delta[List[A]]
 
