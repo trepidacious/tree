@@ -45,6 +45,7 @@ trait LowPrioritySearchable {
 }
 
 object Searchable extends LowPrioritySearchable {
+
   /**
     * Defines a Searchable that finds nothing
     */
@@ -91,6 +92,22 @@ object Searchable extends LowPrioritySearchable {
       // The less safe version:
       // If we have a searchable for head, use it, and add the results of searching the tail
       // Option(hs).fold(Set.empty[Q])(_.find(p)(a.head)) ++ ts.find(p)(a.tail)
+  }
+
+  implicit def cNilSearchable[Q]: Searchable[CNil, Q] = new Searchable[CNil, Q] {
+    def find(p: Q => Boolean)(a: CNil): Set[Q] = throw new Exception("Searching a CNil - shouldn't happen")
+  }
+
+  implicit def coproductSearchable[H, T <: Coproduct, Q](
+    implicit
+    hs: Lazy[Searchable[H, Q]],
+    ts: Searchable[T, Q]
+  ): Searchable[H :+: T, Q] = new Searchable[H :+: T, Q] {
+    def find(p: Q => Boolean)(a: H :+: T): Set[Q] = a match {
+      case Inl(h) => hs.value.find(p)(h)
+      case Inr(t) => ts.find(p)(t)
+    }
+
   }
 
   implicit def refSearchableForGuid[A]: Searchable[Ref[A], Guid] = new Searchable[Ref[A], Guid] {
