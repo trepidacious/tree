@@ -18,10 +18,16 @@ scalacOptions in ThisBuild ++= Seq(
 
 testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-verbosity", "2")
 
+resolvers ++= Seq(
+  Resolver.sonatypeRepo("releases"),
+  Resolver.sonatypeRepo("snapshots")
+)
+
 lazy val http4sVersion              = "0.15.5a"
 lazy val circeVersion               = "0.7.0"
 lazy val catsVersion                = "0.9.0"
 lazy val scalajsReactVersion        = "0.11.3"
+lazy val shapelessVersion           = "2.3.2"
 
 lazy val root = project.in(file(".")).
   aggregate(treeJS, treeJVM).
@@ -35,17 +41,19 @@ lazy val tree = crossProject.in(file(".")).
     name := "tree",
     version := "0.1-SNAPSHOT",
     libraryDependencies ++= Seq(
-      "org.rebeam"                  %%%  "lenses-codec"     % "0.1-SNAPSHOT",
+      "org.rebeam"                  %%% "lenses-codec"    % "0.1-SNAPSHOT",
 
-      "io.circe"                    %%%  "circe-core"       % circeVersion,
-      "io.circe"                    %%%  "circe-generic"    % circeVersion,
-      "io.circe"                    %%%  "circe-parser"     % circeVersion,
+      "io.circe"                    %%% "circe-core"      % circeVersion,
+      "io.circe"                    %%% "circe-generic"   % circeVersion,
+      "io.circe"                    %%% "circe-parser"    % circeVersion,
 
-      "org.typelevel"               %%%  "cats"             % catsVersion,
+      "org.typelevel"               %%% "cats"            % catsVersion,
+      
+      "com.chuusai"                 %%% "shapeless"       % shapelessVersion,
 
-      "org.scalactic"               %%% "scalactic"         % "3.0.0"             % "test",
-      "org.scalatest"               %%% "scalatest"         % "3.0.0"             % "test",
-      "org.scalacheck"              %%% "scalacheck"        % "1.13.4"            % "test"
+      "org.scalactic"               %%% "scalactic"       % "3.0.0"             % "test",
+      "org.scalatest"               %%% "scalatest"       % "3.0.0"             % "test",
+      "org.scalacheck"              %%% "scalacheck"      % "1.13.4"            % "test"
     ),
 
     //For @Lenses

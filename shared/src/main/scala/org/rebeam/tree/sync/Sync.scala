@@ -7,10 +7,12 @@ import io.circe.generic.JsonCodec
 import org.rebeam.tree.sync.ServerStoreUpdate.{ServerStoreFullUpdate, ServerStoreIncrementalUpdate}
 import cats.syntax.either._
 import org.rebeam.tree.DeltaCodecs.DeltaCodec
-import org.rebeam.tree.ref.Ref
+import org.rebeam.tree.sync._
 
 import scala.util.Try
 import scala.util.matching.Regex
+
+import org.rebeam.tree.ref._
 
 object Sync {
 
@@ -45,77 +47,15 @@ object Sync {
   @JsonCodec
   case class DeltaId(clientId: ClientId, clientDeltaId: ClientDeltaId)
 
-  /**
-    * Identifier for a data item, globally unique (globally refers to the whole system under consideration -
-    * may just be one server). This uses the id data of the delta where the data item is created, and adds
-    * an additional id that makes it unique within that delta.
-    * @param clientId       Client id
-    * @param clientDeltaId  Id of delta on that client
-    * @param id             Id of the item amongst those created in this delta
-    * @tparam A             Type of the identified item - Unit if there is no specific identified item.
-    */
-  case class Guid[+A](clientId: ClientId, clientDeltaId: ClientDeltaId, id: Long) {
-    override def toString: String = Guid.toString(this)
-  }
-
-  object Guid {
-    val regex: Regex = "([Gg][Uu][Ii][Dd]-[0-9a-fA-F]+-[0-9a-fA-F]+-[0-9a-fA-F]+)".r
-    val regexGrouped: Regex = "[Gg][Uu][Ii][Dd]-([0-9a-fA-F]+)-([0-9a-fA-F]+)-([0-9a-fA-F]+)".r
-
-    private def hex(x: String): Long = java.lang.Long.parseUnsignedLong(x, 16)
-
-    def fromString[A](s: String): Option[Guid[A]] = s match {
-      case regexGrouped(clientId, clientDeltaId, id) =>
-        Try {
-          Guid[A](ClientId(hex(clientId)), ClientDeltaId(hex(clientDeltaId)), hex(id))
-        }.toOption
-      case _ => None
-    }
-
-    def toString(g: Guid[_]): String = f"guid-${g.clientId.id}%x-${g.clientDeltaId.id}%x-${g.id}%x"
-
-    //Encoder and decoder using plain string format for guid
-
-    implicit def decodeGuid[A]: Decoder[Guid[A]] = Decoder.instance(
-      c => c.as[String].flatMap(string => fromString[A](string).fold[Either[DecodingFailure, Guid[A]]](Left(DecodingFailure("Guid invalid string", c.history)))(Right(_)))
-    )
-    implicit def encodeGuid[A]: Encoder[Guid[A]] = Encoder.instance(
-      g => Json.fromString(toString(g))
-    )
-  }
 
   /**
-    * Indicates a data type has a Guid
-    * @tparam A The data type
-    */
-  trait HasId[+A] {
-    /**
-      * @return The Guid
-      */
-    def id: Guid[A]
-  }
-
-  /**
-    * Typeclass for getting guid
-    * @tparam A The data type
-    */
-  trait ToId[A] {
-    /**
-      * @return The Guid
-      */
-    def id(a: A): Guid[A]
-  }
-
-  implicit def hasIdToId[A <: HasId[A]] = new ToId[A]{ def id(a: A): Guid[A] = a.id }
-
-  /**
-    * Find HasId instances by their Guid.
+    * Find Identified instances by their Id.
     * Works with Cursor.zoomMatch and related methods to zoom to a particular element of a list by id
     * @param id   The id to find
     * @tparam A   The type of item to find, must implement HasId[A]
     */
   @JsonCodec
-  case class FindById[A <: HasId[A]](id: Guid[A]) extends (A => Boolean) {
+  case class FindById[A <: Identified[A]](id: Id[A]) extends (A => Boolean) {
     def apply(a: A): Boolean = a.id == id
   }
 
@@ -126,7 +66,7 @@ object Sync {
     * @tparam A   The type of item referenced by the Ref
     */
   @JsonCodec
-  case class FindRefById[A](id: Guid[A]) extends (Ref[A] => Boolean) {
+  case class FindRefById[A](id: Id[A]) extends (Ref[A] => Boolean) {
     def apply(a: Ref[A]): Boolean = a.id == id
   }
 

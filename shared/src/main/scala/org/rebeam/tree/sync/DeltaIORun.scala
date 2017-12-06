@@ -10,7 +10,7 @@ import org.rebeam.tree.sync.Sync._
 
 object DeltaIORun {
 
-  case class AddedRef[A](id: Guid[A], data: A, revision: Guid[A], codec: MirrorCodec[A])
+  case class AddedRef[A](id: Id[A], data: A, revision: Guid, codec: MirrorCodec[A])
 
   case class DeltaRunResult[A](data: A, addedRefs: List[AddedRef[_]])
 
@@ -36,7 +36,9 @@ object DeltaIORun {
     new (DeltaIOA ~> DeltaContextState) {
       def apply[A](fa: DeltaIOA[A]): DeltaContextState[A] =
         fa match {
-          case GetId() => State(s => (s.withNextGuidId, Guid[Any](s.deltaId.clientId, s.deltaId.clientDeltaId, s.currentGuidId)))
+          case GetGuid => State(s => (s.withNextGuidId, Guid(s.deltaId.clientId, s.deltaId.clientDeltaId, WithinDeltaId(s.currentGuidId))))
+
+          case GetId() => State(s => (s.withNextGuidId, Id[Any](Guid(s.deltaId.clientId, s.deltaId.clientDeltaId, WithinDeltaId(s.currentGuidId)))))
 
           case GetContext => State(s => (s, s.context))
 
@@ -50,14 +52,16 @@ object DeltaIORun {
           case GetPRFloat => State(_.random(_.float))
           case GetPRDouble => State(_.random(_.double))
 
+
           case Put(create, codec) => State(s => {
-            val guid = Guid[A](s.deltaId.clientId, s.deltaId.clientDeltaId, s.currentGuidId)
-            val revision = Guid[A](s.deltaId.clientId, s.deltaId.clientDeltaId, s.currentGuidId + 1)
-            val createDIO: DeltaIO[A] = create(guid)
+            val id = Id[A](Guid(s.deltaId.clientId, s.deltaId.clientDeltaId, WithinDeltaId(s.currentGuidId)))
+            val revision = Guid(s.deltaId.clientId, s.deltaId.clientDeltaId, WithinDeltaId(s.currentGuidId + 1))
+            // MAke the data item
+            val createDIO: DeltaIO[A] = create(id)
             // Remember to increment guid twice for the guid and revision we generated
             val stateWithA = createDIO.foldMap(pureCompiler).run(s.withNextGuidId.withNextGuidId).value
 
-            val newAddedRefs = AddedRef(guid, stateWithA._2, revision, codec) :: stateWithA._1.addedRefs
+            val newAddedRefs = AddedRef(id, stateWithA._2, revision, codec) :: stateWithA._1.addedRefs
             (stateWithA._1.copy(addedRefs = newAddedRefs), stateWithA._2)
           })
         }

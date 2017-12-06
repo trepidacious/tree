@@ -7,8 +7,9 @@ import org.rebeam.lenses._
 import monocle._
 import monocle.std.option
 import org.rebeam.tree.Delta._
-import org.rebeam.tree.ref.{Mirror, MirrorCodec, Ref}
+import org.rebeam.tree.ref._
 import org.rebeam.tree.sync.Sync._
+import org.rebeam.tree.sync._
 
 import scala.reflect.ClassTag
 
@@ -30,7 +31,8 @@ trait Delta[A] {
 }
 
 sealed trait DeltaIOA[A]
-case class GetId[T]() extends DeltaIOA[Guid[T]]
+case object GetGuid extends DeltaIOA[Guid]
+case class GetId[T]() extends DeltaIOA[Id[T]]
 case object GetContext extends DeltaIOA[DeltaIOContext]
 case object GetDeltaId extends DeltaIOA[DeltaId]
 case object GetPRInt extends DeltaIOA[Int]
@@ -39,7 +41,7 @@ case object GetPRLong extends DeltaIOA[Long]
 case object GetPRBoolean extends DeltaIOA[Boolean]
 case object GetPRFloat extends DeltaIOA[Float]
 case object GetPRDouble extends DeltaIOA[Double]
-case class Put[T](create: Guid[T] => DeltaIO[T], codec: MirrorCodec[T]) extends DeltaIOA[T]
+case class Put[T](create: Id[T] => DeltaIO[T], codec: MirrorCodec[T]) extends DeltaIOA[T]
 
 /**
   * Provides the context within which an individual run of a DeltaIO can
@@ -75,13 +77,20 @@ object Delta {
   type DeltaIO[A] = Free[DeltaIOA, A]
 
   /**
-    * GetId returns a Guid[T] value.
-    * @tparam T The type for which we need a Guid
-    * @return A new Guid for the given type. Use for
+    * GetId returns an Id[T] value.
+    * @tparam T The type for which we need an Id
+    * @return A new Id for the given type. Use for
     *         only one data item - do not reuse.
     */
-  def getId[T]: DeltaIO[Guid[T]] =
-    liftF[DeltaIOA, Guid[T]](GetId[T]())
+  def getId[T]: DeltaIO[Id[T]] =
+    liftF[DeltaIOA, Id[T]](GetId[T]())
+
+  /**
+    * GetGuid returns a Guid value.
+    * @return A new Guid.
+    */
+  val getGuid: DeltaIO[Guid] =
+    liftF[DeltaIOA, Guid](GetGuid)
 
   /**
     * Get the DeltaIOContext within which the DeltaIO
@@ -155,14 +164,14 @@ object Delta {
   /**
     * Put a new data item into the Mirror, where that data item
     * can be created by a DeltaIO using a new Guid.
-    * This atomically produces a new Guid for a data item, creates
+    * This atomically produces a new Id for a data item, creates
     * that data item, and registers the data item to the Mirror.
     * @tparam T       The type of data item
     * @param create   A function accepting a new Guid for the data item,
     *                 and returning a DeltaIO that will make the data item.
     * @return         A DeltaIO yielding the new item
     */
-  def put[T](create: Guid[T] => DeltaIO[T])(implicit codec: MirrorCodec[T]): DeltaIO[T] =
+  def put[T](create: Id[T] => DeltaIO[T])(implicit codec: MirrorCodec[T]): DeltaIO[T] =
     liftF[DeltaIOA, T](Put(create, codec))
 
   /**
@@ -175,8 +184,8 @@ object Delta {
     *                 and returning a data item.
     * @return         The new item
     */
-  def putPure[T](create: Guid[T] => T)(implicit codec: MirrorCodec[T]): DeltaIO[T] =
-    put[T]((id: Guid[T]) => pure(create(id)))
+  def putPure[T](create: Id[T] => T)(implicit codec: MirrorCodec[T]): DeltaIO[T] =
+    put[T]((id: Id[T]) => pure(create(id)))
 
   /**
     * Pure DeltaIO value

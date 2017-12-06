@@ -17,7 +17,7 @@ import org.rebeam.tree.sync.ServerStoreUpdate.ServerStoreIncrementalUpdate
 import cats.syntax.either._
 import org.rebeam.lenses.PrismN
 import org.scalatest.prop.Checkers
-import org.rebeam.tree.ref.Ref
+import org.rebeam.tree.sync._
 
 class SyncCodecsSpec extends WordSpec with Matchers with Checkers{
 
@@ -200,9 +200,9 @@ class SyncCodecsSpec extends WordSpec with Matchers with Checkers{
 
     "encode and decode arbitrary guid" in {
       check((clientId: Long, clientDeltaId: Long, id: Long) => {
-        val g: Guid[Unit] = Guid(ClientId(clientId), ClientDeltaId(clientDeltaId), id)
-        val encoded = Guid.encodeGuid[Unit](g)
-        val decoded = Guid.decodeGuid[Unit].decodeJson(encoded)
+        val g: Guid = Guid(ClientId(clientId), ClientDeltaId(clientDeltaId), WithinDeltaId(id))
+        val encoded = Guid.encodeGuid(g)
+        val decoded = Guid.decodeGuid.decodeJson(encoded)
         decoded.fold(
           fail(_),
           _ == g
@@ -212,7 +212,7 @@ class SyncCodecsSpec extends WordSpec with Matchers with Checkers{
 
     "encode and decode arbitrary ref" in {
       check((clientId: Long, clientDeltaId: Long, id: Long) => {
-        val r: Ref[Unit] = Ref(Guid(ClientId(clientId), ClientDeltaId(clientDeltaId), id))
+        val r: Ref[Unit] = Ref(Id(Guid(ClientId(clientId), ClientDeltaId(clientDeltaId), WithinDeltaId(id))))
         val encoded = Ref.encodeRef[Unit](r)
         val decoded = Ref.decodeRef[Unit].decodeJson(encoded)
         decoded.fold(
