@@ -1,15 +1,16 @@
 package org.rebeam.tree.sync
 
-import org.rebeam.tree.ref.{Mirror, MirrorCodec}
+import org.rebeam.tree.Delta
+import org.rebeam.tree.ref.Mirror
 import org.rebeam.tree.sync.DeltaIORun.{AddedRef, DeltaRunResult}
 
-trait RefAdder[A] {
-  def addRefs(deltaRunResult: DeltaRunResult[A]): A
+trait RefAdder[U, A] {
+  def addRefs(deltaRunResult: DeltaRunResult[U, A]): A
 }
 
 object RefAdder {
 
-  private def addRefsToMirror(mirror: Mirror, addedRefs: List[AddedRef[_]]) = {
+  private def addRefsToMirror[U, A, D <: Delta[U, A]](mirror: Mirror[U, A, D], addedRefs: List[AddedRef[U]]) = {
     addedRefs.foldLeft(mirror){
       case (m, addedRef) => {
         val ar = addedRef

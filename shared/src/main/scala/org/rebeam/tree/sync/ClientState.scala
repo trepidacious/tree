@@ -6,8 +6,8 @@ import cats.syntax.either._
 import DeltaIORun._
 
 object ClientState {
-  def initial[A: ModelIdGen](id: ClientId, serverModel: ModelAndId[A]) =
-    ClientState(id, ClientDeltaId(0), serverModel, Vector(), serverModel.model)
+  def initial[U, A: ModelIdGen, D <: Delta[U, A]](id: ClientId, serverModel: ModelAndId[A]): ClientState[U, A, D] =
+    ClientState[U, A, D](id, ClientDeltaId(0), serverModel, Vector(), serverModel.model)
 
   /**
     * Create a ClientState from the first update received. Must be a ModelFullUpdate, otherwise
@@ -16,12 +16,12 @@ object ClientState {
     * @return         A new ClientState or a String error.
     * @tparam A       The type of model
     */
-  def fromFirstUpdate[A: ModelIdGen, D <: Delta[A]](update: ModelUpdate[A, D]): Either[String, ClientState[A, D]] = update match {
+  def fromFirstUpdate[U, A: ModelIdGen, D <: Delta[U, A]](update: ModelUpdate[U, A, D]): Either[String, ClientState[U, A, D]] = update match {
     case i@ModelIncrementalUpdate(_,_,_) => Left("First ClientState update must be a ModelFullUpdate, got " + i)
     case f@ModelFullUpdate(_,_)  => fromFullUpdate(f, ClientDeltaId(0))
   }
 
-  def fromFullUpdate[A: ModelIdGen, D <: Delta[A]](update: ModelFullUpdate[A, D], nextClientDeltaId: ClientDeltaId): Either[String, ClientState[A, D]] = {
+  def fromFullUpdate[U, A: ModelIdGen, D <: Delta[U, A]](update: ModelFullUpdate[U, A, D], nextClientDeltaId: ClientDeltaId): Either[String, ClientState[U, A, D]] = {
     implicitly[ModelIdGen[A]].genId(update.model.model) match {
       case Some(genId) if genId != update.model.id =>
         Left("Locally-generated id " + genId + " does not match full update's remote-generated id " + update.model.id)
@@ -39,8 +39,8 @@ object ClientState {
   }
 
   // Temporary class used to manage a model and deltas
-  private case class ModelAndDeltas[A, D <: Delta[A]](model: A, deltas: Seq[DeltaWithIC[A, D]]) {
-    def applyDelta(delta: D, deltaId: DeltaId, context: DeltaIOContext)(implicit refAdder: RefAdder[A]): ModelAndDeltas[A, D] =
+  private case class ModelAndDeltas[U, A, D <: Delta[U, A]](model: A, deltas: Seq[DeltaWithIC[U, A, D]]) {
+    def applyDelta(delta: D, deltaId: DeltaId, context: DeltaIOContext)(implicit refAdder: RefAdder[A]): ModelAndDeltas[U, A, D] =
       copy(model = {
         val result = delta.runWith(model, context, deltaId)
         refAdder.addRefs(result)
@@ -65,7 +65,7 @@ object ClientState {
   * @tparam A                 The type of model
   * @tparam D                 The type of delta to the model
   */
-case class ClientState[A, D <: Delta[A]](id: ClientId, nextClientDeltaId: ClientDeltaId, serverModel: ModelAndId[A], pendingDeltas: Seq[DeltaWithIC[A, D]], model: A) {
+case class ClientState[U, A, D <: Delta[U, A]](id: ClientId, nextClientDeltaId: ClientDeltaId, serverModel: ModelAndId[A], pendingDeltas: Seq[DeltaWithIC[U, A, D]], model: A) {
 
   import ClientState.ModelAndDeltas
 
@@ -78,12 +78,12 @@ case class ClientState[A, D <: Delta[A]](id: ClientId, nextClientDeltaId: Client
     *                the delta appropriately.
     * @return A new ClientState
     */
-  def apply(delta: D, context: DeltaIOContext)(implicit refAdder: RefAdder[A]): (ClientState[A, D], DeltaId) = {
+  def apply(delta: D, context: DeltaIOContext)(implicit refAdder: RefAdder[A]): (ClientState[U, A, D], DeltaId) = {
     val deltaId = DeltaId(id, nextClientDeltaId)
 
     val nextModel = refAdder.addRefs(delta.runWith(model, context, deltaId))
 
-    val deltaWithIC = DeltaWithIC[A, D](delta, deltaId, context)
+    val deltaWithIC = DeltaWithIC[U, A, D](delta, deltaId, context)
     val state = copy(nextClientDeltaId = nextClientDeltaId.next, model = nextModel, pendingDeltas = pendingDeltas :+ deltaWithIC)
     (state, deltaId)
   }
@@ -93,7 +93,7 @@ case class ClientState[A, D <: Delta[A]](id: ClientId, nextClientDeltaId: Client
     * @param update The update to apply
     * @return An error xor a new ClientState
     */
-  def update(update: ModelUpdate[A, D])(implicit idGen: ModelIdGen[A], refAdder: RefAdder[A]): Either[String, ClientState[A, D]] = update match {
+  def update(update: ModelUpdate[U, A, D])(implicit idGen: ModelIdGen[A], refAdder: RefAdder[A]): Either[String, ClientState[U, A, D]] = update match {
     case i@ModelIncrementalUpdate(_,_,_) => incrementalUpdate(i)
     case f@ModelFullUpdate(_,_)  => fullUpdate(f)
   }
@@ -104,14 +104,14 @@ case class ClientState[A, D <: Delta[A]](id: ClientId, nextClientDeltaId: Client
     * @param update The update to apply
     * @return A new ClientState
     */
-  def fullUpdate(update: ModelFullUpdate[A, D])(implicit idGen: ModelIdGen[A]): Either[String, ClientState[A, D]] = ClientState.fromFullUpdate(update, nextClientDeltaId)
+  def fullUpdate(update: ModelFullUpdate[U, A, D])(implicit idGen: ModelIdGen[A]): Either[String, ClientState[U, A, D]] = ClientState.fromFullUpdate(update, nextClientDeltaId)
 
   /**
     * Reconcile an incremental update to this client state, to produce a new client state, if possible.
     * @param update The update to apply
     * @return An error xor a new ClientState
     */
-  def incrementalUpdate(update: ModelIncrementalUpdate[A, D])(implicit idGen: ModelIdGen[A], refAdder: RefAdder[A]): Either[String, ClientState[A, D]] = {
+  def incrementalUpdate(update: ModelIncrementalUpdate[U, A, D])(implicit idGen: ModelIdGen[A], refAdder: RefAdder[A]): Either[String, ClientState[U, A, D]] = {
     if (update.baseModelId != serverModel.id) {
       Left("Server update expected base model id " + update.baseModelId + " but we have server model id " + serverModel.id)
 
@@ -132,7 +132,7 @@ case class ClientState[A, D <: Delta[A]](id: ClientId, nextClientDeltaId: Client
       // 5. The reduced pending delta list can then be used to build our new client model, optimistically applying deltas we
       //    believe are still pending (on their way to the server and back).
 
-      val initialMAD: Either[String, ModelAndDeltas[A, D]] = Right(ModelAndDeltas(serverModel.model, pendingDeltas))
+      val initialMAD: Either[String, ModelAndDeltas[U, A, D]] = Right(ModelAndDeltas(serverModel.model, pendingDeltas))
 
       val updatedMAD = update.deltas.foldLeft(initialMAD){
         case (Right(mad), u) => u match {

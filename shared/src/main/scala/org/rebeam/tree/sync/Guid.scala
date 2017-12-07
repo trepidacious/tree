@@ -98,6 +98,15 @@ object Id {
   implicit def encodeId[A]: Encoder[Id[A]] = Encoder.instance(
     r => Json.fromString(toString(r))
   )
+
+  implicit def idKeyEncoder[A]: KeyEncoder[Id[A]] = new KeyEncoder[Id[A]] {
+    override def apply(id: Id[A]): String = Id.toString(id)
+  }
+
+  implicit def idKeyDecoder[A]: KeyDecoder[Id[A]] = new KeyDecoder[Id[A]] {
+    override def apply(key: String): Option[Id[A]] = Id.fromString(key)
+  }
+
 }
 
 /**

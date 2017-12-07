@@ -238,7 +238,7 @@ object Logoot {
       * @return           A DeltaIO producing a Position > p and < q and meeting invariants
       */
     @tailrec
-    private[logoot] def positionBetweenRec(p: Position, q: Position, r: Position, clientId: ClientId): DeltaIO[Position] = {
+    private[logoot] def positionBetweenRec[U](p: Position, q: Position, r: Position, clientId: ClientId): DeltaIO[U, Position] = {
 
       // We need a permissive tail that is empty if list is empty, so we can
       // trim down p and q as we recurse
@@ -335,7 +335,7 @@ object Logoot {
       * @param q  Second position, p < q
       * @return   New position r s.t. p < r < q
       */
-    private[logoot] def between(p: Position, q: Position): DeltaIO[Position] = {
+    private[logoot] def between[U](p: Position, q: Position): DeltaIO[U, Position] = {
 //      println(s">>> between $p and $q")
       for {
         deltaId <- getDeltaId
@@ -431,7 +431,7 @@ object Logoot {
       * @param index  The insertion index
       * @return       A DeltaIO producing a suitable insertion position
       */
-    def insertionPosition(index: Int): DeltaIO[Position] = {
+    def insertionPosition[U](index: Int): DeltaIO[U, Position] = {
       // Constrain index to 0 to size of sequence (i.e. appending to end).
       val i = Math.min(Math.max(index, 0), pids.size)
 
@@ -462,9 +462,9 @@ object Logoot {
       * @param index  The insertion index
       * @return       A DeltaIO producing a suitable insertion position id
       */
-    def insertionPositionId(index: Int): DeltaIO[PositionId] = for {
+    def insertionPositionId[U >: PositionId](index: Int): DeltaIO[U, PositionId] = for {
       p <- insertionPosition(index)
-      id <- getId[PositionId]
+      id <- getId[U, PositionId]
     } yield PositionId(p, id)
 
     /**

@@ -5,107 +5,21 @@ import org.rebeam.tree.Delta._
 import org.rebeam.tree.{Delta, Searchable}
 import org.rebeam.tree.sync._
 
-import scala.collection.mutable.ArrayBuffer
-
-/**
-  * Represents a type of data referenced in a Mirror
-  * @param name   The name of the type, must only be associated with one real type in a given mirror.
-  */
-case class MirrorType(name: String) extends AnyVal
-
-/**
-  * Typeclass covering everything needed to contain a type of data in a Mirror
-  * @tparam A     The type of data
-  */
-trait MirrorCodec[A] {
-  def mirrorType: MirrorType
-  def encoder: Encoder[A]
-  def decoder: Decoder[A]
-  def deltaCodec: Encoder[Delta[A]]
-  //  def searchable: Searchable[A, Guid]
-}
-
-object MirrorCodec {
-  def apply[A](mirrorType: String)(implicit encoder: Encoder[A], decoder: Decoder[A], deltaCodec: Encoder[Delta[A]]): MirrorCodec[A] =
-    MirrorCodecBasic(MirrorType(mirrorType), encoder, decoder, deltaCodec)
-}
-
-case class MirrorCodecBasic[A](mirrorType: MirrorType, encoder: Encoder[A], decoder: Decoder[A], deltaCodec: Encoder[Delta[A]]) extends MirrorCodec[A]
-
 object Mirror {
-  val empty = new Mirror(Map.empty, Map.empty)
+  def empty[U, A, D <: Delta[U, A]]: Mirror[U, A, D] = new Mirror[U, A, D](Map.empty)
 
   // There is no meaning to searching for refs in a mirror
-  implicit val mirrorNotSearchableForGuid: Searchable[Mirror, Guid] = Searchable.notSearchable
-
-  /**
-    * An entry in the Mirror.
-    * Note we use type Any - we ensure that data type, guid and codec are for the same type
-    * at runtime by construction of map.
-    * @param guid       Id of the data
-    * @param codec      MirrorCodec so we can encode/decode mirror, etc.
-    * @param revision   The current revision of the data
-    * @param data       The data itself
-    */
-  private case class MirrorEntry(guid: Guid, codec: MirrorCodec[Any], revision: Guid, data: Any)
+  implicit def mirrorNotSearchableForGuid[U, A, D <: Delta[U, A]]: Searchable[Mirror[U, A, D], Guid] = Searchable.notSearchable
 
   /**
     * Decoder for mirrors containing only the types handled by the provided MirrorCodecs
-    * @param codecs The MirrorCodecs to use to decode Mirror contents
-    * @return       A Decoder[Mirror] handling provided content types
+    * @param decoder  Decoder for data contents
+    * @return         A Decoder[Mirror[U, A, D]
     */
-  def decoder(codecs: MirrorCodec[_]*): Decoder[Mirror] = {
-    val codecMap = codecs.toList.map(codec => (codec.mirrorType, codec)).toMap[MirrorType, MirrorCodec[_]]
-    Decoder.instance[Mirror](
-      c => c.fields match {
-
-        case None => Left[DecodingFailure, Mirror](DecodingFailure("No fields in mirror Json", c.history))
-
-        case Some(fields) =>
-          val it = fields.iterator
-          val entries = ArrayBuffer.empty[MirrorEntry]
-          var failed: DecodingFailure = null
-
-          while (failed.eq(null) && it.hasNext) {
-            val field = it.next
-            val atH = c.downField(field)
-
-            Guid.guidKeyDecoder(field) match {
-
-              case Some(guid) =>
-                atH.fieldSet match {
-                  case Some(set) if set.size == 1 =>
-                    val mirrorType = MirrorType(set.head)
-                    val mirrorCodec = codecMap.get(mirrorType)
-                    mirrorCodec match {
-                      case Some(codec) =>
-                        val revAndDataC = atH.downField(set.head)
-
-                        Guid.decodeGuid.tryDecode(revAndDataC.downField("revision")) match {
-                          case Right(revision) =>
-                            codec.decoder.tryDecode(revAndDataC.downField("data")) match {
-                              case Right(data) =>
-                                entries += MirrorEntry(guid, codec.asInstanceOf[MirrorCodec[Any]], revision, data)
-                              case Left(error) => failed = error
-                            }
-                          case Left(error) => failed = error
-                        }
-                      case _ => failed = DecodingFailure("No MirrorCodec for type " + mirrorType, atH.history)
-                    }
-                  case _ => failed = DecodingFailure("Mirror should have entries with single field named after data type", atH.history)
-                }
-              case _ => failed = DecodingFailure("Invalid key in mirror", atH.history)
-            }
-          }
-
-          if (failed.eq(null)) {
-            Right(entries.foldLeft(Mirror.empty) {
-              case (mirror, entry) => mirror.updated(Id[Any](entry.guid), entry.data, entry.revision)(entry.codec)
-            })
-          } else {
-            Left(failed)
-          }
-      }
+  def decoder[U, A, D <: Delta[U, A]](implicit decoder: Decoder[A]): Decoder[Mirror[U, A, D]] = {
+    Decoder.instance[Mirror[U, A, D]](
+      // FIXME implement, use contramap or similar based on map?
+      c => Left[DecodingFailure, Mirror[U, A, D]](DecodingFailure("No fields in mirror Json", c.history))
     )
   }
 
@@ -115,18 +29,15 @@ object Mirror {
     * Each field contains an object named after the MirrorType of the data item,
     * containing its revision and data.
     */
-  val encoder: Encoder[Mirror] = Encoder.instance[Mirror](
+  def encoder[U, A, D <: Delta[U, A]](implicit encoder: Encoder[A]): Encoder[Mirror[U, A, D]] = Encoder.instance[Mirror[U, A, D]](
     m => {
       val jsonMap = m.map.toList.map {
-        case (guid, state) =>
-          val mc = state.mirrorCodec.asInstanceOf[MirrorCodec[Any]]
+        case (id, state) =>
           (
-            Guid.guidKeyEncoder(guid),
+            Id.idKeyEncoder(id),
             Json.obj(
-              mc.mirrorType.name -> Json.obj(
-                "revision" -> Guid.encodeGuid(state.revision),
-                "data" -> mc.encoder(state.data)
-              )
+              "revision" -> Guid.encodeGuid(state.revision),
+              "data" -> encoder(state.data)
             )
           )
       }
@@ -140,12 +51,11 @@ object Mirror {
   * The state of a piece of data in the Mirror
   * @param data           The data itself
   * @param revision       The current revision of the data
-  * @param mirrorCodec    A MirrorCodec for the data type
   * //@param incomingRefs   The Guids of all other pieces of data in the Mirror that contain references to this data
   * //@param outgoingRefs   The Guids of all other pieces of data in the Mirror that are referenced by this data
   * @tparam A             The data type
   */
-private case class MirrorState[A](data: A, revision: Guid, mirrorCodec: MirrorCodec[A]) {//}, incomingRefs: Set[Guid], outgoingRefs: Set[Guid]) {
+private case class MirrorState[A](data: A, revision: Guid) {//}, incomingRefs: Set[Guid], outgoingRefs: Set[Guid]) {
 //  def updatedIncomingRefs(id: Guid, add: Boolean): MirrorState[A] = copy(
 //    incomingRefs = if (add) {
 //      incomingRefs + id
@@ -156,36 +66,30 @@ private case class MirrorState[A](data: A, revision: Guid, mirrorCodec: MirrorCo
 }
 
 /**
-  * A Mirror handles the client side of synchronising a key value map between a client and server.
+  * A Mirror is just a map from Ids to MirrorState, which is the current value
+  * for that Id and the revision of that value
   * @param map    Map from each known Guid to the data identified by that Guid
-  * @param types  Map from types of data in the mirror to the associated codecs
   */
-class Mirror(private val map: Map[Guid, MirrorState[_]], private val types: Map[MirrorType, MirrorCodec[_]]) {
+class Mirror[U, A, D <: Delta[U, A]](private val map: Map[Id[A], MirrorState[A]]) {
 
-  private def updateMap(newMap: Map[Guid, MirrorState[_]]): Mirror = new Mirror(newMap, types)
-
-  def updateType[A](mirrorType: MirrorType, mirrorCodec: MirrorCodec[A]) = new Mirror(map, types.updated(mirrorType, mirrorCodec))
+  private def updateMap(newMap: Map[Id[A], MirrorState[A]]): Mirror[U, A, D] = new Mirror(newMap)
 
   /**
     * Retrieve the data for a reference, if reference is valid and data is present in mirror
     * @param ref  The reference
     * @return     The data if present, or None otherwise
     */
-  def apply[A](ref: Ref[A]): Option[A] = getState(ref.id).map(_.data)
+  def apply(ref: Ref[A]): Option[A] = getState(ref.id).map(_.data)
 
+  private def getState(id: Id[A]): Option[MirrorState[A]] = map.get(id)
 
-  private def getState(guid: Guid): Option[MirrorState[_]] = map.get(guid)
-
-  def revisionOf(guid: Guid): Option[Guid] = getState(guid).map(_.revision)
+  def revisionOf(id: Id[A]): Option[Guid] = getState(id).map(_.revision)
 
 //  def incomingRefs(guid: Guid): Set[Guid] = getState(guid).map(_.incomingRefs).getOrElse(Set.empty[Guid])
 //  def outgoingRefs(guid: Guid): Set[Guid] = getState(guid).map(_.outgoingRefs).getOrElse(Set.empty[Guid])
 
-
-  private def getState[A](id: Id[A]): Option[MirrorState[A]] = map.get(id.guid).map(_.asInstanceOf[MirrorState[A]])
-
-  def get[A](id: Id[A]): Option[A] = getState(id).map(_.data)
-  def revisionOf[A](ref: Ref[A]): Option[Guid] = getState(ref.id).map(_.revision)
+  def get(id: Id[A]): Option[A] = getState(id).map(_.data)
+  def revisionOf(ref: Ref[A]): Option[Guid] = revisionOf(ref.id)
 
 //  private def incomingRefsFor(guid: Guid): Set[Guid] = {
 //    map.foldLeft(Set.empty[Guid]){
@@ -227,11 +131,9 @@ class Mirror(private val map: Map[Guid, MirrorState[_]], private val types: Map[
     *
     * @param a            The value
     * @param identifiable Provides Id for the value
-    * @param mCodecA      MirrorCodec for the value
-    * @tparam A           Type of the value
     * @return             New Mirror with updated value
     */
-  def updated[A](a: A)(implicit identifiable: Identifiable[A], mCodecA: MirrorCodec[A]): DeltaIO[Mirror] = for {
+  def updated(a: A)(implicit identifiable: Identifiable[A]): DeltaIO[U, Mirror[U, A, D]] = for {
     revision <- getGuid
   } yield updated(a, revision)
 
@@ -242,11 +144,9 @@ class Mirror(private val map: Map[Guid, MirrorState[_]], private val types: Map[
     *
     * @param id           The id of the value
     * @param a            The value
-    * @param mCodecA      MirrorCodec for the value
-    * @tparam A           Type of the value
     * @return             New Mirror with updated value
     */
-  def updated[A](id: Id[A], a: A)(implicit mCodecA: MirrorCodec[A]): DeltaIO[Mirror] = for {
+  def updated(id: Id[A], a: A): DeltaIO[U, Mirror[U, A, D]] = for {
     revision <- getGuid
   } yield updated(id, a, revision)
 
@@ -257,11 +157,9 @@ class Mirror(private val map: Map[Guid, MirrorState[_]], private val types: Map[
     * @param a            The value
     * @param revision     The revision of the value
     * @param identifiable Provides Id for the value
-    * @param mCodecA      MirrorCodec for the value
-    * @tparam A           Type of the value
     * @return
     */
-  def updated[A](a: A, revision: Guid)(implicit identifiable: Identifiable[A], mCodecA: MirrorCodec[A]): Mirror = updated(identifiable.id(a), a, revision)
+  def updated(a: A, revision: Guid)(implicit identifiable: Identifiable[A]): Mirror[U, A, D] = updated(identifiable.id(a), a, revision)
 
   /**
     * Update the mirror to contain a value at a specified revision.
@@ -270,19 +168,18 @@ class Mirror(private val map: Map[Guid, MirrorState[_]], private val types: Map[
     * @param id           The id of the value
     * @param a            The value
     * @param revision     The revision of the value
-    * @param mCodecA      MirrorCodec for the value
-    * @tparam A           Type of the value
     * @return
     */
-  def updated[A](id: Id[A], a: A, revision: Guid)(implicit mCodecA: MirrorCodec[A]): Mirror = {
+  def updated(id: Id[A], a: A, revision: Guid): Mirror[U, A, D] = {
     // Updated map for this data item, using the results of update, and new revision
-    val map2 = map.updated(id.guid, MirrorState(a, revision, mCodecA))
+    val map2 = map.updated(id, MirrorState(a, revision))
 
-    // Updated mirror with the updated map, plus updated incoming refs, and with the MirrorCodec added
-    // in case we don't have it already
-    new Mirror(map2, types.updated(mCodecA.mirrorType, mCodecA))
+    // Updated mirror with the updated map
+    new Mirror(map2)
 
     // TODO restore Incoming/outgoing refs version below
+    //, plus updated incoming refs, and with the MirrorCodec added
+    // in case we don't have it already
 //    // Update refs in the updated data
 //    val updateResult = mCodecA.deltaCodec.updateRefs(RefUpdateResult.noRefs(a), this)
 //
@@ -354,14 +251,14 @@ class Mirror(private val map: Map[Guid, MirrorState[_]], private val types: Map[
     * @param id Id of data to remove
     * @return   New mirror with data item not present
     */
-  def removed[A](id: Id[A]): Mirror = {
+  def removed(id: Id[A]): Mirror[U, A, D] = {
     getState(id).fold{
       this
     }{
       // First remove the data item from map
       // Then update the incoming refs of everything the data item referred to, to
       // remove the data item.
-      _ => updateMap(map - id.guid)
+      _ => updateMap(map - id)
 
       // TODO restore Incoming/outgoing refs version below
 //      state =>

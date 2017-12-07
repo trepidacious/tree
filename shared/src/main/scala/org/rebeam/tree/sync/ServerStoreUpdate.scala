@@ -4,8 +4,8 @@ import org.rebeam.tree.sync.Sync._
 import DeltaIORun._
 import org.rebeam.tree.Delta
 
-sealed trait ServerStoreUpdate[A, D <: Delta[A]] {
-  def append(e: ServerStoreUpdate[A, D])(implicit refAdder: RefAdder[A]): ServerStoreUpdate[A, D]
+sealed trait ServerStoreUpdate[U, A, D <: Delta[U, A]] {
+  def append(e: ServerStoreUpdate[U, A, D])(implicit refAdder: RefAdder[A]): ServerStoreUpdate[U, A, D]
 }
 
 object ServerStoreUpdate {
@@ -14,8 +14,8 @@ object ServerStoreUpdate {
     * will always be a ServerStoreFullUpdate
     * @param modelAndId Model and id
     */
-  case class ServerStoreFullUpdate[A, D <: Delta[A]](modelAndId: ModelAndId[A]) extends ServerStoreUpdate[A, D] {
-    def append(e: ServerStoreUpdate[A, D])(implicit refAdder: RefAdder[A]): ServerStoreUpdate[A, D] = {
+  case class ServerStoreFullUpdate[U, A, D <: Delta[U, A]](modelAndId: ModelAndId[A]) extends ServerStoreUpdate[U, A, D] {
+    def append(e: ServerStoreUpdate[U, A, D])(implicit refAdder: RefAdder[A]): ServerStoreUpdate[U, A, D] = {
       e match {
         // Full 1 + full 2 = full 2
         case f@ServerStoreFullUpdate(_) => f
@@ -41,10 +41,10 @@ object ServerStoreUpdate {
     *                         they were applied, with JSON encoding and context for execution
     * @param updatedModelId   The id of the model after the updates
     */
-  case class ServerStoreIncrementalUpdate[A, D <: Delta[A]](baseModelId: ModelId,
-                                             deltas: Seq[DeltaWithIC[A, D]],
-                                             updatedModelId: ModelId) extends ServerStoreUpdate[A, D] {
-    def append(e: ServerStoreUpdate[A, D])(implicit refAdder: RefAdder[A]): ServerStoreUpdate[A, D] = {
+  case class ServerStoreIncrementalUpdate[U, A, D <: Delta[U, A]](baseModelId: ModelId,
+                                             deltas: Seq[DeltaWithIC[U, A, D]],
+                                             updatedModelId: ModelId) extends ServerStoreUpdate[U, A, D] {
+    def append(e: ServerStoreUpdate[U, A, D])(implicit refAdder: RefAdder[A]): ServerStoreUpdate[U, A, D] = {
       e match {
         //Inc 1 + full 1 = full 1
         case f@ServerStoreFullUpdate(_) => f

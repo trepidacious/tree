@@ -70,8 +70,8 @@ object Sync {
     * @tparam A     The type of model the delta applies to
     * @tparam D     The type of delta
     */
-  case class DeltaAndId[A, D <: Delta[A]](delta: D, id: DeltaId){
-    def withContext(context: DeltaIOContext): DeltaWithIC[A, D] = DeltaWithIC(delta, id, context)
+  case class DeltaAndId[U, A, D <: Delta[U, A]](delta: D, id: DeltaId){
+    def withContext(context: DeltaIOContext): DeltaWithIC[U, A, D] = DeltaWithIC(delta, id, context)
   }
 
   /**
@@ -82,7 +82,7 @@ object Sync {
     * @tparam A       The type of model the delta applies to
     * @tparam D     The type of delta
     */
-  case class DeltaWithIC[A, D <: Delta[A]](delta: D, id: DeltaId, context: DeltaIOContext)
+  case class DeltaWithIC[U, A, D <: Delta[U, A]](delta: D, id: DeltaId, context: DeltaIOContext)
 
   /**
     * Globally likely-unique identifier for a model revision. This may be an actual guid, or a good
@@ -122,7 +122,7 @@ object Sync {
     * @tparam A The model type
     * @tparam D The type of delta
     */
-  sealed trait UpdateDelta[A, D <: Delta[A]] {
+  sealed trait UpdateDelta[U, A, D <: Delta[U, A]] {
     def id: DeltaId
   }
 
@@ -135,7 +135,7 @@ object Sync {
     * @tparam A The model type
     * @tparam D The type of delta
     */
-  case class RemoteDelta[A, D <: Delta[A]](delta: D, id: DeltaId, context: DeltaIOContext) extends UpdateDelta[A, D]
+  case class RemoteDelta[U, A, D <: Delta[U, A]](delta: D, id: DeltaId, context: DeltaIOContext) extends UpdateDelta[U, A, D]
 
   /**
     * A delta generated locally, by this client, then referenced by the server in an update
@@ -145,7 +145,7 @@ object Sync {
     * @tparam A The model type
     * @tparam D The type of delta
     */
-  case class LocalDelta[A, D <: Delta[A]](id: DeltaId, context: DeltaIOContext) extends UpdateDelta[A, D]
+  case class LocalDelta[U, A, D <: Delta[U, A]](id: DeltaId, context: DeltaIOContext) extends UpdateDelta[U, A, D]
 
   /**
     * Sealed trait of model updates sent from server to client
@@ -153,7 +153,7 @@ object Sync {
     * @tparam A The model type
     * @tparam D The type of delta
     */
-  sealed trait ModelUpdate[A, D <: Delta[A]]
+  sealed trait ModelUpdate[U, A, D <: Delta[U, A]]
 
   /**
     * An incremental update received from the server, building a new model based
@@ -165,10 +165,10 @@ object Sync {
     * @tparam A The type of model
     * @tparam D The type of delta
     */
-  case class ModelIncrementalUpdate[A, D <: Delta[A]](
+  case class ModelIncrementalUpdate[U, A, D <: Delta[U, A]](
                                         baseModelId: ModelId,
-                                        deltas: Seq[UpdateDelta[A, D]],
-                                        updatedModelId: ModelId) extends ModelUpdate[A, D]
+                                        deltas: Seq[UpdateDelta[U, A, D]],
+                                        updatedModelId: ModelId) extends ModelUpdate[U, A, D]
 
   /**
     * A full update received from server, directly setting a new model and overwriting
@@ -180,12 +180,12 @@ object Sync {
     * @tparam A The type of model
     * @tparam D The type of delta
     */
-  case class ModelFullUpdate[A, D <: Delta[A]](
+  case class ModelFullUpdate[U, A, D <: Delta[U, A]](
                                  clientId: ClientId,
-                                 model: ModelAndId[A]) extends ModelUpdate[A, D]
+                                 model: ModelAndId[A]) extends ModelUpdate[U, A, D]
 
 
-  def localDeltaDecoder[A, D <: Delta[A]]: Decoder[UpdateDelta[A, D]] =
+  def localDeltaDecoder[U, A, D <: Delta[U, A]]: Decoder[UpdateDelta[U, A, D]] =
     Decoder.instance(
       c => {
         val o = c.downField("local")
@@ -196,7 +196,7 @@ object Sync {
       }
     )
 
-  def remoteDeltaDecoder[A, D <: Delta[A]](implicit dd: Decoder[D]): Decoder[UpdateDelta[A, D]] =
+  def remoteDeltaDecoder[U, A, D <: Delta[U, A]](implicit dd: Decoder[D]): Decoder[UpdateDelta[U, A, D]] =
     Decoder.instance(
       c => {
         val o = c.downField("remote")
@@ -208,33 +208,33 @@ object Sync {
       }
     )
 
-  def updateDeltaDecoder[A, D <: Delta[A]](implicit dd: Decoder[D]): Decoder[UpdateDelta[A, D]] =
-    localDeltaDecoder[A, D] or remoteDeltaDecoder[A, D]
+  def updateDeltaDecoder[U, A, D <: Delta[U, A]](implicit dd: Decoder[D]): Decoder[UpdateDelta[U, A, D]] =
+    localDeltaDecoder[U, A, D] or remoteDeltaDecoder[U, A, D]
 
-  def fullUpdateDecoder[A, D <: Delta[A]](implicit d: Decoder[A]): Decoder[ModelUpdate[A, D]] =
+  def fullUpdateDecoder[U, A, D <: Delta[U, A]](implicit d: Decoder[A]): Decoder[ModelUpdate[U, A, D]] =
     Decoder.instance(c => {
       val o = c.downField("full")
       for {
         clientId <- o.downField("clientId").as[ClientId]
         model <- o.downField("model").as[A]
         id <- o.downField("id").as[ModelId]
-      } yield ModelFullUpdate[A, D](clientId, ModelAndId(model, id))
+      } yield ModelFullUpdate[U, A, D](clientId, ModelAndId(model, id))
     })
 
-  def incUpdateDecoder[A, D <: Delta[A]](implicit dd: Decoder[D]): Decoder[ModelUpdate[A, D]] = {
-    implicit val udd: Decoder[UpdateDelta[A, D]] = updateDeltaDecoder[A, D](dd)
+  def incUpdateDecoder[U, A, D <: Delta[U, A]](implicit dd: Decoder[D]): Decoder[ModelUpdate[U, A, D]] = {
+    implicit val udd: Decoder[UpdateDelta[U, A, D]] = updateDeltaDecoder[U, A, D](dd)
     Decoder.instance(c => {
       val o = c.downField("inc")
       for {
         baseModelId <- o.downField("baseModelId").as[ModelId]
         updatedModelId <- o.downField("updatedModelId").as[ModelId]
-        deltas <- o.downField("deltas").as[Vector[UpdateDelta[A, D]]]
-      } yield ModelIncrementalUpdate[A, D](baseModelId, deltas, updatedModelId)
+        deltas <- o.downField("deltas").as[Vector[UpdateDelta[U, A, D]]]
+      } yield ModelIncrementalUpdate[U, A, D](baseModelId, deltas, updatedModelId)
     })
   }
 
-  def updateDecoder[A, D <: Delta[A]](implicit d: Decoder[A], dd: Decoder[D]): Decoder[ModelUpdate[A, D]] =
-    fullUpdateDecoder[A, D] or incUpdateDecoder[A, D]
+  def updateDecoder[U, A, D <: Delta[U, A]](implicit d: Decoder[A], dd: Decoder[D]): Decoder[ModelUpdate[U, A, D]] =
+    fullUpdateDecoder[U, A, D] or incUpdateDecoder[U, A, D]
 
   /**
     * Decode incoming messages from the client.
@@ -244,7 +244,7 @@ object Sync {
     * @tparam A           The type of model
     * @return             A decoder of DeltaWithIJ[T]
     */
-  def clientMsgDecoder[A, D <: Delta[A]](implicit deltaDecoder: Decoder[D]): Decoder[DeltaAndId[A, D]] = Decoder.instance(c => {
+  def clientMsgDecoder[U, A, D <: Delta[U, A]](implicit deltaDecoder: Decoder[D]): Decoder[DeltaAndId[U, A, D]] = Decoder.instance(c => {
 
     val o = c.downField("commit")
 
@@ -261,7 +261,7 @@ object Sync {
     } yield DeltaAndId(delta, id)
   })
 
-  def clientMsgEncoder[A, D <: Delta[A]](implicit deltaEncoder: Encoder[D]): Encoder[DeltaAndId[A, D]] = Encoder.instance{
+  def clientMsgEncoder[U, A, D <: Delta[U, A]](implicit deltaEncoder: Encoder[D]): Encoder[DeltaAndId[U, A, D]] = Encoder.instance{
     dij => Json.obj(
       "commit" -> Json.obj(
         "delta" -> dij.delta.asJson,
@@ -273,7 +273,7 @@ object Sync {
 
   //Server side
 
-  def serverStoreUpdateEncoder[A, D <: Delta[A]](clientId: ClientId)(implicit encoder: Encoder[A], dEncoder: Encoder[D]): Encoder[ServerStoreUpdate[A, D]] = Encoder.instance {
+  def serverStoreUpdateEncoder[U, A, D <: Delta[U, A]](clientId: ClientId)(implicit encoder: Encoder[A], dEncoder: Encoder[D]): Encoder[ServerStoreUpdate[U, A, D]] = Encoder.instance {
 
     case ServerStoreFullUpdate(modelAndId) =>
       Json.obj(
@@ -316,6 +316,5 @@ object Sync {
         )
       )
   }
-
 
 }

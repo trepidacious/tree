@@ -26,12 +26,12 @@ import cats.syntax.either._
   * @tparam A             The type of model in the store
   * @tparam D             The type of delta on the model
   */
-class ServerStore[A: ModelIdGen, D <: Delta[A]](initialModel: A) {
+class ServerStore[U, A: ModelIdGen, D <: Delta[U, A]](initialModel: A) {
 
   private var nextId: Long = 0
   private var m: ModelAndId[A] = ModelAndId(initialModel, makeId(initialModel))
   private val lock = Lock()
-  private val observers = new WeakHashSet[Observer[ServerStoreUpdate[A, D]]]()
+  private val observers = new WeakHashSet[Observer[ServerStoreUpdate[U, A, D]]]()
 
   private def makeId(model: A): ModelId = {
     val mId = implicitly[ModelIdGen[A]].genId(initialModel).getOrElse(ModelId(nextId))
@@ -39,7 +39,7 @@ class ServerStore[A: ModelIdGen, D <: Delta[A]](initialModel: A) {
     mId
   }
 
-  def applyDelta(d: DeltaAndId[A, D], context: DeltaIOContext)(implicit refAdder: RefAdder[A]): Unit = lock {
+  def applyDelta(d: DeltaAndId[U, A, D], context: DeltaIOContext)(implicit refAdder: RefAdder[A]): Unit = lock {
     val baseModelId = m.id
 
     val result = d.runWith(m.model, context)
@@ -52,12 +52,12 @@ class ServerStore[A: ModelIdGen, D <: Delta[A]](initialModel: A) {
     observers.foreach(_.observe(ServerStoreIncrementalUpdate(baseModelId, Vector(d.withContext(context)), newId)))
   }
 
-  def observe(o: Observer[ServerStoreUpdate[A, D]]): Unit = lock {
+  def observe(o: Observer[ServerStoreUpdate[U, A, D]]): Unit = lock {
     observers.add(o)
     o.observe(ServerStoreFullUpdate(m))
   }
 
-  def unobserve(o: Observer[ServerStoreUpdate[A, D]]): Unit = lock{
+  def unobserve(o: Observer[ServerStoreUpdate[U, A, D]]): Unit = lock{
     observers.remove(o)
   }
 
@@ -67,17 +67,17 @@ class ServerStore[A: ModelIdGen, D <: Delta[A]](initialModel: A) {
   * Uses DeltaWithIJs encoded as JSON for incoming messages, and ModelUpdates encoded to JSON for
   * outgoing messages.
   */
-private class ServerStoreValueDispatcher[T, D <: Delta[T]]
-  (val store: ServerStore[T, D], val clientId: ClientId, contextSource: DeltaIOContextSource)
+private class ServerStoreValueDispatcher[U, T, D <: Delta[U, T]]
+  (val store: ServerStore[U, T, D], val clientId: ClientId, contextSource: DeltaIOContextSource)
   (implicit encoder: Encoder[T], deltaDecoder: Decoder[D], deltaEncoder: Encoder[D], refAdder: RefAdder[T])
-  extends Dispatcher[ServerStoreUpdate[T, D], Json, Json] {
+  extends Dispatcher[ServerStoreUpdate[U, T, D], Json, Json] {
 
-  private var pendingUpdateToClient = none[ServerStoreUpdate[T, D]]
+  private var pendingUpdateToClient = none[ServerStoreUpdate[U, T, D]]
 
-  private val updateEncoder = serverStoreUpdateEncoder[T, D](clientId)
+  private val updateEncoder = serverStoreUpdateEncoder[U, T, D](clientId)
 
   //Store pending update
-  override def modelUpdated(update: ServerStoreUpdate[T, D]): Unit = {
+  override def modelUpdated(update: ServerStoreUpdate[U, T, D]): Unit = {
 //    println("New update for client id " + clientId.id + ": " + update)
 
     pendingUpdateToClient = Some(pendingUpdateToClient.fold(update)(
@@ -100,7 +100,7 @@ private class ServerStoreValueDispatcher[T, D <: Delta[T]]
 //      println("Pong!")
     } else {
 
-      val deltaAndId = clientMsgDecoder[T, D].decodeJson(msg)
+      val deltaAndId = clientMsgDecoder[U, T, D].decodeJson(msg)
 
       deltaAndId.fold (
         error => println("Error decoding client message: " + error + "\nMessage: " + msg),
@@ -117,8 +117,8 @@ private class ServerStoreValueDispatcher[T, D <: Delta[T]]
 }
 
 object ServerStoreValueExchange {
-  def apply[M, D <: Delta[M]]
-    (store: ServerStore[M, D], clientId: ClientId, contextSource: DeltaIOContextSource)
+  def apply[U, M, D <: Delta[U, M]]
+    (store: ServerStore[U, M, D], clientId: ClientId, contextSource: DeltaIOContextSource)
     (implicit encoder: Encoder[M], decoder: Decoder[M], deltaDecoder: Decoder[D], deltaEncoder: Encoder[D], refAdder: RefAdder[M]): Exchange[WebSocketFrame, WebSocketFrame] = {
 
     val dispatcher = new ServerStoreValueDispatcher(store, clientId, contextSource)
