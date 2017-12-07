@@ -10,24 +10,14 @@ import org.rebeam.tree.sync.{Guid, Ref => TreeRef}
 import Searchable._
 
 trait Root {
-  def cursorAt[A, L](ref: TreeRef[A], location: L)(implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, L]]
+  def cursorAt[A, D <: Delta[A], L](ref: TreeRef[A], location: L)(implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, D, L]]
   def refRevisions(refGuids: Set[Guid]): Map[Guid, Guid]
 }
 
-private case class ParentAction[M](parent: Parent[M], delta: Delta[M], deltaJs: Json) extends Action {
-  def callback: Callback = parent.callback(delta, deltaJs)
-}
 
-// Note that these will be compared using encoder as well, but we really expect encoder to be the
-// same for actions that need to be compared
-private case class ActAction[M, A <: Delta[M]](parent: Parent[M], actionDelta: A, encoder: Encoder[A]) extends Action {
-  def callback: Callback = parent.callback(actionDelta, Json.obj("action" -> encoder(actionDelta)))
-}
 
-// Note that these will be compared using encoder as well, but we really expect encoder to be the
-// same for actions that need to be compared
-private case class SetAction[M](parent: Parent[M], value: M, encoder: Encoder[M]) extends Action {
-  def callback: Callback = parent.callback(ValueDelta(value), Json.obj("value" -> encoder(value)))
+private case class ParentAction[M, D <: Delta[M]](parent: Parent[M, D], delta: D) extends Action {
+  def callback: Callback = parent.callback(delta)
 }
 
 /**
@@ -36,23 +26,26 @@ private case class SetAction[M](parent: Parent[M], value: M, encoder: Encoder[M]
   * as well as means to zoom into the model (using lenses and similar) to produce
   * cursors for child data.
   *
-  * Also provides a Mirror for resolving refs
+  * Deltas must be of a known type.
+  *
+  * Also provides a Root for resolving refs
   *
   * Most commonly used by a view of a position in a model, since it provides the
   * data to display, and a way of applying deltas to the data at that position.
   *
   *
   * @tparam M     The type of model for the view.
+  * @tparam D     The type of delta we can perform on the model
   * @tparam L     The type of location the cursor is viewing
   */
-trait Cursor[M, L] extends Parent[M] {
+trait Cursor[M, D <: Delta[M], L] extends Parent[M, D] {
 
   /**
     * The parent of the view using this Cursor. Used to convert
     *               deltas into Callbacks that will "run" the delta.
     * @return parent
     */
-  def parent: Parent[M]
+  def parent: Parent[M, D]
 
   /**
     * The actual model value for the child view - the data to display.
@@ -79,49 +72,34 @@ trait Cursor[M, L] extends Parent[M] {
   def allModelRefGuids: Set[Guid]
 
   //Just pass through callback to parent for convenience
-  def callback(delta: Delta[M], deltaJs: Json): Callback = action(delta, deltaJs).callback
+  def callback(delta: D): Callback = action(delta).callback
 
-  def action(delta: Delta[M], deltaJs: Json): Action = ParentAction(parent, delta, deltaJs)
+  def action(delta: D): Action = ParentAction(parent, delta)
 
-  def act[A <: Delta[M]](actionDelta: A)(implicit encoder: Encoder[A]): Action =
-    ActAction(parent, actionDelta, encoder)
-//    callback(actionDelta, Json.obj("action" -> encoder(actionDelta)))
+  def act(delta: D): Action = action(delta)
 
-  def set(value: M)(implicit encoder: Encoder[M]): Action =
-    SetAction(parent, value, encoder)
-//    callback(ValueDelta(newModel), Json.obj("value" -> encoder(newModel)))
+  // FIXME "set" could be provided in the case where D is a known delta type, e.  g.
+  // IntValueDelta, and we could provide set(i: Int)
 
-  // FIXME Zoomer and zoom in this form are a workaround for not being able to infer
-  // type C from the lens itself in the nicer form:
-  //  def zoom[C, L <: Lens[M, C]: OuterEncoder](lens: L): Cursor[C] =
-  //  Cursor[C](LensParent[M, C, L](parent, lens), lens.get(model))
-//  class Zoomer[C] {
-//    def apply[L <: Lens[M, C]: OuterEncoder](lens: L): Cursor[C] =
-//      CursorBasic[C](LensParent[M, C, L](parent, lens), lens.get(model))
-//  }
-//  def zoom[C] = new Zoomer[C]()
-
-  def zoom[C](lens: LensN[M, C])(implicit s: Searchable[C, Guid]): Cursor[C, L] = {
+  def zoom[C, E <: Delta[C]](lens: LensN[M, C], childToParentDelta: E => D)(implicit s: Searchable[C, Guid]): Cursor[C, E, L] = {
     val newModel = lens.get(model)
     val newRefGuids = newModel.allRefGuids
-    CursorBasic[C, L](LensNParent(parent, lens), newModel, location, root, newRefGuids)
+    CursorBasic[C, E, L](ChildParent(parent, childToParentDelta), newModel, location, root, newRefGuids)
   }
 
-  def zoomPrism[C](prismN: PrismN[M, C])(implicit s: Searchable[C, Guid]): Option[Cursor[C, L]] = {
-    prismN.getOption(model).map(c => CursorBasic[C, L](PrismNParent[M, C](parent, prismN), c, location, root, allModelRefGuids))
-  }
+  //FIXME prism
 
-  def label(label: String): Cursor[M, String] = CursorBasic(parent, model, label, root, allModelRefGuids)
+  def label(label: String): Cursor[M, D, String] = CursorBasic(parent, model, label, root, allModelRefGuids)
 
-  def move[N](newLocation: N): Cursor[M, N] = CursorBasic(parent, model, newLocation, root, allModelRefGuids)
+  def move[N](newLocation: N): Cursor[M, D, N] = CursorBasic(parent, model, newLocation, root, allModelRefGuids)
 
-  def withoutLocation: Cursor[M, Unit] = move(())
+  def withoutLocation: Cursor[M, D, Unit] = move(())
 
-  def followRef[A](ref: TreeRef[A])(implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, L]] = root.cursorAt(ref, location)
+  def followRef[A, E <: Delta[A]](ref: TreeRef[A])(implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, E, L]] = root.cursorAt(ref, location)
 
 }
 
-private case class CursorBasic[M, L](parent: Parent[M], model: M, location: L, root: Root, allModelRefGuids: Set[Guid]) extends Cursor[M, L]
+private case class CursorBasic[M, D <: Delta[M], L](parent: Parent[M, D], model: M, location: L, root: Root, allModelRefGuids: Set[Guid]) extends Cursor[M, D, L]
 
 object Cursor {
 
@@ -131,7 +109,7 @@ object Cursor {
     * @tparam L   Location type
     * @return     Reusability for cursor
     */
-  implicit def cursorReusability[M, L]: Reusability[Cursor[M, L]] =
+  implicit def cursorReusability[M, D <: Delta[M], L]: Reusability[Cursor[M, D, L]] =
     Reusability.fn {
       case (c1, c2) =>
         // First check for changes in parent, model or location (i.e. everything except
@@ -153,50 +131,51 @@ object Cursor {
     }
 
   object RootNone extends Root {
-    def cursorAt[A, L](ref: TreeRef[A], location: L)
-                      (implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, L]] = None
+    def cursorAt[A, D <: Delta[A], L](ref: TreeRef[A], location: L)
+                      (implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, D, L]] = None
+
     override def refRevisions(refGuids: Set[Guid]): Map[Guid, Guid] = Map.empty
   }
 
-  def apply[M, L](parent: Parent[M], model: M, location: L, root: Root)(implicit s: Searchable[M, Guid]): Cursor[M, L] =
+  def apply[M, D <: Delta[M], L](parent: Parent[M, D], model: M, location: L, root: Root)(implicit s: Searchable[M, Guid]): Cursor[M, D, L] =
     CursorBasic(parent, model, location, root, model.allRefGuids)
 
-  implicit class ListCursor[C, L](cursor: Cursor[List[C], L]) {
-    def zoomI(index: Int)(implicit s: Searchable[C, Guid]): Option[Cursor[C, L]] = {
-      val optionalI: OptionalI[C] = OptionalI[C](index)
-      optionalI.getOption(cursor.model).map { c =>
-        Cursor[C, L](OptionalIParent(cursor.parent, optionalI), c, cursor.location, cursor.root)
-      }
-    }
-
-    def zoomAllI(implicit s: Searchable[C, Guid]): List[Cursor[C, L]] = cursor.model.zipWithIndex.flatMap {
-      case (a, i) => cursor.zoomI(i)
-    }
-
-    def zoomMatch[F <: C => Boolean](f: F)(implicit fEncoder: Encoder[F], s: Searchable[C, Guid]): Option[Cursor[C, L]] = {
-      val optionalMatch: OptionalMatch[C, F] = OptionalMatch[C, F](f)
-      optionalMatch.getOption(cursor.model).map { c =>
-        Cursor[C, L](OptionalMatchParent(cursor.parent, optionalMatch), c, cursor.location, cursor.root)
-      }
-    }
-
-    def zoomAllMatches[F <: C => Boolean](cToF: C => F)(implicit fEncoder: Encoder[F], s: Searchable[C, Guid]): List[Cursor[C, L]] =
-      cursor.model.map(cToF).flatMap(zoomMatch(_))
-  }
-
-  implicit class OptionCursor[C, L](cursor: Cursor[Option[C], L]) {
-    def zoomOption(implicit s: Searchable[C, Guid]): Option[Cursor[C, L]] = {
-      cursor.model.map { c =>
-        Cursor[C, L](OptionParent[C](cursor.parent), c, cursor.location, cursor.root)
-      }
-    }
-  }
-
-  implicit class MirrorCursor[L](cursor: Cursor[Mirror, L]) {
-    def zoomRef[A: MirrorCodec](ref: TreeRef[A])(implicit s: Searchable[A, Guid]): Option[Cursor[A, L]] = {
-      cursor.model(ref).map { data =>
-        Cursor[A, L](MirrorParent[A](cursor.parent, ref), data, cursor.location, cursor.root)
-      }
-    }
-  }
+//  implicit class ListCursor[C, L](cursor: Cursor[List[C], L]) {
+//    def zoomI(index: Int)(implicit s: Searchable[C, Guid]): Option[Cursor[C, L]] = {
+//      val optionalI: OptionalI[C] = OptionalI[C](index)
+//      optionalI.getOption(cursor.model).map { c =>
+//        Cursor[C, L](OptionalIParent(cursor.parent, optionalI), c, cursor.location, cursor.root)
+//      }
+//    }
+//
+//    def zoomAllI(implicit s: Searchable[C, Guid]): List[Cursor[C, L]] = cursor.model.zipWithIndex.flatMap {
+//      case (a, i) => cursor.zoomI(i)
+//    }
+//
+//    def zoomMatch[F <: C => Boolean](f: F)(implicit fEncoder: Encoder[F], s: Searchable[C, Guid]): Option[Cursor[C, L]] = {
+//      val optionalMatch: OptionalMatch[C, F] = OptionalMatch[C, F](f)
+//      optionalMatch.getOption(cursor.model).map { c =>
+//        Cursor[C, L](OptionalMatchParent(cursor.parent, optionalMatch), c, cursor.location, cursor.root)
+//      }
+//    }
+//
+//    def zoomAllMatches[F <: C => Boolean](cToF: C => F)(implicit fEncoder: Encoder[F], s: Searchable[C, Guid]): List[Cursor[C, L]] =
+//      cursor.model.map(cToF).flatMap(zoomMatch(_))
+//  }
+//
+//  implicit class OptionCursor[C, L](cursor: Cursor[Option[C], L]) {
+//    def zoomOption(implicit s: Searchable[C, Guid]): Option[Cursor[C, L]] = {
+//      cursor.model.map { c =>
+//        Cursor[C, L](OptionParent[C](cursor.parent), c, cursor.location, cursor.root)
+//      }
+//    }
+//  }
+//
+//  implicit class MirrorCursor[L](cursor: Cursor[Mirror, L]) {
+//    def zoomRef[A: MirrorCodec](ref: TreeRef[A])(implicit s: Searchable[A, Guid]): Option[Cursor[A, L]] = {
+//      cursor.model(ref).map { data =>
+//        Cursor[A, L](MirrorParent[A](cursor.parent, ref), data, cursor.location, cursor.root)
+//      }
+//    }
+//  }
 }

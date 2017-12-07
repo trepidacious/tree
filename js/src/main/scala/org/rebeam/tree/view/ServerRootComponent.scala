@@ -11,77 +11,86 @@ import scala.util.{Failure, Success}
 import io.circe._
 import io.circe.parser._
 import io.circe.syntax._
-import org.rebeam.tree.ref.{Mirror, MirrorAndId, MirrorCodec}
+//import org.rebeam.tree.ref.{Mirror, MirrorCodec}
 
 object ServerRootComponent {
 
-  trait RootSource[R] {
-    def rootFor(rootModel: R, parent: Parent[R]): Root
+  trait RootSource[R, D <: Delta[R]] {
+    def rootFor(rootModel: R, parent: Parent[R, D]): Root
   }
 
 
-  private class MirrorRootSource extends RootSource[Mirror] {
-    def rootFor(rootModel: Mirror, parent: Parent[Mirror]): Root = new Root {
-      def cursorAt[A, L](ref: TreeRef[A], location: L)
-                        (implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, L]] = {
-        rootModel.apply(ref).map { data =>
-          Cursor[A, L](MirrorParent[A](parent, ref), data, location, this)
-        }
-      }
-      def refRevisions(refGuids: Set[Guid]): Map[Guid, Guid] = {
-        refGuids.flatMap(refGuid => rootModel.revisionOf(refGuid).map(refGuid -> _)).toMap
-      }
-    }
+//  private class MirrorRootSource extends RootSource[Mirror] {
+//    def rootFor(rootModel: Mirror, parent: Parent[Mirror]): Root = new Root {
+//      def cursorAt[A, L](ref: TreeRef[A], location: L)
+//                        (implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, L]] = {
+//        rootModel.apply(ref).map { data =>
+//          Cursor[A, L](MirrorParent[A](parent, ref), data, location, this)
+//        }
+//      }
+//      def refRevisions(refGuids: Set[Guid]): Map[Guid, Guid] = {
+//        refGuids.flatMap(refGuid => rootModel.revisionOf(refGuid).map(refGuid -> _)).toMap
+//      }
+//    }
+//  }
+//
+//  implicit val mirrorRootSource: RootSource[Mirror] = new MirrorRootSource
+//
+//  private class MirrorAndIdRootSource[M] extends RootSource[MirrorAndId[M]] {
+//    // Keep the same lens instance - reduces changes in cursor data, reducing redraws
+//    private val lens = MirrorAndId.mirror[M]
+//    def rootFor(rootModel: MirrorAndId[M], parent: Parent[MirrorAndId[M]]): Root = new Root {
+//      def cursorAt[A, L](ref: TreeRef[A], location: L)
+//                        (implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, L]] = {
+//        rootModel.mirror.apply(ref).map { data =>
+//          val lensParent = LensNParent[MirrorAndId[M], Mirror](parent, lens)
+//          Cursor[A, L](MirrorParent[A](lensParent, ref), data, location, this)
+//        }
+//      }
+//      def refRevisions(refGuids: Set[Guid]): Map[Guid, Guid] = {
+//        refGuids.flatMap(refGuid => rootModel.mirror.revisionOf(refGuid).map(refGuid -> _)).toMap
+//      }
+//    }
+//  }
+//
+//  implicit def mirrorAndIdRootSource[M]: RootSource[MirrorAndId[M]] = new MirrorAndIdRootSource
+
+  private class NoRootSource[R, D <: Delta[R]] extends RootSource[R, D] {
+    def rootFor(rootModel: R, parent: Parent[R, D]): Root = Cursor.RootNone
   }
 
-  implicit val mirrorRootSource: RootSource[Mirror] = new MirrorRootSource
+  def noRootSource[R, D <: Delta[R]]: RootSource[R, D] = new NoRootSource[R, D]
 
-  private class MirrorAndIdRootSource[M] extends RootSource[MirrorAndId[M]] {
-    // Keep the same lens instance - reduces changes in cursor data, reducing redraws
-    private val lens = MirrorAndId.mirror[M]
-    def rootFor(rootModel: MirrorAndId[M], parent: Parent[MirrorAndId[M]]): Root = new Root {
-      def cursorAt[A, L](ref: TreeRef[A], location: L)
-                        (implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, L]] = {
-        rootModel.mirror.apply(ref).map { data =>
-          val lensParent = LensNParent[MirrorAndId[M], Mirror](parent, lens)
-          Cursor[A, L](MirrorParent[A](lensParent, ref), data, location, this)
-        }
-      }
-      def refRevisions(refGuids: Set[Guid]): Map[Guid, Guid] = {
-        refGuids.flatMap(refGuid => rootModel.mirror.revisionOf(refGuid).map(refGuid -> _)).toMap
-      }
-    }
-  }
+  case class Props[R, D <: Delta[R], P](p: P, render: Cursor[R, D, P] => ReactElement, wsUrl: String, noData: ReactElement)
 
-  implicit def mirrorAndIdRootSource[M]: RootSource[MirrorAndId[M]] = new MirrorAndIdRootSource
+  case class State[R, D <: Delta[R]](clientState: Option[ClientState[R, D]], ws: Option[WebSocket], tick: Option[SetIntervalHandle])
 
-  private class NoRootSource[R] extends RootSource[R] {
-    def rootFor(rootModel: R, parent: Parent[R]): Root = Cursor.RootNone
-  }
+  class Backend[R, D <: Delta[R], P](scope: BackendScope[Props[R, D, P], State[R, D]])
+    (implicit
+     decoder: Decoder[R],
+     deltaDecoder: Decoder[D],
+     deltaEncoder: Encoder[D],
+     idGen: ModelIdGen[R],
+     contextSource: DeltaIOContextSource,
+     rootSource: RootSource[R, D],
+     refAdder: RefAdder[R],
+     searchable: Searchable[R, Guid]) {
 
-  def noRootSource[R]: RootSource[R] = new NoRootSource[R]
+    implicit val cme = clientMsgEncoder[R, D]
 
-  case class Props[R, P](p: P, render: Cursor[R, P] => ReactElement, wsUrl: String, noData: ReactElement)
-
-  case class State[R](clientState: Option[ClientState[R]], ws: Option[WebSocket], tick: Option[SetIntervalHandle])
-
-  class Backend[R, P](scope: BackendScope[Props[R, P], State[R]])
-    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) {
-
-    implicit val cme = clientMsgEncoder[R]
-
-    val deltaToCallback: (Delta[R], Json) => Callback =
-      (delta: Delta[R], deltaJs: Json) =>
+    val deltaToCallback: D => Callback =
+      (delta: D) =>
         for {
           s <- scope.state
           _ <- s.clientState match {
             case None =>
               // TODO implement
               Callback{println("Delta before we have a clientState! Should queue deltas?")}
+
             case Some(cs) => {
               //SIDE-EFFECT: Note this is the point at which we generate the context
               val (newCS, id) = cs.apply(delta, contextSource.getContext)
-              val dij = DeltaWithIJ(delta, id, deltaJs)
+              val dij = DeltaAndId[R, D](delta, id)
               for {
                 _ <- scope.setState(s.copy(clientState = Some(newCS)))
                 // TODO should store up deltas if we don't have a websocket, and send when we do
@@ -94,11 +103,11 @@ object ServerRootComponent {
           }
         } yield {}
 
-    val rootParent = RootParent[R](deltaToCallback)
+    val rootParent = RootParent[R, D](deltaToCallback)
 
-    def render(props: Props[R, P], state: State[R]) = {
+    def render(props: Props[R, D, P], state: State[R, D]) = {
       state.clientState.map { cs =>
-        val cursorP: Cursor[R, P] = Cursor(rootParent, cs.model, props.p, rootSource.rootFor(cs.model, rootParent))
+        val cursorP: Cursor[R, D, P] = Cursor(rootParent, cs.model, props.p, rootSource.rootFor(cs.model, rootParent))
         props.render(cursorP)
       }.getOrElse(
         props.noData
@@ -131,12 +140,12 @@ object ServerRootComponent {
 
           parse(msg).fold[Unit](
             pf => println("Invalid JSON from server " + pf),
-            json => updateDecoder[R].decodeJson(json).fold(
+            json => updateDecoder[R, D].decodeJson(json).fold(
               df => println("Could not decode JSON from server " + df + ":\n" + msg),
               update => {
 
                 val newCSX = direct.state.clientState.fold(
-                  ClientState.fromFirstUpdate[R](update)
+                  ClientState.fromFirstUpdate[R, D](update)
                 )(
                   _.update(update)
                 )
@@ -196,27 +205,52 @@ object ServerRootComponent {
 
   }
 
-  def factory[R, P]
+  def factory[R, D <: Delta[R], P]
     (noData: ReactElement, wsUrl: String)
-    (render: Cursor[R, P] => ReactElement)
-    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) = {
-    val c = ctor[R, P](decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder, searchable)
-    (page: P) => c(Props[R, P](page, render, wsUrl, noData))
+    (render: Cursor[R, D, P] => ReactElement)
+    (implicit
+     decoder: Decoder[R],
+     deltaDecoder: Decoder[D],
+     deltaEncoder: Encoder[D],
+     idGen: ModelIdGen[R],
+     contextSource: DeltaIOContextSource,
+     rootSource: RootSource[R, D],
+     refAdder: RefAdder[R],
+     searchable: Searchable[R, Guid]) = {
+    val c = ctor[R, D, P](decoder, deltaDecoder, deltaEncoder, idGen, contextSource, rootSource, refAdder, searchable)
+    (page: P) => c(Props[R, D, P](page, render, wsUrl, noData))
   }
 
 
-  def apply[R]
+  def apply[R, D <: Delta[R]]
   (noData: ReactElement, wsUrl: String)
-  (render: Cursor[R, Unit] => ReactElement)
-  (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) = {
-    val c = ctor[R, Unit](decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder, searchable)
-    c(Props[R, Unit]((), render, wsUrl, noData))
+  (render: Cursor[R, D, Unit] => ReactElement)
+  (implicit
+   decoder: Decoder[R],
+   deltaDecoder: Decoder[D],
+   deltaEncoder: Encoder[D],
+   idGen: ModelIdGen[R],
+   contextSource: DeltaIOContextSource,
+   rootSource: RootSource[R, D],
+   refAdder: RefAdder[R],
+   searchable: Searchable[R, Guid]) = {
+    val c = ctor[R, D, Unit](decoder, deltaDecoder, deltaEncoder, idGen, contextSource, rootSource, refAdder, searchable)
+    c(Props[R, D, Unit]((), render, wsUrl, noData))
   }
 
   //Just make the component constructor - props to be supplied later to make a component
-  def ctor[R, P](implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) = ReactComponentB[Props[R, P]]("ServerRootComponent")
-    .initialState(State[R](None, None, None))
-    .backend(new Backend[R, P](_)(decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder, searchable))
+  def ctor[R, D <: Delta[R], P]
+    (implicit
+     decoder: Decoder[R],
+     deltaDecoder: Decoder[D],
+     deltaEncoder: Encoder[D],
+     idGen: ModelIdGen[R],
+     contextSource: DeltaIOContextSource,
+     rootSource: RootSource[R, D],
+     refAdder: RefAdder[R],
+     searchable: Searchable[R, Guid]) = ReactComponentB[Props[R, D, P]]("ServerRootComponent")
+    .initialState(State[R, D](None, None, None))
+    .backend(new Backend[R, D, P](_)(decoder, deltaDecoder, deltaEncoder, idGen, contextSource, rootSource, refAdder, searchable))
     .render(s => s.backend.render(s.props, s.state))
     .componentDidMount(_.backend.start)
     .componentWillUnmount(_.backend.end)

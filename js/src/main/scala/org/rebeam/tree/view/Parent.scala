@@ -2,11 +2,6 @@ package org.rebeam.tree.view
 
 import japgolly.scalajs.react._
 import org.rebeam.tree._
-import org.rebeam.lenses._
-import io.circe._
-import monocle.Lens
-import org.rebeam.tree.ref.{Mirror, MirrorCodec}
-import org.rebeam.tree.sync.Ref
 
 /**
   * Interface provided by a parent component (view) to a child component,
@@ -17,10 +12,11 @@ import org.rebeam.tree.sync.Ref
   * The child's model value itself (of type C) will be passed separately, e.g.
   * using a Cursor.
   *
-  * @tparam C The type of child component in the parent/child relationship.
+  * @tparam C The type of child model in the parent/child relationship.
+  * @tparam D The type of delta on the child model
   */
-trait Parent[C] {
-  def callback(delta: Delta[C], deltaJs: Json): Callback
+trait Parent[C, D <: Delta[C]] {
+  def callback(delta: D): Callback
 }
 
 /**
@@ -30,190 +26,32 @@ trait Parent[C] {
   * calling modState using the delta, and perhaps sending the deltaJs to a server to
   * allow changes to be propagated to other clients, etc.
   *
-  * Since other parents like LensParent require a parent themselves, this allows us to
+  * Since other parents require a parent themselves, this allows us to
   * start the tree of parents for a tree of views.
   *
   * @param deltaToCallback  Returns a callback handling the delta as appropriate for the entire model.
   * @tparam R The type of the root of the model
+  * @tparam D The type of delta on the root model
   */
-case class RootParent[R](deltaToCallback: (Delta[R], Json) => Callback) extends Parent[R] {
-  def callback(delta: Delta[R], deltaJs: Json): Callback = deltaToCallback(delta, deltaJs)
+case class RootParent[R, D <: Delta[R]](deltaToCallback: D => Callback) extends Parent[R, D] {
+  def callback(delta: D): Callback = deltaToCallback(delta)
 }
 
 /**
-  * We have some model p: P, which has a child c: C that can be reached using a
-  * Lens[P, C]. Given a parent of p we can use this class to produce a parent of c.
-  *
-  * So for example P might be Person, and C could then be String - the type of the
-  * first name of that person. The fieldName would be "firstName", and lens is a
-  * lens from a person to their first name. Given a Parent[Person] we wish to
-  * produce a Parent[String] suitable for a view of the person's first name.
-  *
-  * @param parent The parent of the parent component
-  * @param lensN The lens from the parent model to the child model
-  * @tparam P The type of the parent model
-  * @tparam C The type of child model
+  * Given a parent with a model: M and delta: D, produces a parent
+  * for a child component with model: C and delta: E. This works by
+  * just transforming the child delta: E to parent delta: D using a
+  * provided function (often based on a constructor), and then using
+  * the provided parent to produce the callback.
+  * This allows us to chain Parents while navigating through a data
+  * model.
+  * @param parent               The parent to use to produce callbacks
+  * @param childToParentDelta   Transforms from child to parent deltas
+  * @tparam M                   The type of model in the parent
+  * @tparam D                   The type of delta on the parent model
+  * @tparam C                   The type of model in the child
+  * @tparam E                   The type of delta on the child model
   */
-case class LensNParent[P, C](parent: Parent[P], lensN: LensN[P, C]) extends Parent[C] {
-  def callback(delta: Delta[C], deltaJs: Json): Callback = {
-    //Produce a LensDelta from the provided child delta, to make it into a delta
-    //of the parent
-    val parentDelta = LensNDelta(lensN, delta)
-
-    //Add this delta to the JSON
-    val parentDeltaJs = Json.obj(
-      "lens" -> Json.obj(
-        "lensN" -> Json.obj(
-          lensN.name -> deltaJs)
-      )
-    )
-
-    //Run using the parent's own parent
-    parent.callback(parentDelta, parentDeltaJs)
-  }
+case class ChildParent[M, D <: Delta[M], C, E <: Delta[C]](parent: Parent[M, D], childToParentDelta: E => D) extends Parent[C, E] {
+  def callback(delta: E): Callback = parent.callback(childToParentDelta(delta))
 }
-
-case class OptionalIParent[C](parent: Parent[List[C]], optionalI: OptionalI[C]) extends Parent[C] {
-  def callback(delta: Delta[C], deltaJs: Json): Callback = {
-    //Produce a LensDelta from the provided child delta, to make it into a delta
-    //of the parent
-    val parentDelta = OptionalIDelta[C](optionalI, delta)
-
-    //Add this delta to the JSON
-    val parentDeltaJs = Json.obj(
-      "optional" -> Json.obj(
-        "optionalI" -> Json.obj(
-          "index" -> Json.fromInt(optionalI.index),
-          "delta" -> deltaJs
-        )
-      )
-    )
-
-    //Run using the parent's own parent
-    parent.callback(parentDelta, parentDeltaJs)
-  }
-}
-
-case class PrismNParent[S, C](parent: Parent[S], prismN: PrismN[S, C]) extends Parent[C] {
-  def callback(delta: Delta[C], deltaJs: Json): Callback = {
-    //Produce a PrismNDelta from the provided child delta, to make it into a delta
-    //of the parent (the sum class)
-    val parentDelta = PrismNDelta[S, C](prismN, delta)
-
-    //Add this delta to the JSON
-    val parentDeltaJs = Json.obj(
-      "prism" -> Json.obj(
-        "prismN" -> Json.obj(
-          prismN.name -> deltaJs
-        )
-      )
-    )
-
-    //Run using the parent's own parent
-    parent.callback(parentDelta, parentDeltaJs)
-  }
-}
-
-
-case class OptionalMatchParent[A, F <: A => Boolean](parent: Parent[List[A]], optionalMatch: OptionalMatch[A, F])(implicit cEncoder: Encoder[F]) extends Parent[A] {
-  def callback(delta: Delta[A], deltaJs: Json): Callback = {
-    //Produce a LensDelta from the provided child delta, to make it into a delta
-    //of the parent
-    val parentDelta = OptionalMatchDelta[A, F](optionalMatch, delta)
-
-    //Add this delta to the JSON
-    val parentDeltaJs = Json.obj(
-      "optional" -> Json.obj(
-        "optionalMatch" -> Json.obj(
-          "find" -> cEncoder(optionalMatch.f),
-          "delta" -> deltaJs
-        )
-      )
-    )
-
-    //Run using the parent's own parent
-    parent.callback(parentDelta, parentDeltaJs)
-  }
-}
-
-case class OptionParent[C](parent: Parent[Option[C]]) extends Parent[C] {
-  def callback(delta: Delta[C], deltaJs: Json): Callback = {
-    //Produce an OptionDelta from the provided child delta, to make it into a delta
-    //of the parent (i.e. convert child's Delta[C] to parent's Delta[Option[C]]
-    val parentDelta = OptionDelta[C](delta)
-
-    //Add this delta to the JSON
-    val parentDeltaJs = Json.obj(
-      "option" -> Json.obj(
-        "delta" -> deltaJs
-      )
-    )
-
-    //Run using the parent's own parent
-    parent.callback(parentDelta, parentDeltaJs)
-  }
-}
-
-/**
-  * We have some model p: P, which has a child c: C that can be reached using a
-  * Lens[P, C]. Given a parent of p we can use this class to produce a parent of c.
-  *
-  * So for example P might be Person, and C could then be String - the type of the
-  * first name of that person. The fieldName would be "firstName", and lens is a
-  * lens from a person to their first name. Given a Parent[Person] we wish to
-  * produce a Parent[String] suitable for a view of the person's first name.
-  *
-  * We use a typeclass to encode the Json for the parent delta, given the child delta,
-  * allowing us to work with general Lens classes (e.g. we can support encoding an
-  * index, a field name or a key in a map).
-  *
-  * @param parent The parent of the parent component
-  * @param lens The lens from the parent model to the child model
-  * @tparam P The type of the parent model
-  * @tparam C The type of child model
-  */
-case class LensParent[P, C, L <: Lens[P, C] : OuterEncoder](parent: Parent[P], lens: L) extends Parent[C] {
-  def callback(delta: Delta[C], deltaJs: Json): Callback = {
-    //Produce a LensDelta from the provided child delta, to make it into a delta
-    //of the parent
-    val parentDelta = LensDelta(lens, delta)
-
-    //Add this delta to the JSON
-    val parentDeltaJs = Json.obj("lens" -> implicitly[OuterEncoder[L]].encode(lens, deltaJs))
-
-    //Run using the parent's own parent
-    parent.callback(parentDelta, parentDeltaJs)
-  }
-}
-
-/**
-  * Produce a Parent for a data item in a Mirror, from a Parent for that Mirror. This uses
-  * an Ref to move between the Mirror and a data item
-  * @param parent         The parent of the Mirror
-  * @param ref            The Ref to use to look up data in Mirror
-  * @tparam A             The type of data item in the Mirror
-  */
-case class MirrorParent[A: MirrorCodec](parent: Parent[Mirror], ref: Ref[A]) extends Parent[A] {
-
-  def callback(delta: Delta[A], deltaJs: Json): Callback = {
-    //Produce a MirrorDelta from the provided child delta, to make it into a delta
-    //of the parent (i.e. convert child's Delta[A] to parent's Delta[Mirror]
-    val parentDelta = MirrorDelta(ref, delta)
-
-    //Add this delta to the JSON
-    val parentDeltaJs = Json.obj(
-      "mirror" -> Json.obj(
-        implicitly[MirrorCodec[A]].mirrorType.name -> Json.obj(
-          "ref" -> Ref.encodeRef[A](ref),
-          "delta" -> deltaJs
-        )
-      )
-    )
-
-    //Run using the parent's own parent
-    parent.callback(parentDelta, parentDeltaJs)
-  }
-}
-
-
-
