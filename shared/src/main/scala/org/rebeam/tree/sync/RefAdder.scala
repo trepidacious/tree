@@ -1,6 +1,5 @@
 package org.rebeam.tree.sync
 
-import org.rebeam.tree.Delta
 import org.rebeam.tree.ref.Mirror
 import org.rebeam.tree.sync.DeltaIORun.{AddedRef, DeltaRunResult}
 
@@ -10,17 +9,14 @@ trait RefAdder[U, A] {
 
 object RefAdder {
 
-  private def addRefsToMirror[U, A, D <: Delta[U, A]](mirror: Mirror[U, A, D], addedRefs: List[AddedRef[U]]) = {
+  private def addRefsToMirror[A](mirror: Mirror[A], addedRefs: List[AddedRef[A]]) = {
     addedRefs.foldLeft(mirror){
-      case (m, addedRef) => {
-        val ar = addedRef
-        m.updated(ar.id, ar.data, ar.revision)(ar.codec)
-      }
+      case (m, ar) => m.updated(ar.id, ar.data, ar.revision)
     }
   }
 
-  implicit val mirrorRefAdder: RefAdder[Mirror] = new RefAdder[Mirror] {
-    override def addRefs(deltaRunResult: DeltaRunResult[Mirror]): Mirror =
+  implicit def mirrorRefAdder[U]: RefAdder[U, Mirror[U]] = new RefAdder[U, Mirror[U]] {
+    override def addRefs(deltaRunResult: DeltaRunResult[U, Mirror[U]]): Mirror[U] =
       addRefsToMirror(deltaRunResult.data, deltaRunResult.addedRefs)
   }
 
@@ -37,7 +33,7 @@ object RefAdder {
     * @tparam A The data type
     * @return   A RefAdder that does nothing with Refs, leaving data unaltered
     */
-  def noOpRefAdder[A]: RefAdder[A] = new RefAdder[A] {
-    override def addRefs(deltaRunResult: DeltaRunResult[A]): A = deltaRunResult.data
+  def noOpRefAdder[U, A]: RefAdder[U, A] = new RefAdder[U, A] {
+    override def addRefs(deltaRunResult: DeltaRunResult[U, A]): A = deltaRunResult.data
   }
 }

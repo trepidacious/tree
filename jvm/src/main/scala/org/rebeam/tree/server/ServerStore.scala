@@ -39,7 +39,7 @@ class ServerStore[U, A: ModelIdGen, D <: Delta[U, A]](initialModel: A) {
     mId
   }
 
-  def applyDelta(d: DeltaAndId[U, A, D], context: DeltaIOContext)(implicit refAdder: RefAdder[A]): Unit = lock {
+  def applyDelta(d: DeltaAndId[U, A, D], context: DeltaIOContext)(implicit refAdder: RefAdder[U, A]): Unit = lock {
     val baseModelId = m.id
 
     val result = d.runWith(m.model, context)
@@ -69,7 +69,7 @@ class ServerStore[U, A: ModelIdGen, D <: Delta[U, A]](initialModel: A) {
   */
 private class ServerStoreValueDispatcher[U, T, D <: Delta[U, T]]
   (val store: ServerStore[U, T, D], val clientId: ClientId, contextSource: DeltaIOContextSource)
-  (implicit encoder: Encoder[T], deltaDecoder: Decoder[D], deltaEncoder: Encoder[D], refAdder: RefAdder[T])
+  (implicit encoder: Encoder[T], deltaDecoder: Decoder[D], deltaEncoder: Encoder[D], refAdder: RefAdder[U, T])
   extends Dispatcher[ServerStoreUpdate[U, T, D], Json, Json] {
 
   private var pendingUpdateToClient = none[ServerStoreUpdate[U, T, D]]
@@ -119,7 +119,7 @@ private class ServerStoreValueDispatcher[U, T, D <: Delta[U, T]]
 object ServerStoreValueExchange {
   def apply[U, M, D <: Delta[U, M]]
     (store: ServerStore[U, M, D], clientId: ClientId, contextSource: DeltaIOContextSource)
-    (implicit encoder: Encoder[M], decoder: Decoder[M], deltaDecoder: Decoder[D], deltaEncoder: Encoder[D], refAdder: RefAdder[M]): Exchange[WebSocketFrame, WebSocketFrame] = {
+    (implicit encoder: Encoder[M], decoder: Decoder[M], deltaDecoder: Decoder[D], deltaEncoder: Encoder[D], refAdder: RefAdder[U, M]): Exchange[WebSocketFrame, WebSocketFrame] = {
 
     val dispatcher = new ServerStoreValueDispatcher(store, clientId, contextSource)
     val observer = new DispatchObserver(dispatcher)

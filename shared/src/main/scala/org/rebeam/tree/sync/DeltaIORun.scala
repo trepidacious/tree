@@ -20,7 +20,7 @@ object DeltaIORun {
     */
   case class DeltaRunResult[U, A](data: A, addedRefs: List[AddedRef[U]])
 
-  private case class StateData[U](context: DeltaIOContext, deltaId: DeltaId, currentGuidId: Long, addedRefs: List[AddedRef[U]], pr: PRandom) {
+  case class StateData[U](context: DeltaIOContext, deltaId: DeltaId, currentGuidId: Long, addedRefs: List[AddedRef[U]], pr: PRandom) {
     def withNextGuidId: StateData[U] = copy(currentGuidId = currentGuidId + 1)
     def random[A](f: PRandom => (PRandom, A)): (StateData[U], A) = {
       val (prNew, a) = f(pr)
@@ -28,7 +28,7 @@ object DeltaIORun {
     }
   }
 
-  private object StateData {
+  object StateData {
     def initial[U](context: DeltaIOContext, deltaId: DeltaId): StateData[U] = {
       val pr = PRandom(deltaId.clientId.id ^ deltaId.clientDeltaId.id)
       StateData(context, deltaId, 0, Nil, pr)
@@ -37,18 +37,18 @@ object DeltaIORun {
 
   class Compiler[U] {
     // State monad using StateData
-    private type DeltaContextState[A] = State[StateData[U], A]
+    type DeltaContextState[A] = State[StateData[U], A]
 
     // Specialise DeltaIOA to "universe" type U
-    private type DeltaIOAU[A] = DeltaIOA[U, A]
+    type DeltaIOAU[A] = DeltaIOA[U, A]
 
-    val pureCompiler: (DeltaIOAU ~> DeltaContextState) =
+    val arrow: (DeltaIOAU ~> DeltaContextState) =
       new (DeltaIOAU ~> DeltaContextState) {
         def apply[A](fa: DeltaIOA[U, A]): DeltaContextState[A] =
           fa match {
             case GetGuid() => State(s => (s.withNextGuidId, Guid(s.deltaId.clientId, s.deltaId.clientDeltaId, WithinDeltaId(s.currentGuidId))))
 
-            case GetId() => State(s => (s.withNextGuidId, Id[Any](Guid(s.deltaId.clientId, s.deltaId.clientDeltaId, WithinDeltaId(s.currentGuidId)))))
+            case GetId() => State(s => (s.withNextGuidId, Id[Any](Guid(s.deltaId.clientId, s.deltaId.clientDeltaId, WithinDeltaId(s.currentGuidId))).asInstanceOf[A]))
 
             case GetContext() => State(s => (s, s.context))
 
@@ -69,9 +69,9 @@ object DeltaIORun {
               val revision = Guid(s.deltaId.clientId, s.deltaId.clientDeltaId, WithinDeltaId(s.currentGuidId + 1))
 
               // Make the data item
-              val createDIO: DeltaIO[U, A] = create(id)
+              val createDIO = create(id.asInstanceOf[Id[U with A]])
               // Remember to increment guid twice for the guid and revision we generated
-              val stateWithA: (StateData[U], A) = createDIO.foldMap(pureCompiler).run(s.withNextGuidId.withNextGuidId).value
+              val stateWithA: (StateData[U], A) = createDIO.foldMap(arrow).run(s.withNextGuidId.withNextGuidId).value
 
               // We know that Put requires A <: U,
               // so the instanceOfs are safe
@@ -81,28 +81,27 @@ object DeltaIORun {
           }
       }
 
-  }
+    def runDeltaIO[A](dc: DeltaIO[U, A], context: DeltaIOContext, deltaId: DeltaId): DeltaRunResult[U, A] = {
+      val s = dc.foldMap(arrow).run(StateData.initial(context, deltaId)).value
+      DeltaRunResult(s._2, s._1.addedRefs)
+    }
 
-  def runDeltaIO[U, A](dc: DeltaIO[U, A], context: DeltaIOContext, deltaId: DeltaId): DeltaRunResult[U, A] = {
-    val s = dc.foldMap(new Compiler[U].pureCompiler).run(StateData.initial(context, deltaId)).value
-    DeltaRunResult(s._2, s._1.addedRefs)
   }
-
 
   implicit class DeltaRun[U, A](d: Delta[U, A]) {
-    def runWith(a: A, context: DeltaIOContext, deltaId: DeltaId): DeltaRunResult[U, A] = runDeltaIO(d(a), context, deltaId)
+    def runWith(a: A, context: DeltaIOContext, deltaId: DeltaId): DeltaRunResult[U, A] = new Compiler[U].runDeltaIO(d(a), context, deltaId)
   }
 
   implicit class DeltaIORun[U, A](dio: DeltaIO[U, A]) {
-    def runWith(context: DeltaIOContext, deltaId: DeltaId): DeltaRunResult[U, A] = runDeltaIO(dio, context, deltaId)
+    def runWith(context: DeltaIOContext, deltaId: DeltaId): DeltaRunResult[U, A] = new Compiler[U].runDeltaIO(dio, context, deltaId)
   }
 
   implicit class DeltaAndIdRun[U, A, D <: Delta[U, A]](deltaAndId: DeltaAndId[U, A, D]) {
-    def runWith(a: A, context: DeltaIOContext): DeltaRunResult[U, A] = runDeltaIO(deltaAndId.delta.apply(a), context, deltaAndId.id)
+    def runWith(a: A, context: DeltaIOContext): DeltaRunResult[U, A] = new Compiler[U].runDeltaIO(deltaAndId.delta.apply(a), context, deltaAndId.id)
   }
 
   implicit class DeltaWithICRun[U, A, D <: Delta[U, A]](dic: DeltaWithIC[U, A, D]) {
-    def runWith(a: A): DeltaRunResult[U, A] = runDeltaIO(dic.delta.apply(a), dic.context, dic.id)
-    def runWithNewContext(a: A, context: DeltaIOContext): DeltaRunResult[U, A] = runDeltaIO(dic.delta.apply(a), context, dic.id)
+    def runWith(a: A): DeltaRunResult[U, A] = new Compiler[U].runDeltaIO(dic.delta.apply(a), dic.context, dic.id)
+    def runWithNewContext(a: A, context: DeltaIOContext): DeltaRunResult[U, A] = new Compiler[U].runDeltaIO(dic.delta.apply(a), context, dic.id)
   }
 }

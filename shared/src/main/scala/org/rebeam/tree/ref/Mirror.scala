@@ -2,24 +2,24 @@ package org.rebeam.tree.ref
 
 import io.circe._
 import org.rebeam.tree.Delta._
-import org.rebeam.tree.{Delta, Searchable}
+import org.rebeam.tree.Searchable
 import org.rebeam.tree.sync._
 
 object Mirror {
-  def empty[U, A, D <: Delta[U, A]]: Mirror[U, A, D] = new Mirror[U, A, D](Map.empty)
+  def empty[A]: Mirror[A] = new Mirror[A](Map.empty)
 
   // There is no meaning to searching for refs in a mirror
-  implicit def mirrorNotSearchableForGuid[U, A, D <: Delta[U, A]]: Searchable[Mirror[U, A, D], Guid] = Searchable.notSearchable
+  implicit def mirrorNotSearchableForGuid[A]: Searchable[Mirror[A], Guid] = Searchable.notSearchable
 
   /**
     * Decoder for mirrors containing only the types handled by the provided MirrorCodecs
     * @param decoder  Decoder for data contents
     * @return         A Decoder[Mirror[U, A, D]
     */
-  def decoder[U, A, D <: Delta[U, A]](implicit decoder: Decoder[A]): Decoder[Mirror[U, A, D]] = {
-    Decoder.instance[Mirror[U, A, D]](
+  def decoder[A](implicit decoder: Decoder[A]): Decoder[Mirror[A]] = {
+    Decoder.instance[Mirror[A]](
       // FIXME implement, use contramap or similar based on map?
-      c => Left[DecodingFailure, Mirror[U, A, D]](DecodingFailure("No fields in mirror Json", c.history))
+      c => Left[DecodingFailure, Mirror[A]](DecodingFailure("No fields in mirror Json", c.history))
     )
   }
 
@@ -29,7 +29,7 @@ object Mirror {
     * Each field contains an object named after the MirrorType of the data item,
     * containing its revision and data.
     */
-  def encoder[U, A, D <: Delta[U, A]](implicit encoder: Encoder[A]): Encoder[Mirror[U, A, D]] = Encoder.instance[Mirror[U, A, D]](
+  def encoder[A](implicit encoder: Encoder[A]): Encoder[Mirror[A]] = Encoder.instance[Mirror[A]](
     m => {
       val jsonMap = m.map.toList.map {
         case (id, state) =>
@@ -70,9 +70,9 @@ private case class MirrorState[A](data: A, revision: Guid) {//}, incomingRefs: S
   * for that Id and the revision of that value
   * @param map    Map from each known Guid to the data identified by that Guid
   */
-class Mirror[U, A, D <: Delta[U, A]](private val map: Map[Id[A], MirrorState[A]]) {
+class Mirror[A](private val map: Map[Id[A], MirrorState[A]]) {
 
-  private def updateMap(newMap: Map[Id[A], MirrorState[A]]): Mirror[U, A, D] = new Mirror(newMap)
+  private def updateMap(newMap: Map[Id[A], MirrorState[A]]): Mirror[A] = new Mirror(newMap)
 
   /**
     * Retrieve the data for a reference, if reference is valid and data is present in mirror
@@ -133,8 +133,8 @@ class Mirror[U, A, D <: Delta[U, A]](private val map: Map[Id[A], MirrorState[A]]
     * @param identifiable Provides Id for the value
     * @return             New Mirror with updated value
     */
-  def updated(a: A)(implicit identifiable: Identifiable[A]): DeltaIO[U, Mirror[U, A, D]] = for {
-    revision <- getGuid
+  def updated[U](a: A)(implicit identifiable: Identifiable[A]): DeltaIO[U, Mirror[A]] = for {
+    revision <- getGuid[U]
   } yield updated(a, revision)
 
   /**
@@ -146,8 +146,8 @@ class Mirror[U, A, D <: Delta[U, A]](private val map: Map[Id[A], MirrorState[A]]
     * @param a            The value
     * @return             New Mirror with updated value
     */
-  def updated(id: Id[A], a: A): DeltaIO[U, Mirror[U, A, D]] = for {
-    revision <- getGuid
+  def updated[U](id: Id[A], a: A): DeltaIO[U, Mirror[A]] = for {
+    revision <- getGuid[U]
   } yield updated(id, a, revision)
 
   /**
@@ -159,7 +159,7 @@ class Mirror[U, A, D <: Delta[U, A]](private val map: Map[Id[A], MirrorState[A]]
     * @param identifiable Provides Id for the value
     * @return
     */
-  def updated(a: A, revision: Guid)(implicit identifiable: Identifiable[A]): Mirror[U, A, D] = updated(identifiable.id(a), a, revision)
+  def updated[U](a: A, revision: Guid)(implicit identifiable: Identifiable[A]): Mirror[A] = updated(identifiable.id(a), a, revision)
 
   /**
     * Update the mirror to contain a value at a specified revision.
@@ -170,7 +170,7 @@ class Mirror[U, A, D <: Delta[U, A]](private val map: Map[Id[A], MirrorState[A]]
     * @param revision     The revision of the value
     * @return
     */
-  def updated(id: Id[A], a: A, revision: Guid): Mirror[U, A, D] = {
+  def updated(id: Id[A], a: A, revision: Guid): Mirror[A] = {
     // Updated map for this data item, using the results of update, and new revision
     val map2 = map.updated(id, MirrorState(a, revision))
 
@@ -251,7 +251,7 @@ class Mirror[U, A, D <: Delta[U, A]](private val map: Map[Id[A], MirrorState[A]]
     * @param id Id of data to remove
     * @return   New mirror with data item not present
     */
-  def removed(id: Id[A]): Mirror[U, A, D] = {
+  def removed(id: Id[A]): Mirror[A] = {
     getState(id).fold{
       this
     }{

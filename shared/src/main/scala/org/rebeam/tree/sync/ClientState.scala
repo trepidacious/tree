@@ -40,13 +40,13 @@ object ClientState {
 
   // Temporary class used to manage a model and deltas
   private case class ModelAndDeltas[U, A, D <: Delta[U, A]](model: A, deltas: Seq[DeltaWithIC[U, A, D]]) {
-    def applyDelta(delta: D, deltaId: DeltaId, context: DeltaIOContext)(implicit refAdder: RefAdder[A]): ModelAndDeltas[U, A, D] =
+    def applyDelta(delta: D, deltaId: DeltaId, context: DeltaIOContext)(implicit refAdder: RefAdder[U, A]): ModelAndDeltas[U, A, D] =
       copy(model = {
         val result = delta.runWith(model, context, deltaId)
         refAdder.addRefs(result)
       })
 
-    def modelWithDeltas(implicit refAdder: RefAdder[A]): A = deltas.foldLeft(model) { case (m, d) => refAdder.addRefs(d.runWith(m)) }
+    def modelWithDeltas(implicit refAdder: RefAdder[U, A]): A = deltas.foldLeft(model) { case (m, d) => refAdder.addRefs(d.runWith(m)) }
   }
 
 }
@@ -78,7 +78,7 @@ case class ClientState[U, A, D <: Delta[U, A]](id: ClientId, nextClientDeltaId: 
     *                the delta appropriately.
     * @return A new ClientState
     */
-  def apply(delta: D, context: DeltaIOContext)(implicit refAdder: RefAdder[A]): (ClientState[U, A, D], DeltaId) = {
+  def apply(delta: D, context: DeltaIOContext)(implicit refAdder: RefAdder[U, A]): (ClientState[U, A, D], DeltaId) = {
     val deltaId = DeltaId(id, nextClientDeltaId)
 
     val nextModel = refAdder.addRefs(delta.runWith(model, context, deltaId))
@@ -93,7 +93,7 @@ case class ClientState[U, A, D <: Delta[U, A]](id: ClientId, nextClientDeltaId: 
     * @param update The update to apply
     * @return An error xor a new ClientState
     */
-  def update(update: ModelUpdate[U, A, D])(implicit idGen: ModelIdGen[A], refAdder: RefAdder[A]): Either[String, ClientState[U, A, D]] = update match {
+  def update(update: ModelUpdate[U, A, D])(implicit idGen: ModelIdGen[A], refAdder: RefAdder[U, A]): Either[String, ClientState[U, A, D]] = update match {
     case i@ModelIncrementalUpdate(_,_,_) => incrementalUpdate(i)
     case f@ModelFullUpdate(_,_)  => fullUpdate(f)
   }
@@ -111,7 +111,7 @@ case class ClientState[U, A, D <: Delta[U, A]](id: ClientId, nextClientDeltaId: 
     * @param update The update to apply
     * @return An error xor a new ClientState
     */
-  def incrementalUpdate(update: ModelIncrementalUpdate[U, A, D])(implicit idGen: ModelIdGen[A], refAdder: RefAdder[A]): Either[String, ClientState[U, A, D]] = {
+  def incrementalUpdate(update: ModelIncrementalUpdate[U, A, D])(implicit idGen: ModelIdGen[A], refAdder: RefAdder[U, A]): Either[String, ClientState[U, A, D]] = {
     if (update.baseModelId != serverModel.id) {
       Left("Server update expected base model id " + update.baseModelId + " but we have server model id " + serverModel.id)
 
