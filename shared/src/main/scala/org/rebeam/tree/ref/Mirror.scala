@@ -2,8 +2,7 @@ package org.rebeam.tree.ref
 
 import io.circe._
 import org.rebeam.tree.Delta._
-import org.rebeam.tree.DeltaCodecs.DeltaCodec
-import org.rebeam.tree.Searchable
+import org.rebeam.tree.{Delta, Searchable}
 import org.rebeam.tree.sync._
 
 import scala.collection.mutable.ArrayBuffer
@@ -22,16 +21,16 @@ trait MirrorCodec[A] {
   def mirrorType: MirrorType
   def encoder: Encoder[A]
   def decoder: Decoder[A]
-  def deltaCodec: DeltaCodec[A]
+  def deltaCodec: Encoder[Delta[A]]
   //  def searchable: Searchable[A, Guid]
 }
 
 object MirrorCodec {
-  def apply[A](mirrorType: String)(implicit encoder: Encoder[A], decoder: Decoder[A], deltaCodec: DeltaCodec[A]): MirrorCodec[A] =
+  def apply[A](mirrorType: String)(implicit encoder: Encoder[A], decoder: Decoder[A], deltaCodec: Encoder[Delta[A]]): MirrorCodec[A] =
     MirrorCodecBasic(MirrorType(mirrorType), encoder, decoder, deltaCodec)
 }
 
-case class MirrorCodecBasic[A](mirrorType: MirrorType, encoder: Encoder[A], decoder: Decoder[A], deltaCodec: DeltaCodec[A]) extends MirrorCodec[A]
+case class MirrorCodecBasic[A](mirrorType: MirrorType, encoder: Encoder[A], decoder: Decoder[A], deltaCodec: Encoder[Delta[A]]) extends MirrorCodec[A]
 
 object Mirror {
   val empty = new Mirror(Map.empty, Map.empty)
