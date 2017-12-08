@@ -12,10 +12,11 @@ import org.rebeam.tree._
   * The child's model value itself (of type C) will be passed separately, e.g.
   * using a Cursor.
   *
+  * @tparam U     The type of data accessible via reference.
   * @tparam C The type of child model in the parent/child relationship.
   * @tparam D The type of delta on the child model
   */
-trait Parent[C, D <: Delta[C]] {
+trait Parent[U, C, D <: Delta[U, C]] {
   def callback(delta: D): Callback
 }
 
@@ -30,10 +31,11 @@ trait Parent[C, D <: Delta[C]] {
   * start the tree of parents for a tree of views.
   *
   * @param deltaToCallback  Returns a callback handling the delta as appropriate for the entire model.
+  * @tparam U     The type of data accessible via reference.
   * @tparam R The type of the root of the model
   * @tparam D The type of delta on the root model
   */
-case class RootParent[R, D <: Delta[R]](deltaToCallback: D => Callback) extends Parent[R, D] {
+case class RootParent[U, R, D <: Delta[U, R]](deltaToCallback: D => Callback) extends Parent[U, R, D] {
   def callback(delta: D): Callback = deltaToCallback(delta)
 }
 
@@ -47,11 +49,12 @@ case class RootParent[R, D <: Delta[R]](deltaToCallback: D => Callback) extends 
   * model.
   * @param parent               The parent to use to produce callbacks
   * @param childToParentDelta   Transforms from child to parent deltas
+  * @tparam U                   The type of data accessible via reference.
   * @tparam M                   The type of model in the parent
   * @tparam D                   The type of delta on the parent model
   * @tparam C                   The type of model in the child
   * @tparam E                   The type of delta on the child model
   */
-case class ChildParent[M, D <: Delta[M], C, E <: Delta[C]](parent: Parent[M, D], childToParentDelta: E => D) extends Parent[C, E] {
+case class ChildParent[U, M, D <: Delta[U, M], C, E <: Delta[U, C]](parent: Parent[U, M, D], childToParentDelta: E => D) extends Parent[U, C, E] {
   def callback(delta: E): Callback = parent.callback(childToParentDelta(delta))
 }

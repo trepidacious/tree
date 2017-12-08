@@ -5,18 +5,16 @@ import org.rebeam.tree._
 import org.rebeam.lenses._
 import io.circe._
 import japgolly.scalajs.react.extra.Reusability
-import org.rebeam.tree.ref.{Mirror, MirrorCodec}
+import org.rebeam.tree.ref.Mirror
 import org.rebeam.tree.sync.{Guid, Ref => TreeRef}
 import Searchable._
 
 trait Root {
-  def cursorAt[A, D <: Delta[A], L](ref: TreeRef[A], location: L)(implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, D, L]]
+  def cursorAt[U, A, D <: Delta[U, A], L](ref: TreeRef[A], location: L)(implicit s: Searchable[A, Guid]): Option[Cursor[U, A, D, L]]
   def refRevisions(refGuids: Set[Guid]): Map[Guid, Guid]
 }
 
-
-
-private case class ParentAction[M, D <: Delta[M]](parent: Parent[M, D], delta: D) extends Action {
+private case class ParentAction[U, M, D <: Delta[U, M]](parent: Parent[U, M, D], delta: D) extends Action {
   def callback: Callback = parent.callback(delta)
 }
 
@@ -33,19 +31,19 @@ private case class ParentAction[M, D <: Delta[M]](parent: Parent[M, D], delta: D
   * Most commonly used by a view of a position in a model, since it provides the
   * data to display, and a way of applying deltas to the data at that position.
   *
-  *
+  * @tparam U     The type of data accessible via reference.
   * @tparam M     The type of model for the view.
   * @tparam D     The type of delta we can perform on the model
   * @tparam L     The type of location the cursor is viewing
   */
-trait Cursor[M, D <: Delta[M], L] extends Parent[M, D] {
+trait Cursor[U, M, D <: Delta[U, M], L] extends Parent[U, M, D] {
 
   /**
     * The parent of the view using this Cursor. Used to convert
     *               deltas into Callbacks that will "run" the delta.
     * @return parent
     */
-  def parent: Parent[M, D]
+  def parent: Parent[U, M, D]
 
   /**
     * The actual model value for the child view - the data to display.
@@ -81,25 +79,25 @@ trait Cursor[M, D <: Delta[M], L] extends Parent[M, D] {
   // FIXME "set" could be provided in the case where D is a known delta type, e.  g.
   // IntValueDelta, and we could provide set(i: Int)
 
-  def zoom[C, E <: Delta[C]](lens: LensN[M, C], childToParentDelta: E => D)(implicit s: Searchable[C, Guid]): Cursor[C, E, L] = {
+  def zoom[C, E <: Delta[U, C]](lens: LensN[M, C], childToParentDelta: E => D)(implicit s: Searchable[C, Guid]): Cursor[U, C, E, L] = {
     val newModel = lens.get(model)
     val newRefGuids = newModel.allRefGuids
-    CursorBasic[C, E, L](ChildParent(parent, childToParentDelta), newModel, location, root, newRefGuids)
+    CursorBasic[U, C, E, L](ChildParent(parent, childToParentDelta), newModel, location, root, newRefGuids)
   }
 
   //FIXME prism
 
-  def label(label: String): Cursor[M, D, String] = CursorBasic(parent, model, label, root, allModelRefGuids)
+  def label(label: String): Cursor[U, M, D, String] = CursorBasic(parent, model, label, root, allModelRefGuids)
 
-  def move[N](newLocation: N): Cursor[M, D, N] = CursorBasic(parent, model, newLocation, root, allModelRefGuids)
+  def move[N](newLocation: N): Cursor[U, M, D, N] = CursorBasic(parent, model, newLocation, root, allModelRefGuids)
 
-  def withoutLocation: Cursor[M, D, Unit] = move(())
+  def withoutLocation: Cursor[U, M, D, Unit] = move(())
 
-  def followRef[A, E <: Delta[A]](ref: TreeRef[A])(implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, E, L]] = root.cursorAt(ref, location)
+  def followRef[A, E <: Delta[U, A]](ref: TreeRef[A])(implicit s: Searchable[A, Guid]): Option[Cursor[U, A, E, L]] = root.cursorAt(ref, location)
 
 }
 
-private case class CursorBasic[M, D <: Delta[M], L](parent: Parent[M, D], model: M, location: L, root: Root, allModelRefGuids: Set[Guid]) extends Cursor[M, D, L]
+private case class CursorBasic[U, M, D <: Delta[U, M], L](parent: Parent[U, M, D], model: M, location: L, root: Root, allModelRefGuids: Set[Guid]) extends Cursor[U, M, D, L]
 
 object Cursor {
 
@@ -109,7 +107,7 @@ object Cursor {
     * @tparam L   Location type
     * @return     Reusability for cursor
     */
-  implicit def cursorReusability[M, D <: Delta[M], L]: Reusability[Cursor[M, D, L]] =
+  implicit def cursorReusability[U, M, D <: Delta[U, M], L]: Reusability[Cursor[U, M, D, L]] =
     Reusability.fn {
       case (c1, c2) =>
         // First check for changes in parent, model or location (i.e. everything except
@@ -131,13 +129,13 @@ object Cursor {
     }
 
   object RootNone extends Root {
-    def cursorAt[A, D <: Delta[A], L](ref: TreeRef[A], location: L)
-                      (implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, D, L]] = None
+    def cursorAt[U, A, D <: Delta[U, A], L](ref: TreeRef[A], location: L)
+                      (implicit s: Searchable[A, Guid]): Option[Cursor[U, A, D, L]] = None
 
     override def refRevisions(refGuids: Set[Guid]): Map[Guid, Guid] = Map.empty
   }
 
-  def apply[M, D <: Delta[M], L](parent: Parent[M, D], model: M, location: L, root: Root)(implicit s: Searchable[M, Guid]): Cursor[M, D, L] =
+  def apply[U, M, D <: Delta[U, M], L](parent: Parent[U, M, D], model: M, location: L, root: Root)(implicit s: Searchable[M, Guid]): Cursor[U, M, D, L] =
     CursorBasic(parent, model, location, root, model.allRefGuids)
 
 //  implicit class ListCursor[C, L](cursor: Cursor[List[C], L]) {
