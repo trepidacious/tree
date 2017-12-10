@@ -2,8 +2,6 @@ package org.rebeam.tree.view
 
 import japgolly.scalajs.react._
 import org.rebeam.tree._
-import org.rebeam.lenses._
-import io.circe._
 import japgolly.scalajs.react.extra.Reusability
 import org.rebeam.tree.ref.Mirror
 import org.rebeam.tree.sync.{Guid, Ref => TreeRef}
@@ -71,30 +69,32 @@ trait Cursor[U, M, D <: Delta[U, M], L] extends Parent[U, M, D] {
 
   //Just pass through callback to parent for convenience
   def callback(delta: D): Callback = action(delta).callback
-
   def action(delta: D): Action = ParentAction(parent, delta)
-
   def act(delta: D): Action = action(delta)
 
   // FIXME "set" could be provided in the case where D is a known delta type, e.  g.
   // IntValueDelta, and we could provide set(i: Int)
 
-  def zoom[C, E <: Delta[U, C]](lens: LensN[M, C], childToParentDelta: E => D)(implicit s: Searchable[C, Guid]): Cursor[U, C, E, L] = {
-    val newModel = lens.get(model)
+  def zoom[C, E <: Delta[U, C]](dLens: DLens[U, M, D, C, E])(implicit s: Searchable[C, Guid]): Cursor[U, C, E, L] = {
+    val newModel = dLens.aToB(model)
     val newRefGuids = newModel.allRefGuids
-    CursorBasic[U, C, E, L](ChildParent(parent, childToParentDelta), newModel, location, root, newRefGuids)
+    CursorBasic[U, C, E, L](ChildParent(parent, dLens.eToD), newModel, location, root, newRefGuids)
   }
 
-  //FIXME prism
+  def zoomOptional[C, E <: Delta[U, C]](dOptional: DOptional[U, M, D, C, E])(implicit s: Searchable[C, Guid]): Option[Cursor[U, C, E, L]] = {
+    dOptional.aToB(model).map {
+      newModel =>
+        val newRefGuids = newModel.allRefGuids
+        CursorBasic[U, C, E, L](ChildParent(parent, dOptional.eToD), newModel, location, root, newRefGuids)
+    }
+  }
+
+  //FIXME add prism
 
   def label(label: String): Cursor[U, M, D, String] = CursorBasic(parent, model, label, root, allModelRefGuids)
-
   def move[N](newLocation: N): Cursor[U, M, D, N] = CursorBasic(parent, model, newLocation, root, allModelRefGuids)
-
   def withoutLocation: Cursor[U, M, D, Unit] = move(())
-
   def followRef[A, E <: Delta[U, A]](ref: TreeRef[A])(implicit s: Searchable[A, Guid]): Option[Cursor[U, A, E, L]] = root.cursorAt(ref, location)
-
 }
 
 private case class CursorBasic[U, M, D <: Delta[U, M], L](parent: Parent[U, M, D], model: M, location: L, root: Root, allModelRefGuids: Set[Guid]) extends Cursor[U, M, D, L]
@@ -138,18 +138,12 @@ object Cursor {
   def apply[U, M, D <: Delta[U, M], L](parent: Parent[U, M, D], model: M, location: L, root: Root)(implicit s: Searchable[M, Guid]): Cursor[U, M, D, L] =
     CursorBasic(parent, model, location, root, model.allRefGuids)
 
-//  implicit class ListCursor[C, L](cursor: Cursor[List[C], L]) {
-//    def zoomI(index: Int)(implicit s: Searchable[C, Guid]): Option[Cursor[C, L]] = {
-//      val optionalI: OptionalI[C] = OptionalI[C](index)
-//      optionalI.getOption(cursor.model).map { c =>
-//        Cursor[C, L](OptionalIParent(cursor.parent, optionalI), c, cursor.location, cursor.root)
-//      }
-//    }
-//
-//    def zoomAllI(implicit s: Searchable[C, Guid]): List[Cursor[C, L]] = cursor.model.zipWithIndex.flatMap {
-//      case (a, i) => cursor.zoomI(i)
-//    }
-//
+  implicit class ListIndexCursor[U, A, D <: Delta[U, A], L](cursor: Cursor[U, List[A], ListIndexDelta[U, A, D], L])(implicit s: Searchable[A, Guid]) {
+    def zoomI(i: Int): Option[Cursor[U, A, D, L]] = cursor.zoomOptional(ListIndexDelta.toIndex(i))
+    def zoomAllI: List[Cursor[U, A, D, L]] = cursor.model.indices.flatMap(cursor.zoomI).toList
+  }
+
+  //  implicit class ListCursor[C, L](cursor: Cursor[List[C], L]) {
 //    def zoomMatch[F <: C => Boolean](f: F)(implicit fEncoder: Encoder[F], s: Searchable[C, Guid]): Option[Cursor[C, L]] = {
 //      val optionalMatch: OptionalMatch[C, F] = OptionalMatch[C, F](f)
 //      optionalMatch.getOption(cursor.model).map { c =>
