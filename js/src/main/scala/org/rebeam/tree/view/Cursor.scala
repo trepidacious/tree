@@ -89,7 +89,7 @@ trait Cursor[U, M, D <: Delta[U, M], L] extends Parent[U, M, D] {
     }
   }
 
-  //FIXME add prism
+  //FIXME add zoomPrism if needed
 
   def label(label: String): Cursor[U, M, D, String] = CursorBasic(parent, model, label, root, allModelRefGuids)
   def move[N](newLocation: N): Cursor[U, M, D, N] = CursorBasic(parent, model, newLocation, root, allModelRefGuids)
@@ -143,26 +143,10 @@ object Cursor {
     def zoomAllI: List[Cursor[U, A, D, L]] = cursor.model.indices.flatMap(cursor.zoomI).toList
   }
 
-  //  implicit class ListCursor[C, L](cursor: Cursor[List[C], L]) {
-//    def zoomMatch[F <: C => Boolean](f: F)(implicit fEncoder: Encoder[F], s: Searchable[C, Guid]): Option[Cursor[C, L]] = {
-//      val optionalMatch: OptionalMatch[C, F] = OptionalMatch[C, F](f)
-//      optionalMatch.getOption(cursor.model).map { c =>
-//        Cursor[C, L](OptionalMatchParent(cursor.parent, optionalMatch), c, cursor.location, cursor.root)
-//      }
-//    }
-//
-//    def zoomAllMatches[F <: C => Boolean](cToF: C => F)(implicit fEncoder: Encoder[F], s: Searchable[C, Guid]): List[Cursor[C, L]] =
-//      cursor.model.map(cToF).flatMap(zoomMatch(_))
-//  }
-//
-//  implicit class OptionCursor[C, L](cursor: Cursor[Option[C], L]) {
-//    def zoomOption(implicit s: Searchable[C, Guid]): Option[Cursor[C, L]] = {
-//      cursor.model.map { c =>
-//        Cursor[C, L](OptionParent[C](cursor.parent), c, cursor.location, cursor.root)
-//      }
-//    }
-//  }
-//
+  implicit class OptionCursor[U, A, D <: Delta[U, A], L](cursor: Cursor[U, Option[A], OptionDelta[U, A, D], L])(implicit s: Searchable[A, Guid]) {
+    def zoomOption: Option[Cursor[U, A, D, L]] = cursor.zoomOptional(OptionDelta.toSome[U, A, D])
+  }
+
 //  implicit class MirrorCursor[L](cursor: Cursor[Mirror, L]) {
 //    def zoomRef[A: MirrorCodec](ref: TreeRef[A])(implicit s: Searchable[A, Guid]): Option[Cursor[A, L]] = {
 //      cursor.model(ref).map { data =>

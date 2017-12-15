@@ -245,14 +245,14 @@ abstract class OptionalMatchDelta[U, A, F <: A => Boolean](optionalMatch: Option
     )  //optionalMatch.modify(delta.apply)(l)
 }
 
-abstract class OptionDelta[U, A](delta: Delta[U, A]) extends Delta[U, Option[A]] {
-//  private lazy val mod: Option[A] => Option[A] = option.some[A].modify(delta.apply)
-  def apply(a: Option[A]): DeltaIO[U, Option[A]] = option.some[A].getOption(a).fold(
-    pure[U, Option[A]](a)
-  )(
-    delta(_).map(option.some[A].set(_)(a))
-  )  //mod(o)
-}
+//abstract class OptionDelta[U, A](delta: Delta[U, A]) extends Delta[U, Option[A]] {
+////  private lazy val mod: Option[A] => Option[A] = option.some[A].modify(delta.apply)
+//  def apply(a: Option[A]): DeltaIO[U, Option[A]] = option.some[A].getOption(a).fold(
+//    pure[U, Option[A]](a)
+//  )(
+//    delta(_).map(option.some[A].set(_)(a))
+//  )  //mod(o)
+//}
 
 abstract class PrismNDelta[U, S, A](prismN: PrismN[S, A], delta: Delta[U, A]) extends Delta[U, S] {
   def apply(s: S): DeltaIO[U, S] =
