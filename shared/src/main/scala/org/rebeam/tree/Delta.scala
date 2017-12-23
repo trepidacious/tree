@@ -223,10 +223,6 @@ abstract class LensNDelta[U, A, B](lensN: LensN[A, B], delta: Delta[U, B]) exten
   def apply(a: A): DeltaIO[U, A] = delta(lensN.get(a)).map(lensN.set(_)(a)) //lensN.modify(delta.apply)(a)
 }
 
-abstract class ValueDelta[U, A](v: A) extends Delta[U, A] {
-  def apply(a: A): DeltaIO[U, A] = pure(v)  //v
-}
-
 abstract class OptionalIDelta[U, A](optionalI: OptionalI[A], delta: Delta[U, A]) extends Delta[U, List[A]] {
   def apply(a: List[A]): DeltaIO[U, List[A]] =
     optionalI.getOption(a).fold(
@@ -277,29 +273,41 @@ abstract class PrismNDelta[U, S, A](prismN: PrismN[S, A], delta: Delta[U, A]) ex
 //    )
 //}
 
-@JsonCodec
-case class BooleanValueDelta[U](a: String) extends ValueDelta[U, String](a)
+abstract class AbstractValueDelta[U, A](v: A) extends Delta[U, A] {
+  def apply(a: A): DeltaIO[U, A] = pure(v)  //v
+}
 
 @JsonCodec
-case class ByteValueDelta[U](a: Byte) extends ValueDelta[U, Byte](a)
+case class ValueDelta[U, A](v: A) extends Delta[U, A] {
+  def apply(a: A): DeltaIO[U, A] = pure(v)  //v
+}
 
-@JsonCodec
-case class ShortValueDelta[U](a: Short) extends ValueDelta[U, Short](a)
+object ValueDelta {
+  type BooleanValueDelta[U] = ValueDelta[U, Boolean]
+  def BooleanValueDelta[U](a: Boolean): BooleanValueDelta[U] = ValueDelta(a)
 
-@JsonCodec
-case class IntValueDelta[U](a: Int) extends ValueDelta[U, Int](a)
+  type ByteValueDelta[U] = ValueDelta[U, Byte]
+  def ByteValueDelta[U](a: Byte): ByteValueDelta[U] = ValueDelta(a)
 
-@JsonCodec
-case class LongValueDelta[U](a: Long) extends ValueDelta[U, Long](a)
+  type ShortValueDelta[U] = ValueDelta[U, Short]
+  def ShortValueDelta[U](a: Short): ShortValueDelta[U] = ValueDelta(a)
 
-@JsonCodec
-case class FloatValueDelta[U](a: Float) extends ValueDelta[U, Float](a)
+  type IntValueDelta[U] = ValueDelta[U, Int]
+  def IntValueDelta[U](a: Int): IntValueDelta[U] = ValueDelta(a)
 
-@JsonCodec
-case class DoubleValueDelta[U](a: Double) extends ValueDelta[U, Double](a)
+  type LongValueDelta[U] = ValueDelta[U, Long]
+  def LongValueDelta[U](a: Long): LongValueDelta[U] = ValueDelta(a)
 
-@JsonCodec
-case class CharValueDelta[U](a: Char) extends ValueDelta[U, Char](a)
+  type FloatValueDelta[U] = ValueDelta[U, Float]
+  def FloatValueDelta[U](a: Float): FloatValueDelta[U] = ValueDelta(a)
 
-@JsonCodec
-case class StringValueDelta[U](a: String) extends ValueDelta[U, String](a)
+  type DoubleValueDelta[U] = ValueDelta[U, Double]
+  def DoubleValueDelta[U](a: Double): DoubleValueDelta[U] = ValueDelta(a)
+
+  type CharValueDelta[U] = ValueDelta[U, Char]
+  def CharValueDelta[U](a: Char): CharValueDelta[U] = ValueDelta(a)
+
+  type StringValueDelta[U] = ValueDelta[U, String]
+  def StringValueDelta[U](a: String): StringValueDelta[U] = ValueDelta(a)
+}
+

@@ -11,7 +11,10 @@ import scala.util.{Failure, Success}
 import io.circe._
 import io.circe.parser._
 import io.circe.syntax._
+import japgolly.scalajs.react.extra.Reusability
+import org.scalajs.dom.html.Div
 //import org.rebeam.tree.ref.{Mirror, MirrorCodec}
+import japgolly.scalajs.react.vdom.prefix_<^._
 
 object ServerRootComponent {
 
@@ -55,7 +58,8 @@ object ServerRootComponent {
 //  implicit def mirrorAndIdRootSource[M]: RootSource[MirrorAndId[M]] = new MirrorAndIdRootSource
 
   private class NoRootSource[U, R, D <: Delta[U, R]] extends RootSource[U, R, D] {
-    def rootFor(rootModel: R, parent: Parent[U, R, D]): Root = Cursor.RootNone
+    val root: Root = Cursor.RootNone
+    def rootFor(rootModel: R, parent: Parent[U, R, D]): Root = root
   }
 
   def noRootSource[U, R, D <: Delta[U, R]]: RootSource[U, R, D] = new NoRootSource[U, R, D]
@@ -104,16 +108,27 @@ object ServerRootComponent {
 
     val rootParent = RootParent[U, R, D](deltaToCallback)
 
-    def render(props: Props[U, R, D, P], state: State[U, R, D]) = {
-      state.clientState.map { cs =>
+    def stringViewThing = ReactComponentB[String]("stringViewThing")
+      .render_P(s => <.div(s): ReactElement)
+      .configure(Reusability.shouldComponentUpdateWithOverlay)
+      .build
+
+    def render(props: Props[U, R, D, P], state: State[U, R, D]): ReactElement = {
+//      println("Render " + props + " " + state)
+      println(this + " render")
+      val blah: Option[ReactElement] = state.clientState.map { cs =>
         val cursorP: Cursor[U, R, D, P] = Cursor(rootParent, cs.model, props.p, rootSource.rootFor(cs.model, rootParent))
-        props.render(cursorP)
-      }.getOrElse(
-        props.noData
-      )
+        <.div(
+          stringViewThing(cs.model.toString),
+          props.render(cursorP)
+        ): ReactElement
+      }
+      blah.getOrElse(props.noData: ReactElement)
     }
 
     def start: Callback = {
+
+      println(this + " started (mounted)")
 
       // This will establish the connection and return the WebSocket
       def connect(u: String) = CallbackTo[(WebSocket, SetIntervalHandle)] {
@@ -196,6 +211,8 @@ object ServerRootComponent {
     }
 
     def end: Callback = {
+      println(this + " ended (unmounted)")
+
       def closeWebSocket = scope.state.map(_.ws.foreach(_.close()))
       def clearWebSocket = scope.modState(_.copy(ws = None))
       def clearTick = scope.state.map(_.tick.foreach(clearInterval)) >> scope.modState(_.copy(tick = None))

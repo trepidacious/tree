@@ -104,10 +104,11 @@ object ListIndexDelta {
     * @tparam D   The type of delta on list elements
     * @return     DLens from list to indexed element
     */
-  def toIndex[U, A, D <: Delta[U, A]](i: Int): DOptional[U, List[A], ListIndexDelta[U, A, D], A, D] =
-    new DOptional[U, List[A], ListIndexDelta[U, A, D], A, D] {
-      def aToB(l: List[A]): Option[A] = l.lift(i)
-      def eToD(e: D): ListIndexDelta[U, A, D] = ListIndexDelta.Edited(i, e)
-    }
+  def toIndex[U, A, D <: Delta[U, A]](i: Int): DOptional[U, List[A], ListIndexDelta[U, A, D], A, D] = ListIndexDOptional(i)
 
+}
+
+case class ListIndexDOptional[U, A, D <: Delta[U, A]](i: Int) extends DOptional[U, List[A], ListIndexDelta[U, A, D], A, D] {
+  def aToB(l: List[A]): Option[A] = l.lift(i)
+  def eToD(e: D): ListIndexDelta[U, A, D] = ListIndexDelta.Edited(i, e)
 }

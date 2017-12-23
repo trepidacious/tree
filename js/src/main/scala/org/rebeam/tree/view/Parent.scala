@@ -37,24 +37,52 @@ trait Parent[U, C, D <: Delta[U, C]] {
   */
 case class RootParent[U, R, D <: Delta[U, R]](deltaToCallback: D => Callback) extends Parent[U, R, D] {
   def callback(delta: D): Callback = deltaToCallback(delta)
+
+//  override def toString: String = s"RootParent(${deltaToCallback.hashCode()})"
 }
 
 /**
   * Given a parent with a model: M and delta: D, produces a parent
   * for a child component with model: C and delta: E. This works by
   * just transforming the child delta: E to parent delta: D using a
-  * provided function (often based on a constructor), and then using
+  * provided DLens, and then using
   * the provided parent to produce the callback.
   * This allows us to chain Parents while navigating through a data
   * model.
+  * Note we use a DLens rather than a function since it is easy for
+  * functions to be regenerated from methods each time a parent is created,
+  * making parents non-equal.
   * @param parent               The parent to use to produce callbacks
-  * @param childToParentDelta   Transforms from child to parent deltas
+  * @param dLens                DLens from parent to child
   * @tparam U                   The type of data accessible via reference.
   * @tparam M                   The type of model in the parent
   * @tparam D                   The type of delta on the parent model
   * @tparam C                   The type of model in the child
   * @tparam E                   The type of delta on the child model
   */
-case class ChildParent[U, M, D <: Delta[U, M], C, E <: Delta[U, C]](parent: Parent[U, M, D], childToParentDelta: E => D) extends Parent[U, C, E] {
-  def callback(delta: E): Callback = parent.callback(childToParentDelta(delta))
+case class DLensParent[U, M, D <: Delta[U, M], C, E <: Delta[U, C]](parent: Parent[U, M, D], dLens: DLens[U, M, D, C, E]) extends Parent[U, C, E] {
+  def callback(delta: E): Callback = parent.callback(dLens.eToD(delta))
+}
+
+/**
+  * Given a parent with a model: M and delta: D, produces a parent
+  * for a child component with model: C and delta: E. This works by
+  * just transforming the child delta: E to parent delta: D using a
+  * provided DOptional, and then using
+  * the provided parent to produce the callback.
+  * This allows us to chain Parents while navigating through a data
+  * model.
+  * Note we use a DOptional rather than a function since it is easy for
+  * functions to be regenerated from methods each time a parent is created,
+  * making parents non-equal.
+  * @param parent               The parent to use to produce callbacks
+  * @param dOptional            DOptional from parent to child
+  * @tparam U                   The type of data accessible via reference.
+  * @tparam M                   The type of model in the parent
+  * @tparam D                   The type of delta on the parent model
+  * @tparam C                   The type of model in the child
+  * @tparam E                   The type of delta on the child model
+  */
+case class DOptionalParent[U, M, D <: Delta[U, M], C, E <: Delta[U, C]](parent: Parent[U, M, D], dOptional: DOptional[U, M, D, C, E]) extends Parent[U, C, E] {
+  def callback(delta: E): Callback = parent.callback(dOptional.eToD(delta))
 }

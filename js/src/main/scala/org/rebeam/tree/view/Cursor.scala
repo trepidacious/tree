@@ -3,7 +3,6 @@ package org.rebeam.tree.view
 import japgolly.scalajs.react._
 import org.rebeam.tree._
 import japgolly.scalajs.react.extra.Reusability
-import org.rebeam.tree.ref.Mirror
 import org.rebeam.tree.sync.{Guid, Ref => TreeRef}
 import Searchable._
 
@@ -72,20 +71,17 @@ trait Cursor[U, M, D <: Delta[U, M], L] extends Parent[U, M, D] {
   def action(delta: D): Action = ParentAction(parent, delta)
   def act(delta: D): Action = action(delta)
 
-  // FIXME "set" could be provided in the case where D is a known delta type, e.  g.
-  // IntValueDelta, and we could provide set(i: Int)
-
   def zoom[C, E <: Delta[U, C]](dLens: DLens[U, M, D, C, E])(implicit s: Searchable[C, Guid]): Cursor[U, C, E, L] = {
     val newModel = dLens.aToB(model)
     val newRefGuids = newModel.allRefGuids
-    CursorBasic[U, C, E, L](ChildParent(parent, dLens.eToD), newModel, location, root, newRefGuids)
+    CursorBasic[U, C, E, L](DLensParent(parent, dLens), newModel, location, root, newRefGuids)
   }
 
   def zoomOptional[C, E <: Delta[U, C]](dOptional: DOptional[U, M, D, C, E])(implicit s: Searchable[C, Guid]): Option[Cursor[U, C, E, L]] = {
     dOptional.aToB(model).map {
       newModel =>
         val newRefGuids = newModel.allRefGuids
-        CursorBasic[U, C, E, L](ChildParent(parent, dOptional.eToD), newModel, location, root, newRefGuids)
+        CursorBasic[U, C, E, L](DOptionalParent(parent, dOptional), newModel, location, root, newRefGuids)
     }
   }
 
@@ -113,7 +109,7 @@ object Cursor {
         // First check for changes in parent, model or location (i.e. everything except
         // changes to the data pointed to by Refs)
         if (!(c1.parent == c2.parent && c1.model == c2.model && c1.location == c2.location)) {
-//          println("c1 != c2 (non-ref) " + c1 + ", c2")
+          println(s"c1 != c2 (non-ref) $c1, $c2, parent equal? ${c1.parent == c2.parent}, model equal? ${c1.model == c2.model}, location equal? ${c1.location == c2.location}" )
           false
 
         // Otherwise look for changes in referenced values.
@@ -123,7 +119,7 @@ object Cursor {
           val c1RefRevs = c1.root.refRevisions(c1.allModelRefGuids)
           val c2RefRevs = c2.root.refRevisions(c2.allModelRefGuids)
           val e = c1RefRevs == c2RefRevs
-//          println("c1 " + c1 + ", c1RefRevs " + c1RefRevs + ", c2Refs " + c2RefRevs + ", equal? " + e)
+          println("c1 " + c1 + ", c1RefRevs " + c1RefRevs + ", c2Refs " + c2RefRevs + ", equal? " + e)
           e
         }
     }
@@ -143,8 +139,17 @@ object Cursor {
     def zoomAllI: List[Cursor[U, A, D, L]] = cursor.model.indices.flatMap(cursor.zoomI).toList
   }
 
+  implicit class ListMatchCursor[U, A, D <: Delta[U, A], L, F <: A => Boolean](cursor: Cursor[U, List[A], ListMatchDelta[U, A, D, F], L])(implicit s: Searchable[A, Guid]) {
+    def zoomMatch(f: F): Option[Cursor[U, A, D, L]] = cursor.zoomOptional(ListMatchDelta.toMatch(f))
+    def zoomAllMatches(toFinder: A => F): List[Cursor[U, A, D, L]] = cursor.model.map(toFinder).flatMap(cursor.zoomMatch)
+  }
+
   implicit class OptionCursor[U, A, D <: Delta[U, A], L](cursor: Cursor[U, Option[A], OptionDelta[U, A, D], L])(implicit s: Searchable[A, Guid]) {
     def zoomOption: Option[Cursor[U, A, D, L]] = cursor.zoomOptional(OptionDelta.toSome[U, A, D])
+  }
+
+  implicit class ValueCursor[U, A, L](cursor: Cursor[U, A, ValueDelta[U, A], L])(implicit s: Searchable[A, Guid]) {
+    def set(a: A): Action = cursor.act(ValueDelta(a))
   }
 
 //  implicit class MirrorCursor[L](cursor: Cursor[Mirror, L]) {
@@ -154,4 +159,5 @@ object Cursor {
 //      }
 //    }
 //  }
+
 }
