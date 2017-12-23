@@ -4,7 +4,7 @@ version in ThisBuild := "0.1-SNAPSHOT"
 
 organization in ThisBuild := "org.rebeam"
 
-scalaVersion in ThisBuild := "2.11.8"
+scalaVersion in ThisBuild := "2.11.12"
 
 scalacOptions in ThisBuild ++= Seq(
   "-feature",
