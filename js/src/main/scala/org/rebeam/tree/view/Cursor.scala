@@ -119,7 +119,7 @@ object Cursor {
           val c1RefRevs = c1.root.refRevisions(c1.allModelRefGuids)
           val c2RefRevs = c2.root.refRevisions(c2.allModelRefGuids)
           val e = c1RefRevs == c2RefRevs
-          println("c1 " + c1 + ", c1RefRevs " + c1RefRevs + ", c2Refs " + c2RefRevs + ", equal? " + e)
+          println("c1 " + c1 + ", c1RefRevs " + c1RefRevs + ", c2RefRevs " + c2RefRevs + ", equal? " + e)
           e
         }
     }
