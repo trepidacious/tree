@@ -109,7 +109,7 @@ object Cursor {
         // First check for changes in parent, model or location (i.e. everything except
         // changes to the data pointed to by Refs)
         if (!(c1.parent == c2.parent && c1.model == c2.model && c1.location == c2.location)) {
-          println(s"c1 != c2 (non-ref) $c1, $c2, parent equal? ${c1.parent == c2.parent}, model equal? ${c1.model == c2.model}, location equal? ${c1.location == c2.location}" )
+//          println(s"c1 != c2 (non-ref) $c1, $c2, parent equal? ${c1.parent == c2.parent}, model equal? ${c1.model == c2.model}, location equal? ${c1.location == c2.location}" )
           false
 
         // Otherwise look for changes in referenced values.
@@ -119,7 +119,7 @@ object Cursor {
           val c1RefRevs = c1.root.refRevisions(c1.allModelRefGuids)
           val c2RefRevs = c2.root.refRevisions(c2.allModelRefGuids)
           val e = c1RefRevs == c2RefRevs
-          println("c1 " + c1 + ", c1RefRevs " + c1RefRevs + ", c2RefRevs " + c2RefRevs + ", equal? " + e)
+//          println("c1 " + c1 + ", c1RefRevs " + c1RefRevs + ", c2RefRevs " + c2RefRevs + ", equal? " + e)
           e
         }
     }

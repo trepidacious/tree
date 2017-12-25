@@ -2,7 +2,7 @@ package org.rebeam.tree.view
 
 import japgolly.scalajs.react._
 import org.rebeam.tree._
-import org.rebeam.tree.sync.{ClientState, Guid, RefAdder, Ref => TreeRef}
+import org.rebeam.tree.sync.{ClientState, Guid, RefAdder}//, Ref => TreeRef}
 import org.rebeam.tree.sync.Sync._
 import org.scalajs.dom._
 
@@ -11,10 +11,7 @@ import scala.util.{Failure, Success}
 import io.circe._
 import io.circe.parser._
 import io.circe.syntax._
-import japgolly.scalajs.react.extra.Reusability
-import org.scalajs.dom.html.Div
 //import org.rebeam.tree.ref.{Mirror, MirrorCodec}
-import japgolly.scalajs.react.vdom.prefix_<^._
 
 object ServerRootComponent {
 
@@ -79,7 +76,7 @@ object ServerRootComponent {
      refAdder: RefAdder[U, R],
      searchable: Searchable[R, Guid]) {
 
-    implicit val cme = clientMsgEncoder[U, R, D]
+    implicit val cme: Encoder[DeltaAndId[U, R, D]] = clientMsgEncoder[U, R, D]
 
     val deltaToCallback: D => Callback =
       (delta: D) =>
@@ -88,9 +85,9 @@ object ServerRootComponent {
           _ <- s.clientState match {
             case None =>
               // TODO implement
-              Callback{println("Delta before we have a clientState! Should queue deltas?")}
+              Callback{println("SRC: Delta before we have a clientState! Should queue deltas?")}
 
-            case Some(cs) => {
+            case Some(cs) =>
               //SIDE-EFFECT: Note this is the point at which we generate the context
               val (newCS, id) = cs.apply(delta, contextSource.getContext)
               val dij = DeltaAndId[U, R, D](delta, id)
@@ -102,33 +99,20 @@ object ServerRootComponent {
                   s.ws.foreach(socket => socket.send(msg))
                 }
               } yield {}
-            }
           }
         } yield {}
 
-    val rootParent = RootParent[U, R, D](deltaToCallback)
-
-    def stringViewThing = ReactComponentB[String]("stringViewThing")
-      .render_P(s => <.div(s): ReactElement)
-      .configure(Reusability.shouldComponentUpdateWithOverlay)
-      .build
+    val rootParent: RootParent[U, R, D] = RootParent[U, R, D](deltaToCallback)
 
     def render(props: Props[U, R, D, P], state: State[U, R, D]): ReactElement = {
-//      println("Render " + props + " " + state)
-      println(this + " render")
-      val blah: Option[ReactElement] = state.clientState.map { cs =>
-        val cursorP: Cursor[U, R, D, P] = Cursor(rootParent, cs.model, props.p, rootSource.rootFor(cs.model, rootParent))
-        <.div(
-          stringViewThing(cs.model.toString),
-          props.render(cursorP)
-        ): ReactElement
-      }
-      blah.getOrElse(props.noData: ReactElement)
+      state.clientState.map { cs =>
+        props.render(Cursor(rootParent, cs.model, props.p, rootSource.rootFor(cs.model, rootParent)))
+      }.getOrElse(props.noData: ReactElement)
     }
 
     def start: Callback = {
 
-      println(this + " started (mounted)")
+      println("SRC: Mounted")
 
       // This will establish the connection and return the WebSocket
       def connect(u: String) = CallbackTo[(WebSocket, SetIntervalHandle)] {
@@ -146,16 +130,16 @@ object ServerRootComponent {
 
         // These are message-receiving events from the WebSocket "thread".
 
-        def onOpen(e: Event): Unit = println("Connected.")
+        def onOpen(e: Event): Unit = println("SRC: Connected.")
 
         def onMessage(e: MessageEvent): Unit = {
 //          println(s"Updating with: ${e.data.toString}")
           val msg = e.data.toString
 
           parse(msg).fold[Unit](
-            pf => println("Invalid JSON from server " + pf),
+            pf => println("SRC: Invalid JSON from server " + pf),
             json => updateDecoder[U, R, D].decodeJson(json).fold(
-              df => println("Could not decode JSON from server " + df + ":\n" + msg),
+              df => println("SRC: Could not decode JSON from server " + df + ":\n" + msg),
               update => {
 
                 val newCSX = direct.state.clientState.fold(
@@ -165,7 +149,7 @@ object ServerRootComponent {
                 )
 
                 newCSX.fold(
-                  error => println("Can't use server update: " + error),
+                  error => println("SRC: Can't use server update: " + error),
                   newCS => direct.modState(_.copy(clientState = Some(newCS)))
                 )
 
@@ -176,12 +160,12 @@ object ServerRootComponent {
 
         def onError(e: ErrorEvent): Unit = {
           // TODO recover?
-          println(s"Error: ${e.message}")
+          println(s"SRC: Error: ${e.message}")
         }
 
         def onClose(e: CloseEvent): Unit = {
           // TODO reconnect
-          println(s"Closed: ${e.reason}")
+          println(s"SRC: Closed: ${e.reason}")
           // Close the connection
           direct.modState(_.copy(ws = None))
         }
@@ -195,7 +179,7 @@ object ServerRootComponent {
 
         //Regularly send ping (empty object) through websocket, if we have one
         val tick = setInterval(5000) {
-          println("Ping!")
+          println("SRC: Ping!")
           direct.state.ws.foreach(_.send("{}"))
         }
 
@@ -206,12 +190,12 @@ object ServerRootComponent {
       scope.props.map(_.wsUrl).flatMap(connect).attemptTry.flatMap {
         case Success((ws, tick)) => scope.modState(_.copy(ws = Some(ws)).copy(tick = Some(tick)))
         // TODO handle failure
-        case Failure(error) => Callback(println(error.toString))
+        case Failure(error) => Callback(println(s"SRC: Websocket error: ${error.toString}"))
       }
     }
 
     def end: Callback = {
-      println(this + " ended (unmounted)")
+      println("SRC: Unmounted")
 
       def closeWebSocket = scope.state.map(_.ws.foreach(_.close()))
       def clearWebSocket = scope.modState(_.copy(ws = None))
