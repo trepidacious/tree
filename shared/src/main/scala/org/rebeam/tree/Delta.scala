@@ -10,21 +10,8 @@ import org.rebeam.tree.Delta._
 import org.rebeam.tree.sync.Sync._
 import org.rebeam.tree.sync._
 
-//class WidenedDelta[A, B >: A](aDelta: Delta[A], f: B => Option[A]) extends Delta[B] {
-//  def apply(b: B): DeltaIO[B] = f(b).fold(
-//    pure(b)
-//  )(
-//    a => aDelta(a).map(r => r: B)
-//  )
-//}
-
 trait Delta[U, A] {
   def apply(a: A): DeltaIO[U, A]
-
-//  def widen[B >: A](f: B => Option[A]): Delta[B] = new WidenedDelta[A, B](this, f)
-//  def widenPF[B >: A](f: PartialFunction[B, A]): Delta[B] = new WidenedDelta[A, B](this, f.lift)
-//  def widenCT[B >: A](implicit ct: ClassTag[A]): Delta[B] = new WidenedDelta[A, B](this, ct.unapply)
-//
 }
 
 sealed trait DeltaIOA[U, A]
@@ -53,6 +40,7 @@ case class Put[U, T <: U](create: Id[T] => DeltaIO[U, T]) extends DeltaIOA[U, T]
   */
 @JsonCodec
 case class DeltaIOContext(moment: Moment)
+
 
 /**
   * Provides DeltaIOContext for executing DeltaIOs.

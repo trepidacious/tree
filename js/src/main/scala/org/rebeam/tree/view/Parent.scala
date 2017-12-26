@@ -37,8 +37,6 @@ trait Parent[U, C, D <: Delta[U, C]] {
   */
 case class RootParent[U, R, D <: Delta[U, R]](deltaToCallback: D => Callback) extends Parent[U, R, D] {
   def callback(delta: D): Callback = deltaToCallback(delta)
-
-//  override def toString: String = s"RootParent(${deltaToCallback.hashCode()})"
 }
 
 /**
