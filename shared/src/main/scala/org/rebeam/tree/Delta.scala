@@ -2,6 +2,7 @@ package org.rebeam.tree
 
 import cats.free.Free
 import cats.free.Free.liftF
+import cats.~>
 import io.circe.generic.JsonCodec
 import org.rebeam.lenses._
 import monocle._
@@ -26,6 +27,15 @@ case class GetPRBoolean[U]() extends DeltaIOA[U, Boolean]
 case class GetPRFloat[U]() extends DeltaIOA[U, Float]
 case class GetPRDouble[U]() extends DeltaIOA[U, Double]
 case class Put[U, T <: U](create: Id[T] => DeltaIO[U, T]) extends DeltaIOA[U, T]
+
+object DeltaIOA {
+  //TODO - kind projector?
+//  def widenUArrow[U, V <: U, A]: DeltaIOA[V, A] ~> DeltaIOA[U, A] =
+//    new (DeltaIOA[V, A] ~> DeltaIOA[U, A]) {
+//
+//    }
+}
+
 
 /**
   * Provides the context within which an individual run of a DeltaIO can
@@ -62,6 +72,9 @@ object Delta {
 //  type DeltaIO[U, A] = Free[DeltaIOA, A]
 
   type DeltaIO[U, A] = Free[({ type T[X] = DeltaIOA[U, X] })#T, A]
+
+  // FIXME implement using mapK and DeltaIOA[V, A] ~> DeltaIOA[U, A]
+  def widenU[U, V <: U, A](d: DeltaIO[V, A]): DeltaIO[U, A] = d.asInstanceOf[DeltaIO[U, A]]
 
   /**
     * GetId returns an Id[T] value.

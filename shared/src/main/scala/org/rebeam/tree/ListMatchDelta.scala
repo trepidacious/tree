@@ -12,7 +12,7 @@ import cats.syntax.traverse._
   * Deltas on a list using a predicate for location
   */
 @JsonCodec
-sealed trait ListMatchDelta[U, A, D <: Delta[U, A], F <: A => Boolean] extends Delta[U, List[A]]
+sealed trait ListMatchDelta[U, V <: U, A, D <: Delta[V, A], F <: A => Boolean] extends Delta[U, List[A]]
 
 object ListMatchDelta {
 
@@ -21,11 +21,12 @@ object ListMatchDelta {
     * @param f    The predicate used to find the matching elements
     * @param a    The item to place at given index
     * @tparam U   The universe type
+    * @tparam V   The universe type for delta on list elements
     * @tparam A   The list element type
     * @tparam D   The type of delta on list elements
     * @tparam F   The type of predicate used to find the matching elements
     */
-  case class Updated[U, A, D <: Delta[U, A], F <: A => Boolean](f: F, a: A) extends ListMatchDelta[U, A, D, F]  {
+  case class Updated[U, V <: U, A, D <: Delta[V, A], F <: A => Boolean](f: F, a: A) extends ListMatchDelta[U, V, A, D, F]  {
     def apply(l: List[A]): DeltaIO[U, List[A]] = pure {
       val i = l.indexWhere(f)
       if (i < 0) l else l.updated(i, a)
@@ -37,11 +38,12 @@ object ListMatchDelta {
     * @param f    The predicate used to find the first matching element
     * @param a    The item to insert at given index
     * @tparam U   The universe type
+    * @tparam V   The universe type for delta on list elements
     * @tparam A   The list element type
     * @tparam D   The type of delta on list elements
     * @tparam F   The type of predicate used to find the matching elements
     */
-  case class Inserted[U, A, D <: Delta[U, A], F <: A => Boolean](f: F, a: A) extends ListMatchDelta[U, A, D, F]  {
+  case class Inserted[U, V <: U, A, D <: Delta[V, A], F <: A => Boolean](f: F, a: A) extends ListMatchDelta[U, V, A, D, F]  {
     def apply(l: List[A]): DeltaIO[U, List[A]] = pure {
       val i = l.indexWhere(f)
       if (i < 0)  l else  l.inserted(i, a)
@@ -53,17 +55,18 @@ object ListMatchDelta {
     * @param f    The predicate used to find the matching elements
     * @param d    The delta to run on first matching element
     * @tparam U   The universe type
+    * @tparam V   The universe type for delta on list elements
     * @tparam A   The list element type
     * @tparam D   The type of delta on list elements
     * @tparam F   The type of predicate used to find the matching elements
     */
-  case class Edited[U, A, D <: Delta[U, A], F <: A => Boolean](f: F, d: D) extends ListMatchDelta[U, A, D, F]  {
+  case class Edited[U, V <: U, A, D <: Delta[V, A], F <: A => Boolean](f: F, d: D) extends ListMatchDelta[U, V, A, D, F]  {
     def apply(l: List[A]): DeltaIO[U, List[A]] = {
       val i = l.indexWhere(f)
       if (i < 0) {
         pure(l)
       } else {
-        d(l(i)).map(b => l.updated(i, b))
+        Delta.widenU[U, V, A](d(l(i))).map(b => l.updated(i, b))
       }
     }
   }
@@ -73,11 +76,12 @@ object ListMatchDelta {
     * Delete first matching list element
     * @param f    The predicate used to find matching elements to delete
     * @tparam U   The universe type
+    * @tparam V   The universe type for delta on list elements
     * @tparam A   The list element type
     * @tparam D   The type of delta on list elements
     * @tparam F   The type of predicate used to find the matching elements
     */
-  case class Deleted[U, A, D <: Delta[U, A], F <: A => Boolean](f: F) extends ListMatchDelta[U, A, D, F]  {
+  case class Deleted[U, V <: U, A, D <: Delta[V, A], F <: A => Boolean](f: F) extends ListMatchDelta[U, V, A, D, F]  {
     def apply(l: List[A]): DeltaIO[U, List[A]] = pure {
       val i = l.indexWhere(f)
       l.deleted(i)
@@ -90,16 +94,17 @@ object ListMatchDelta {
     * with the appropriate item delta
     * @param f    The predicate used to find matching elements
     * @tparam U   The universe type
+    * @tparam V   The universe type for delta on list elements
     * @tparam A   The list element type
     * @tparam D   The type of delta on list elements
     * @return     DLens from list to indexed element
     */
-  def toMatch[U, A, D <: Delta[U, A], F <: A => Boolean](f: F):
-    DOptional[U, List[A], ListMatchDelta[U, A, D, F], A, D] = ListMatchDOptional(f)
+  def toMatch[U, V <: U, A, D <: Delta[V, A], F <: A => Boolean](f: F):
+    DOptional[U, List[A], ListMatchDelta[U, V, A, D, F], V, A, D] = ListMatchDOptional(f)
 
 }
 
-case class ListMatchDOptional[U, A, D <: Delta[U, A], F <: A => Boolean](f: F) extends DOptional[U, List[A], ListMatchDelta[U, A, D, F], A, D] {
+case class ListMatchDOptional[U, V <: U, A, D <: Delta[V, A], F <: A => Boolean](f: F) extends DOptional[U, List[A], ListMatchDelta[U, V, A, D, F], V, A, D] {
   def aToB(l: List[A]): Option[A] = l.find(f)
-  def eToD(e: D): ListMatchDelta[U, A, D, F] = ListMatchDelta.Edited(f, e)
+  def eToD(e: D): ListMatchDelta[U, V, A, D, F] = ListMatchDelta.Edited(f, e)
 }
