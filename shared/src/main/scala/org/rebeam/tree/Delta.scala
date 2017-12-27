@@ -62,6 +62,10 @@ object Delta {
 
   type DeltaIO[U, A] = Free[({ type T[X] = DeltaIOA[U, X] })#T, A]
 
+//  type DeltaION[A] = DeltaIO[Nothing, A]
+//
+//  type DeltaN[A] = Delta[Nothing, A]
+
 //  class Widener[U, V <: U] {
 //    type DIOU[A] = DeltaIOA[U, A]
 //    type DIOV[A] = DeltaIOA[V, A]
@@ -290,41 +294,41 @@ abstract class PrismNDelta[U, S, A](prismN: PrismN[S, A], delta: Delta[U, A]) ex
 //    )
 //}
 
-abstract class AbstractValueDelta[U, A](v: A) extends Delta[U, A] {
-  def apply(a: A): DeltaIO[U, A] = pure(v)  //v
+abstract class AbstractValueDelta[A](v: A) extends Delta[Nothing, A] {
+  def apply(a: A): DeltaIO[Nothing, A] = pure(v)
 }
 
 @JsonCodec
-case class ValueDelta[U, A](v: A) extends Delta[U, A] {
-  def apply(a: A): DeltaIO[U, A] = pure(v)  //v
+case class ValueDelta[A](v: A) extends Delta[Nothing, A] {
+  def apply(a: A): DeltaIO[Nothing, A] = pure(v)
 }
 
 object ValueDelta {
-  type BooleanValueDelta[U] = ValueDelta[U, Boolean]
-  def BooleanValueDelta[U](a: Boolean): BooleanValueDelta[U] = ValueDelta(a)
+  type BooleanValueDelta = ValueDelta[Boolean]
+  def BooleanValueDelta(a: Boolean): BooleanValueDelta = ValueDelta(a)
 
-  type ByteValueDelta[U] = ValueDelta[U, Byte]
-  def ByteValueDelta[U](a: Byte): ByteValueDelta[U] = ValueDelta(a)
+  type ByteValueDelta = ValueDelta[Byte]
+  def ByteValueDelta(a: Byte): ByteValueDelta = ValueDelta(a)
 
-  type ShortValueDelta[U] = ValueDelta[U, Short]
-  def ShortValueDelta[U](a: Short): ShortValueDelta[U] = ValueDelta(a)
+  type ShortValueDelta = ValueDelta[Short]
+  def ShortValueDelta(a: Short): ShortValueDelta = ValueDelta(a)
 
-  type IntValueDelta[U] = ValueDelta[U, Int]
-  def IntValueDelta[U](a: Int): IntValueDelta[U] = ValueDelta(a)
+  type IntValueDelta = ValueDelta[Int]
+  def IntValueDelta(a: Int): IntValueDelta = ValueDelta(a)
 
-  type LongValueDelta[U] = ValueDelta[U, Long]
-  def LongValueDelta[U](a: Long): LongValueDelta[U] = ValueDelta(a)
+  type LongValueDelta = ValueDelta[Long]
+  def LongValueDelta(a: Long): LongValueDelta = ValueDelta(a)
 
-  type FloatValueDelta[U] = ValueDelta[U, Float]
-  def FloatValueDelta[U](a: Float): FloatValueDelta[U] = ValueDelta(a)
+  type FloatValueDelta = ValueDelta[Float]
+  def FloatValueDelta(a: Float): FloatValueDelta = ValueDelta(a)
 
-  type DoubleValueDelta[U] = ValueDelta[U, Double]
-  def DoubleValueDelta[U](a: Double): DoubleValueDelta[U] = ValueDelta(a)
+  type DoubleValueDelta = ValueDelta[Double]
+  def DoubleValueDelta(a: Double): DoubleValueDelta = ValueDelta(a)
 
-  type CharValueDelta[U] = ValueDelta[U, Char]
-  def CharValueDelta[U](a: Char): CharValueDelta[U] = ValueDelta(a)
+  type CharValueDelta = ValueDelta[Char]
+  def CharValueDelta(a: Char): CharValueDelta = ValueDelta(a)
 
-  type StringValueDelta[U] = ValueDelta[U, String]
-  def StringValueDelta[U](a: String): StringValueDelta[U] = ValueDelta(a)
+  type StringValueDelta = ValueDelta[String]
+  def StringValueDelta(a: String): StringValueDelta = ValueDelta(a)
 }
 

@@ -97,6 +97,8 @@ private case class CursorBasic[U, M, D <: Delta[U, M], L](parent: Parent[U, M, D
 
 object Cursor {
 
+  type CursorN[M, D <: Delta[Nothing, M], L] = Cursor[Nothing, M, D, L]
+
   /**
     * Compare cursors
     * @tparam M   Model type
@@ -148,7 +150,7 @@ object Cursor {
     def zoomOption: Option[Cursor[V, A, D, L]] = cursor.zoomOptional(OptionDelta.toSome[U, V, A, D])
   }
 
-  implicit class ValueCursor[U, A, L](cursor: Cursor[U, A, ValueDelta[U, A], L])(implicit s: Searchable[A, Guid]) {
+  implicit class ValueCursor[A, L](cursor: CursorN[A, ValueDelta[A], L])(implicit s: Searchable[A, Guid]) {
     def set(a: A): Action = cursor.act(ValueDelta(a))
   }
 
