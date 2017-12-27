@@ -77,9 +77,10 @@ class Mirror[A](private val map: Map[Id[A], MirrorState[A]]) {
   /**
     * Retrieve the data for a reference, if reference is valid and data is present in mirror
     * @param ref  The reference
+    * @tparam B   The type of data
     * @return     The data if present, or None otherwise
     */
-  def apply(ref: Ref[A]): Option[A] = getState(ref.id).map(_.data)
+  def apply[B <: A](ref: Ref[B]): Option[B] = getState(ref.id).map(_.data.asInstanceOf[B])
 
   private def getState(id: Id[A]): Option[MirrorState[A]] = map.get(id)
 
