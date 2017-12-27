@@ -71,17 +71,17 @@ trait Cursor[U, M, D <: Delta[U, M], L] extends Parent[U, M, D] {
   def action(delta: D): Action = ParentAction(parent, delta)
   def act(delta: D): Action = action(delta)
 
-  def zoom[C, E <: Delta[U, C]](dLens: DLens[U, M, D, C, E])(implicit s: Searchable[C, Guid]): Cursor[U, C, E, L] = {
+  def zoom[V <: U, C, E <: Delta[V, C]](dLens: DLens[U, M, D, V, C, E])(implicit s: Searchable[C, Guid]): Cursor[V, C, E, L] = {
     val newModel = dLens.aToB(model)
     val newRefGuids = newModel.allRefGuids
-    CursorBasic[U, C, E, L](DLensParent(parent, dLens), newModel, location, root, newRefGuids)
+    CursorBasic[V, C, E, L](DLensParent(parent, dLens), newModel, location, root, newRefGuids)
   }
 
-  def zoomOptional[C, E <: Delta[U, C]](dOptional: DOptional[U, M, D, C, E])(implicit s: Searchable[C, Guid]): Option[Cursor[U, C, E, L]] = {
+  def zoomOptional[V <: U, C, E <: Delta[V, C]](dOptional: DOptional[U, M, D, V, C, E])(implicit s: Searchable[C, Guid]): Option[Cursor[V, C, E, L]] = {
     dOptional.aToB(model).map {
       newModel =>
         val newRefGuids = newModel.allRefGuids
-        CursorBasic[U, C, E, L](DOptionalParent(parent, dOptional), newModel, location, root, newRefGuids)
+        CursorBasic[V, C, E, L](DOptionalParent(parent, dOptional), newModel, location, root, newRefGuids)
     }
   }
 
@@ -134,18 +134,18 @@ object Cursor {
   def apply[U, M, D <: Delta[U, M], L](parent: Parent[U, M, D], model: M, location: L, root: Root)(implicit s: Searchable[M, Guid]): Cursor[U, M, D, L] =
     CursorBasic(parent, model, location, root, model.allRefGuids)
 
-  implicit class ListIndexCursor[U, A, D <: Delta[U, A], L](cursor: Cursor[U, List[A], ListIndexDelta[U, A, D], L])(implicit s: Searchable[A, Guid]) {
-    def zoomI(i: Int): Option[Cursor[U, A, D, L]] = cursor.zoomOptional(ListIndexDelta.toIndex(i))
-    def zoomAllI: List[Cursor[U, A, D, L]] = cursor.model.indices.flatMap(cursor.zoomI).toList
+  implicit class ListIndexCursor[U, V <: U, A, D <: Delta[V, A], L](cursor: Cursor[U, List[A], ListIndexDelta[U, V, A, D], L])(implicit s: Searchable[A, Guid]) {
+    def zoomI(i: Int): Option[Cursor[V, A, D, L]] = cursor.zoomOptional(ListIndexDelta.toIndex(i))
+    def zoomAllI: List[Cursor[V, A, D, L]] = cursor.model.indices.flatMap(cursor.zoomI).toList
   }
 
-  implicit class ListMatchCursor[U, A, D <: Delta[U, A], L, F <: A => Boolean](cursor: Cursor[U, List[A], ListMatchDelta[U, A, D, F], L])(implicit s: Searchable[A, Guid]) {
-    def zoomMatch(f: F): Option[Cursor[U, A, D, L]] = cursor.zoomOptional(ListMatchDelta.toMatch(f))
-    def zoomAllMatches(toFinder: A => F): List[Cursor[U, A, D, L]] = cursor.model.map(toFinder).flatMap(cursor.zoomMatch)
+  implicit class ListMatchCursor[U, V <: U, A, D <: Delta[V, A], L, F <: A => Boolean](cursor: Cursor[U, List[A], ListMatchDelta[U, V, A, D, F], L])(implicit s: Searchable[A, Guid]) {
+    def zoomMatch(f: F): Option[Cursor[V, A, D, L]] = cursor.zoomOptional(ListMatchDelta.toMatch(f))
+    def zoomAllMatches(toFinder: A => F): List[Cursor[V, A, D, L]] = cursor.model.map(toFinder).flatMap(cursor.zoomMatch)
   }
 
-  implicit class OptionCursor[U, A, D <: Delta[U, A], L](cursor: Cursor[U, Option[A], OptionDelta[U, A, D], L])(implicit s: Searchable[A, Guid]) {
-    def zoomOption: Option[Cursor[U, A, D, L]] = cursor.zoomOptional(OptionDelta.toSome[U, A, D])
+  implicit class OptionCursor[U, V <: U, A, D <: Delta[V, A], L](cursor: Cursor[U, Option[A], OptionDelta[U, V, A, D], L])(implicit s: Searchable[A, Guid]) {
+    def zoomOption: Option[Cursor[V, A, D, L]] = cursor.zoomOptional(OptionDelta.toSome[U, V, A, D])
   }
 
   implicit class ValueCursor[U, A, L](cursor: Cursor[U, A, ValueDelta[U, A], L])(implicit s: Searchable[A, Guid]) {

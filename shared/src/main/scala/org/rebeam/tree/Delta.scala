@@ -28,15 +28,6 @@ case class GetPRFloat[U]() extends DeltaIOA[U, Float]
 case class GetPRDouble[U]() extends DeltaIOA[U, Double]
 case class Put[U, T <: U](create: Id[T] => DeltaIO[U, T]) extends DeltaIOA[U, T]
 
-object DeltaIOA {
-  //TODO - kind projector?
-//  def widenUArrow[U, V <: U, A]: DeltaIOA[V, A] ~> DeltaIOA[U, A] =
-//    new (DeltaIOA[V, A] ~> DeltaIOA[U, A]) {
-//
-//    }
-}
-
-
 /**
   * Provides the context within which an individual run of a DeltaIO can
   * occur. Currently just the moment in which we should run, but may be extended
@@ -69,12 +60,37 @@ object DeltaIOContextSource {
 
 object Delta {
 
-//  type DeltaIO[U, A] = Free[DeltaIOA, A]
-
   type DeltaIO[U, A] = Free[({ type T[X] = DeltaIOA[U, X] })#T, A]
 
+//  class Widener[U, V <: U] {
+//    type DIOU[A] = DeltaIOA[U, A]
+//    type DIOV[A] = DeltaIOA[V, A]
+//
+//    val widenUArrow: DIOV ~> DIOU =
+//      new (DIOV ~> DIOU) {
+//        def apply[A](v: DIOV[A]): DIOU[A] =
+//          v match {
+//            case GetGuid() => GetGuid()
+//            case GetId() => GetId()
+//            case GetContext() => GetContext()
+//            case GetDeltaId() => GetDeltaId()
+//            case GetPRInt() => GetPRInt()
+//            case GetPRIntUntil(bound) => GetPRIntUntil(bound)
+//            case GetPRLong() => GetPRLong()
+//            case GetPRBoolean() => GetPRBoolean()
+//            case GetPRFloat() => GetPRFloat()
+//            case GetPRDouble() => GetPRDouble()
+//            case Put(create) =>
+//              val createU = ((a: Id[A] ) => a.asInstanceOf[Id[V with A]]).andThen(create.andThen(dioV => Delta.widenU[U, V, A](dioV.map(vWithA => vWithA : A))))
+//              Put[U, A](createU)
+//          }
+//      }
+//  }
+
   // FIXME implement using mapK and DeltaIOA[V, A] ~> DeltaIOA[U, A]
-  def widenU[U, V <: U, A](d: DeltaIO[V, A]): DeltaIO[U, A] = d.asInstanceOf[DeltaIO[U, A]]
+  def widenU[U, V <: U, A](d: DeltaIO[V, A]): DeltaIO[U, A] = {
+    d.asInstanceOf[DeltaIO[U, A]]
+  }
 
   /**
     * GetId returns an Id[T] value.

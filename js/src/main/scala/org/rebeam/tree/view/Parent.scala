@@ -12,7 +12,7 @@ import org.rebeam.tree._
   * The child's model value itself (of type C) will be passed separately, e.g.
   * using a Cursor.
   *
-  * @tparam U     The type of data accessible via reference.
+  * @tparam U The type of data accessible via reference.
   * @tparam C The type of child model in the parent/child relationship.
   * @tparam D The type of delta on the child model
   */
@@ -52,13 +52,14 @@ case class RootParent[U, R, D <: Delta[U, R]](deltaToCallback: D => Callback) ex
   * making parents non-equal.
   * @param parent               The parent to use to produce callbacks
   * @param dLens                DLens from parent to child
-  * @tparam U                   The type of data accessible via reference.
+  * @tparam U                   The type of data accessible via reference in parent.
   * @tparam M                   The type of model in the parent
   * @tparam D                   The type of delta on the parent model
+  * @tparam V                   The type of data accessible via reference in child.
   * @tparam C                   The type of model in the child
   * @tparam E                   The type of delta on the child model
   */
-case class DLensParent[U, M, D <: Delta[U, M], C, E <: Delta[U, C]](parent: Parent[U, M, D], dLens: DLens[U, M, D, C, E]) extends Parent[U, C, E] {
+case class DLensParent[U, M, D <: Delta[U, M], V <: U, C, E <: Delta[V, C]](parent: Parent[U, M, D], dLens: DLens[U, M, D, V, C, E]) extends Parent[V, C, E] {
   def callback(delta: E): Callback = parent.callback(dLens.eToD(delta))
 }
 
@@ -81,6 +82,6 @@ case class DLensParent[U, M, D <: Delta[U, M], C, E <: Delta[U, C]](parent: Pare
   * @tparam C                   The type of model in the child
   * @tparam E                   The type of delta on the child model
   */
-case class DOptionalParent[U, M, D <: Delta[U, M], C, E <: Delta[U, C]](parent: Parent[U, M, D], dOptional: DOptional[U, M, D, C, E]) extends Parent[U, C, E] {
+case class DOptionalParent[U, M, D <: Delta[U, M], V <: U, C, E <: Delta[V, C]](parent: Parent[U, M, D], dOptional: DOptional[U, M, D, V, C, E]) extends Parent[V, C, E] {
   def callback(delta: E): Callback = parent.callback(dOptional.eToD(delta))
 }
