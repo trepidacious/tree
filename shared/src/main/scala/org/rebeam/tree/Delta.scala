@@ -13,6 +13,11 @@ import org.rebeam.tree.sync._
 
 trait Delta[U, A] {
   def apply(a: A): DeltaIO[U, A]
+  def widenU[W >: U]: Delta[W, A] = new WiderDelta[W, U, A](this)
+}
+
+class WiderDelta[U, V <: U, A](d: Delta[V, A]) extends Delta[U, A] {
+  def apply(a: A): DeltaIO[U, A] = Delta.widenU[U, V, A](d.apply(a))
 }
 
 sealed trait DeltaIOA[U, A]
@@ -57,6 +62,7 @@ object DeltaIOContextSource {
     override def getContext: DeltaIOContext = DeltaIOContext(Moment(System.currentTimeMillis()))
   }
 }
+
 
 object Delta {
 
@@ -219,48 +225,48 @@ object Delta {
 
 }
 
-object LensDelta {
-  def byLens[U, A, B](a: A, lens: Lens[A, B], delta: Delta[U, B]): DeltaIO[U, A] = delta(lens.get(a)).map(lens.set(_)(a))
-}
+//object LensDelta {
+//  def byLens[U, A, B](a: A, lens: Lens[A, B], delta: Delta[U, B]): DeltaIO[U, A] = delta(lens.get(a)).map(lens.set(_)(a))
+//}
 
 //abstract class LensDelta[A, B, D <: Delta[B]](lens: Lens[A, B], d: D) extends Delta[A] {
 //  def apply(a: A): DeltaIO[A] = LensDelta.byLens(a, lens, d)
 //}
 
-abstract class LensDelta[U, A, B](lens: Lens[A, B], delta: Delta[U, B]) extends Delta[U, A] {
-  def apply(a: A): DeltaIO[U, A] = delta(lens.get(a)).map(lens.set(_)(a)) //  lens.modify(delta.apply)(a)
+abstract class LensDelta[U, A, V <: U, B](lens: Lens[A, B], delta: Delta[V, B]) extends Delta[U, A] {
+  def apply(a: A): DeltaIO[U, A] = Delta.widenU[U, V, B](delta(lens.get(a))).map(lens.set(_)(a)) //  lens.modify(delta.apply)(a)
 }
 
-abstract class OptionalDelta[U, A, B](optional: Optional[A, B], delta: Delta[U, B]) extends Delta[U, A] {
-  def apply(a: A): DeltaIO[U, A] =
-    optional.getOption(a).fold(
-      pure[U, A](a)
-    )(
-      delta(_).map(optional.set(_)(a))
-    )  //optional.modify(delta.apply)(a)
-}
+//abstract class OptionalDelta[U, A, B](optional: Optional[A, B], delta: Delta[U, B]) extends Delta[U, A] {
+//  def apply(a: A): DeltaIO[U, A] =
+//    optional.getOption(a).fold(
+//      pure[U, A](a)
+//    )(
+//      delta(_).map(optional.set(_)(a))
+//    )  //optional.modify(delta.apply)(a)
+//}
 
-abstract class LensNDelta[U, A, B](lensN: LensN[A, B], delta: Delta[U, B]) extends Delta[U, A] {
-  def apply(a: A): DeltaIO[U, A] = delta(lensN.get(a)).map(lensN.set(_)(a)) //lensN.modify(delta.apply)(a)
-}
+//abstract class LensNDelta[U, A, V <: U, B](lensN: LensN[A, B], delta: Delta[V, B]) extends Delta[U, A] {
+//  def apply(a: A): DeltaIO[U, A] = Delta.widenU(delta(lensN.get(a))).map(lensN.set(_)(a)) //lensN.modify(delta.apply)(a)
+//}
 
-abstract class OptionalIDelta[U, A](optionalI: OptionalI[A], delta: Delta[U, A]) extends Delta[U, List[A]] {
-  def apply(a: List[A]): DeltaIO[U, List[A]] =
-    optionalI.getOption(a).fold(
-      pure[U, List[A]](a)
-    )(
-      delta(_).map(optionalI.set(_)(a))
-    )  //optionalI.modify(delta.apply)(l)
-}
-
-abstract class OptionalMatchDelta[U, A, F <: A => Boolean](optionalMatch: OptionalMatch[A, F], delta: Delta[U, A]) extends Delta[U, List[A]] {
-  def apply(a: List[A]): DeltaIO[U, List[A]] =
-    optionalMatch.getOption(a).fold(
-      pure[U, List[A]](a)
-    )(
-      delta(_).map(optionalMatch.set(_)(a))
-    )  //optionalMatch.modify(delta.apply)(l)
-}
+//abstract class OptionalIDelta[U, A](optionalI: OptionalI[A], delta: Delta[U, A]) extends Delta[U, List[A]] {
+//  def apply(a: List[A]): DeltaIO[U, List[A]] =
+//    optionalI.getOption(a).fold(
+//      pure[U, List[A]](a)
+//    )(
+//      delta(_).map(optionalI.set(_)(a))
+//    )  //optionalI.modify(delta.apply)(l)
+//}
+//
+//abstract class OptionalMatchDelta[U, A, F <: A => Boolean](optionalMatch: OptionalMatch[A, F], delta: Delta[U, A]) extends Delta[U, List[A]] {
+//  def apply(a: List[A]): DeltaIO[U, List[A]] =
+//    optionalMatch.getOption(a).fold(
+//      pure[U, List[A]](a)
+//    )(
+//      delta(_).map(optionalMatch.set(_)(a))
+//    )  //optionalMatch.modify(delta.apply)(l)
+//}
 
 //abstract class OptionDelta[U, A](delta: Delta[U, A]) extends Delta[U, Option[A]] {
 ////  private lazy val mod: Option[A] => Option[A] = option.some[A].modify(delta.apply)

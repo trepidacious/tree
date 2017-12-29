@@ -47,6 +47,17 @@ trait LowPrioritySearchable {
 object Searchable extends LowPrioritySearchable {
 
   /**
+    * Make an instance of Searchable
+    * @param f    Implementing function
+    * @tparam A   Type to search in
+    * @tparam Q   Type to search for
+    * @return     Set of Q
+    */
+  def instance[A, Q](f: (Q => Boolean) => A => Set[Q]): Searchable[A, Q] = new Searchable[A, Q] {
+    def find(p: Q => Boolean)(a: A): Set[Q] = f(p)(a)
+  }
+
+  /**
     * Defines a Searchable that finds nothing
     */
   def notSearchable[A, Q]: Searchable[A, Q] = new Searchable[A, Q] {
