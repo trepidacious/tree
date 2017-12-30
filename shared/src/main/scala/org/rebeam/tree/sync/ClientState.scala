@@ -2,7 +2,6 @@ package org.rebeam.tree.sync
 
 import org.rebeam.tree.{Delta, DeltaIOContext}
 import org.rebeam.tree.sync.Sync._
-import cats.syntax.either._
 import DeltaIORun._
 
 object ClientState {

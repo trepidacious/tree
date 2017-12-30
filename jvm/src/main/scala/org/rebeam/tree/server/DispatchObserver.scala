@@ -5,7 +5,7 @@ import org.rebeam.tree.server.util.Lock
 import scalaz.concurrent.Task
 import scalaz.{\/, \/-}
 import scalaz.Scalaz.none
-import scalaz.stream.{Exchange, Process, Sink}
+import scalaz.stream.Process
 
 /**
   * Uses an OutgoingDispatcher to provide Observer implementation.

@@ -4,7 +4,7 @@ version in ThisBuild := "0.1-SNAPSHOT"
 
 organization in ThisBuild := "org.rebeam"
 
-scalaVersion in ThisBuild := "2.11.12"
+scalaVersion in ThisBuild := "2.12.4"
 
 scalacOptions in ThisBuild ++= Seq(
   "-feature",
@@ -13,7 +13,9 @@ scalacOptions in ThisBuild ++= Seq(
   "-unchecked",
   "-Xfatal-warnings",
   "-Xlint",
-  "-Xcheckinit"
+  "-Xcheckinit",
+  "-Xlint:-unused",
+  "-Ywarn-unused:imports"
 )
 
 testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-verbosity", "2")

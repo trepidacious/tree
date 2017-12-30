@@ -5,8 +5,6 @@ import org.rebeam.tree.sync.Sync.{ClientDeltaId, ClientId}
 import scala.util.Try
 import scala.util.matching.Regex
 import io.circe._
-import cats.syntax.either._
-
 
 /**
   * A reference to a data item with a known Id.

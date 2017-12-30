@@ -1,6 +1,6 @@
 package org.rebeam.tree.sync
 
-import org.rebeam.tree.ref.{Mirror, MirrorAndId, MirrorCodec}
+import org.rebeam.tree.ref.{Mirror, MirrorAndId}
 import org.rebeam.tree.sync.DeltaIORun.{AddedRef, DeltaRunResult}
 
 trait RefAdder[A] {

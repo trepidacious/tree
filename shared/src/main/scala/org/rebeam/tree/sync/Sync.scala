@@ -5,14 +5,7 @@ import io.circe._
 import io.circe.syntax._
 import io.circe.generic.JsonCodec
 import org.rebeam.tree.sync.ServerStoreUpdate.{ServerStoreFullUpdate, ServerStoreIncrementalUpdate}
-import cats.syntax.either._
 import org.rebeam.tree.DeltaCodecs.DeltaCodec
-import org.rebeam.tree.sync._
-
-import scala.util.Try
-import scala.util.matching.Regex
-
-import org.rebeam.tree.ref._
 
 object Sync {
 

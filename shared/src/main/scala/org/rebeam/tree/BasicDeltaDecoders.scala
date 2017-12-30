@@ -1,7 +1,5 @@
 package org.rebeam.tree
 
-import scala.language.higherKinds
-
 object BasicDeltaDecoders {
   import DeltaCodecs._
   implicit val stringDeltaReader: DeltaCodec[String] = value[String]

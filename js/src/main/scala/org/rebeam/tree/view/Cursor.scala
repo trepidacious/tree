@@ -107,7 +107,7 @@ trait Cursor[M, L] extends Parent[M] {
     CursorBasic[C, L](LensNParent(parent, lens), newModel, location, root, newRefGuids)
   }
 
-  def zoomPrism[C](prismN: PrismN[M, C])(implicit s: Searchable[C, Guid]): Option[Cursor[C, L]] = {
+  def zoomPrism[C](prismN: PrismN[M, C]): Option[Cursor[C, L]] = {
     prismN.getOption(model).map(c => CursorBasic[C, L](PrismNParent[M, C](parent, prismN), c, location, root, allModelRefGuids))
   }
 

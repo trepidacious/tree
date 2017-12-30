@@ -1,6 +1,6 @@
 package org.rebeam.tree.server
 
-import org.rebeam.tree.{Delta, DeltaIOContext, DeltaIOContextSource}
+import org.rebeam.tree.{DeltaIOContext, DeltaIOContextSource}
 import org.rebeam.tree.server.util._
 import org.rebeam.tree.sync.{DeltaIORun, ServerStoreUpdate}
 import org.rebeam.tree.sync.ServerStoreUpdate._
@@ -16,7 +16,6 @@ import scalaz.stream.{Exchange, Process, Sink}
 import org.http4s.websocket.WebsocketBits._
 import io.circe._
 import io.circe.parser._
-import cats.syntax.either._
 import org.rebeam.tree.DeltaCodecs.DeltaCodec
 
 /**
@@ -114,7 +113,7 @@ private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clien
 }
 
 object ServerStoreValueExchange {
-  def apply[M](store: ServerStore[M], clientId: ClientId, contextSource: DeltaIOContextSource)(implicit encoder: Encoder[M], decoder: Decoder[M], deltaDecoder: DeltaCodec[M], refAdder: RefAdder[M]): Exchange[WebSocketFrame, WebSocketFrame] = {
+  def apply[M](store: ServerStore[M], clientId: ClientId, contextSource: DeltaIOContextSource)(implicit encoder: Encoder[M], deltaDecoder: DeltaCodec[M], refAdder: RefAdder[M]): Exchange[WebSocketFrame, WebSocketFrame] = {
 
     val dispatcher = new ServerStoreValueDispatcher(store, clientId, contextSource)
     val observer = new DispatchObserver(dispatcher)

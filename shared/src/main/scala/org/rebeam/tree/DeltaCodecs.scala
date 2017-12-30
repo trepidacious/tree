@@ -2,9 +2,7 @@ package org.rebeam.tree
 
 import io.circe._
 import org.rebeam.lenses._
-import cats.syntax.either._
 import org.rebeam.tree.ref.{Mirror, MirrorCodec}
-import scala.language.higherKinds
 import org.rebeam.tree.sync._
 
 object DeltaCodecs {
