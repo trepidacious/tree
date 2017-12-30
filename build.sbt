@@ -28,7 +28,7 @@ resolvers ++= Seq(
 lazy val http4sVersion              = "0.15.5a"
 lazy val circeVersion               = "0.7.0"
 lazy val catsVersion                = "0.9.0"
-lazy val scalajsReactVersion        = "0.11.3"
+lazy val scalajsReactVersion        = "1.1.1"
 lazy val shapelessVersion           = "2.3.2"
 
 lazy val root = project.in(file(".")).

@@ -1,6 +1,8 @@
 package org.rebeam.tree.view
 
 import japgolly.scalajs.react._
+import japgolly.scalajs.react.vdom.VdomElement
+
 import org.rebeam.tree._
 import org.rebeam.tree.sync.{ClientState, Guid, RefAdder, Ref => TreeRef}
 import org.rebeam.tree.sync.Sync._
@@ -61,7 +63,7 @@ object ServerRootComponent {
 
   def noRootSource[R]: RootSource[R] = new NoRootSource[R]
 
-  case class Props[R, P](p: P, render: Cursor[R, P] => ReactElement, wsUrl: String, noData: ReactElement)
+  case class Props[R, P](p: P, render: Cursor[R, P] => VdomElement, wsUrl: String, noData: VdomElement)
 
   case class State[R](clientState: Option[ClientState[R]], ws: Option[WebSocket], tick: Option[SetIntervalHandle])
 
@@ -119,7 +121,8 @@ object ServerRootComponent {
 
         // Get direct access so WebSockets API can modify state directly
         // (for access outside of a normal DOM/React callback).
-        val direct = scope.accessDirect
+        // This means that calls like .setState will now return Unit instead of Callback.
+        val direct = scope.withEffectsImpure
 
         // These are message-receiving events from the WebSocket "thread".
 
@@ -197,8 +200,8 @@ object ServerRootComponent {
   }
 
   def factory[R, P]
-    (noData: ReactElement, wsUrl: String)
-    (render: Cursor[R, P] => ReactElement)
+    (noData: VdomElement, wsUrl: String)
+    (render: Cursor[R, P] => VdomElement)
     (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) = {
     val c = ctor[R, P](decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder, searchable)
     (page: P) => c(Props[R, P](page, render, wsUrl, noData))
@@ -206,15 +209,15 @@ object ServerRootComponent {
 
 
   def apply[R]
-  (noData: ReactElement, wsUrl: String)
-  (render: Cursor[R, Unit] => ReactElement)
+  (noData: VdomElement, wsUrl: String)
+  (render: Cursor[R, Unit] => VdomElement)
   (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) = {
     val c = ctor[R, Unit](decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder, searchable)
     c(Props[R, Unit]((), render, wsUrl, noData))
   }
 
   //Just make the component constructor - props to be supplied later to make a component
-  def ctor[R, P](implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) = ReactComponentB[Props[R, P]]("ServerRootComponent")
+  def ctor[R, P](implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) = ScalaComponent.builder[Props[R, P]]("ServerRootComponent")
     .initialState(State[R](None, None, None))
     .backend(new Backend[R, P](_)(decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder, searchable))
     .render(s => s.backend.render(s.props, s.state))

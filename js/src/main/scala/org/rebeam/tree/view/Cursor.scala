@@ -132,7 +132,7 @@ object Cursor {
     * @return     Reusability for cursor
     */
   implicit def cursorReusability[M, L]: Reusability[Cursor[M, L]] =
-    Reusability.fn {
+    Reusability {
       case (c1, c2) =>
         // First check for changes in parent, model or location (i.e. everything except
         // changes to the data pointed to by Refs)
