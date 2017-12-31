@@ -15,7 +15,8 @@ scalacOptions in ThisBuild ++= Seq(
   "-Xlint",
   "-Xcheckinit",
   "-Xlint:-unused",
-  "-Ywarn-unused:imports"
+  "-Ywarn-unused:imports",
+  "-Ypartial-unification"
 )
 
 testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-verbosity", "2")
