@@ -50,7 +50,7 @@ case class Color(r: Int, g: Int, b: Int, a: Int) {
     ColorHSLA(h, s, l, a)
   }
 
-  override def toString() = if (a == 255) s"rgb($r, $g, $b)" else s"rgba($r, $g, $b, $alphaUnitScale)"
+  override def toString: String = if (a == 255) s"rgb($r, $g, $b)" else s"rgba($r, $g, $b, $alphaUnitScale)"
 
 //  def *(c: Color) = Color(r * c.r, g * c.g, b * c.b)
 //
