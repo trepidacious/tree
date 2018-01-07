@@ -1,6 +1,10 @@
 # TODO
 
-2. Make all deltas encodable, and remove the deltaJS stuff.
+1. Reinstate todo demos.
+2. Add partial unification flag.
+3. Look at typelevel scala - fixes known subclasses thing?
+4. cats to 1.0?
+2. Make all deltas encodable, and remove the deltaJS stuff. Do this using partial codec on delta, for lenses look at lens identity on encoding.
 3. Get back to thinking about OT deltas as below.
 4. Websocket re-open on close with exponential backoff.
 5. If possible, make all deltas directly serialisable - currently we require conversion to JSON inside-out as callback is built from original delta up through parent's deltas. This is messy because we need to retain JSON, we can't reserialise from just the delta. This would be useful for history on server, so we could retain just the deltas for efficiency.
