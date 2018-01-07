@@ -70,7 +70,9 @@ object Guid {
   * @param guid The Guid
   * @tparam A Type of the identified item
   */
-case class Id[+A](guid: Guid)
+case class Id[+A](guid: Guid) {
+  override def toString: String = Id.toString(this)
+}
 
 object Id {
   val regex: Regex = "([Ii][Dd]-[0-9a-fA-F]+-[0-9a-fA-F]+-[0-9a-fA-F]+)".r
@@ -86,7 +88,6 @@ object Id {
       }.toOption
     case _ => None
   }
-
 
   def toString[A](r: Id[A]): String = f"id-${r.guid.clientId.id}%x-${r.guid.clientDeltaId.id}%x-${r.guid.withinDeltaId.id}%x"
 

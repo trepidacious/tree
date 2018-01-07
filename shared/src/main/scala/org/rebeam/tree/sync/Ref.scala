@@ -10,7 +10,9 @@ import io.circe._
   * A reference to a data item with a known Id.
   * @tparam A The type of data item
   */
-case class Ref[+A](id: Id[A]) extends Identified[A]
+case class Ref[+A](id: Id[A]) extends Identified[A] {
+  override def toString: String = Ref.toString(this)
+}
 
 object Ref {
   val regex: Regex = "([Rr][Ee][Ff]-[0-9a-fA-F]+-[0-9a-fA-F]+-[0-9a-fA-F]+)".r
