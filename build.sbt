@@ -4,7 +4,12 @@ version in ThisBuild := "0.1-SNAPSHOT"
 
 organization in ThisBuild := "org.rebeam"
 
-scalaVersion in ThisBuild := "2.12.4"
+// Plain Scala
+//scalaVersion in ThisBuild := "2.12.4"
+
+//Typelevel Scala, also see .jsSettings below
+scalaOrganization in ThisBuild := "org.typelevel"
+scalaVersion in ThisBuild := "2.12.4-bin-typelevel-4"
 
 scalacOptions in ThisBuild ++= Seq(
   "-feature",
@@ -59,8 +64,8 @@ lazy val tree = crossProject.in(file(".")).
       "org.scalacheck"              %%% "scalacheck"      % "1.13.4"            % "test"
     ),
 
-    //For @Lenses
-    addCompilerPlugin("org.scalamacros" %% "paradise" % "2.1.0" cross CrossVersion.full)
+    //For @Lenses and Circe
+    addCompilerPlugin("org.scalamacros" %% "paradise" % "2.1.0" cross CrossVersion.patch)
 
   ).jvmSettings(
     // Add JVM-specific settings here
@@ -74,8 +79,15 @@ lazy val tree = crossProject.in(file(".")).
     libraryDependencies ++= Seq(
       "com.github.japgolly.scalajs-react" %%% "core" % scalajsReactVersion,
       "com.github.japgolly.scalajs-react" %%% "extra" % scalajsReactVersion
-    )
-  )
+    ),
+
+    //Typelevel scala, see https://github.com/scala-js/scala-js/pull/2954#issuecomment-302743801
+    // Remove the dependency on the scalajs-compiler
+    libraryDependencies := libraryDependencies.value.filterNot(_.name == "scalajs-compiler"),
+    // And add a custom one
+    addCompilerPlugin("org.scala-js" % "scalajs-compiler" % scalaJSVersion cross CrossVersion.patch)
+
+)
 
 lazy val treeJVM = tree.jvm
 lazy val treeJS = tree.js

@@ -122,6 +122,8 @@ object ServerStoreValueExchange {
     //Treat received text as JSON encoded deltas to data, if valid
     val sink: Sink[Task, WebSocketFrame] = Process.constant {
       case Text(t, _) => Task.delay( parse(t).toOption.foreach(msg => dispatcher.msgFromClient(msg)) )
+      // TODO error?
+      case _ => Task.delay(())
     }
 
     //Get source of messages for client from the observer's process
