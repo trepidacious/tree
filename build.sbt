@@ -35,7 +35,7 @@ lazy val http4sVersion              = "0.15.5a" // -> 0.18.0-M7
 lazy val circeVersion               = "0.7.0"   // -> 0.8.0
 lazy val catsVersion                = "0.9.0"   // -> 1.0.0
 lazy val scalajsReactVersion        = "1.1.1"
-lazy val shapelessVersion           = "2.3.2"
+lazy val shapelessVersion           = "2.3.3"
 
 lazy val root = project.in(file(".")).
   aggregate(treeJS, treeJVM).
