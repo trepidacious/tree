@@ -20,8 +20,36 @@ object DeltaCodecProto {
     def apply(a: A): A = v
   }
 
+  /**
+    * An Encoder that can only encode some input values, and so produces Option[Json]
+    * @tparam A The type of possibly-encodable values
+    */
+  trait PartialEncoder[A] extends Serializable { self =>
+    /**
+      * Convert a value to Some(JSON) if possible, None if not.
+      */
+    def apply(a: A): Option[Json]
+
+    /**
+      * Create a new [[PartialEncoder]] by applying a function to a value of type `B` before encoding as an
+      * `A`.
+      */
+    final def contramap[B](f: B => A): PartialEncoder[B] = a => self(f(a))
+
+    /**
+      * Create a new [[PartialEncoder]] by applying a function to the output of this one.
+      */
+    final def mapJson(f: Json => Json): PartialEncoder[A] = a => self(a).map(f)
+
+    final def or(o: PartialEncoder[A]): PartialEncoder[A] = a => self(a).orElse(o(a))
+  }
+
+  object PartialEncoder {
+    def apply[A](e: Encoder[A]): PartialEncoder[A] = a => Some(e(a))
+  }
+
   trait PartialDeltaCodec[A] {
-    def encode(a: Delta[A]): Option[Json]
+    def encoder: PartialEncoder[Delta[A]]
     val decoder: Decoder[Delta[A]]
 
     def or(other: PartialDeltaCodec[A]): PartialDeltaCodec[A] =
@@ -29,7 +57,7 @@ object DeltaCodecProto {
   }
 
   case class EitherPartialDeltaCodec[A](lc: PartialDeltaCodec[A], rc: PartialDeltaCodec[A]) extends PartialDeltaCodec[A] {
-    def encode(a: Delta[A]): Option[Json] = lc.encode(a).orElse(rc.encode(a))
+    val encoder: PartialEncoder[Delta[A]] = lc.encoder or rc.encoder
     val decoder: Decoder[Delta[A]] = lc.decoder or rc.decoder
   }
 
@@ -41,9 +69,9 @@ object DeltaCodecProto {
 
     implicit val deltaBDecoder: Decoder[Delta[B]] = partialBCodec.decoder
 
-    def encode(a: Delta[A]): Option[Json] = a match {
+    val encoder: PartialEncoder[Delta[A]] = {
       case LensDelta(l, d) if l == lens =>
-        partialBCodec.encode(d.asInstanceOf[Delta[B]])
+        partialBCodec.encoder(d.asInstanceOf[Delta[B]])
           .map(dJson =>
             Json.obj(
               "LensDelta" -> Json.obj(
@@ -66,7 +94,7 @@ object DeltaCodecProto {
                                  deltaBDecoder: Decoder[A]
                                ): PartialDeltaCodec[A] = new PartialDeltaCodec[A] {
 
-    def encode(a: Delta[A]): Option[Json] = a match {
+    val encoder: PartialEncoder[Delta[A]] = {
       case ValueDelta(v) =>
         Some(Json.obj(
           "ValueDelta" -> v.asJson
@@ -100,8 +128,8 @@ object DeltaCodecProto {
     val nameDelta: Delta[Person] = LensDelta(Person.name, ValueDelta("bob"))
     val ageDelta: Delta[Person] = LensDelta(Person.age, ValueDelta(20))
 
-    println(partialPersonDeltaCodec.encode(nameDelta))
-    println(partialPersonDeltaCodec.encode(ageDelta))
+    println(partialPersonDeltaCodec.encoder(nameDelta))
+    println(partialPersonDeltaCodec.encoder(ageDelta))
 
   }
 
