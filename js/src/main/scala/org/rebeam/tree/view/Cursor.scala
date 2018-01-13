@@ -2,33 +2,30 @@ package org.rebeam.tree.view
 
 import japgolly.scalajs.react._
 import org.rebeam.tree._
-import org.rebeam.lenses._
 import io.circe._
 import japgolly.scalajs.react.extra.Reusability
 import org.rebeam.tree.ref.{Mirror, MirrorCodec}
 import org.rebeam.tree.sync.{Guid, Ref => TreeRef}
 import Searchable._
+import monocle.{Lens, Prism}
 
 trait Root {
   def cursorAt[A, L](ref: TreeRef[A], location: L)(implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, L]]
   def refRevisions(refGuids: Set[Guid]): Map[Guid, Guid]
 }
 
-private case class ParentAction[M](parent: Parent[M], delta: Delta[M], deltaJs: Json) extends Action {
-  def callback: Callback = parent.callback(delta, deltaJs)
+private case class ParentAction[M](parent: Parent[M], delta: Delta[M]) extends Action {
+  def callback: Callback = parent.callback(delta)
 }
 
-// Note that these will be compared using encoder as well, but we really expect encoder to be the
-// same for actions that need to be compared
-private case class ActAction[M, A <: Delta[M]](parent: Parent[M], actionDelta: A, encoder: Encoder[A]) extends Action {
-  def callback: Callback = parent.callback(actionDelta, Json.obj("action" -> encoder(actionDelta)))
+private case class ActAction[M, A <: Delta[M]](parent: Parent[M], actionDelta: A) extends Action {
+  def callback: Callback = parent.callback(actionDelta)
 }
 
-// Note that these will be compared using encoder as well, but we really expect encoder to be the
-// same for actions that need to be compared
-private case class SetAction[M](parent: Parent[M], value: M, encoder: Encoder[M]) extends Action {
-  def callback: Callback = parent.callback(ValueDelta(value), Json.obj("value" -> encoder(value)))
+private case class SetAction[M](parent: Parent[M], value: M) extends Action {
+  def callback: Callback = parent.callback(ValueDelta(value))
 }
+
 
 /**
   * Cursor giving a "position" in a data model, providing the value at that position
@@ -79,16 +76,14 @@ trait Cursor[M, L] extends Parent[M] {
   def allModelRefGuids: Set[Guid]
 
   //Just pass through callback to parent for convenience
-  def callback(delta: Delta[M], deltaJs: Json): Callback = action(delta, deltaJs).callback
+  def callback(delta: Delta[M]): Callback = action(delta).callback
 
-  def action(delta: Delta[M], deltaJs: Json): Action = ParentAction(parent, delta, deltaJs)
+  def action(delta: Delta[M]): Action = ParentAction(parent, delta)
 
-  def act[A <: Delta[M]](actionDelta: A)(implicit encoder: Encoder[A]): Action =
-    ActAction(parent, actionDelta, encoder)
+  def act[A <: Delta[M]](actionDelta: A): Action = ActAction(parent, actionDelta)
 //    callback(actionDelta, Json.obj("action" -> encoder(actionDelta)))
 
-  def set(value: M)(implicit encoder: Encoder[M]): Action =
-    SetAction(parent, value, encoder)
+  def set(value: M): Action = SetAction(parent, value)
 //    callback(ValueDelta(newModel), Json.obj("value" -> encoder(newModel)))
 
   // FIXME Zoomer and zoom in this form are a workaround for not being able to infer
@@ -101,14 +96,14 @@ trait Cursor[M, L] extends Parent[M] {
 //  }
 //  def zoom[C] = new Zoomer[C]()
 
-  def zoom[C](lens: LensN[M, C])(implicit s: Searchable[C, Guid]): Cursor[C, L] = {
+  def zoom[C](lens: Lens[M, C])(implicit s: Searchable[C, Guid]): Cursor[C, L] = {
     val newModel = lens.get(model)
     val newRefGuids = newModel.allRefGuids
-    CursorBasic[C, L](LensNParent(parent, lens), newModel, location, root, newRefGuids)
+    CursorBasic[C, L](LensParent(parent, lens), newModel, location, root, newRefGuids)
   }
 
-  def zoomPrism[C](prismN: PrismN[M, C]): Option[Cursor[C, L]] = {
-    prismN.getOption(model).map(c => CursorBasic[C, L](PrismNParent[M, C](parent, prismN), c, location, root, allModelRefGuids))
+  def zoomPrism[C](prism: Prism[M, C]): Option[Cursor[C, L]] = {
+    prism.getOption(model).map(c => CursorBasic[C, L](PrismParent[M, C](parent, prism), c, location, root, allModelRefGuids))
   }
 
   def label(label: String): Cursor[M, String] = CursorBasic(parent, model, label, root, allModelRefGuids)
@@ -161,6 +156,7 @@ object Cursor {
   def apply[M, L](parent: Parent[M], model: M, location: L, root: Root)(implicit s: Searchable[M, Guid]): Cursor[M, L] =
     CursorBasic(parent, model, location, root, model.allRefGuids)
 
+  //FIXME add a ListIdCursor to provide for zooming by id
   implicit class ListCursor[C, L](cursor: Cursor[List[C], L]) {
     def zoomI(index: Int)(implicit s: Searchable[C, Guid]): Option[Cursor[C, L]] = {
       val optionalI: OptionalI[C] = OptionalI[C](index)

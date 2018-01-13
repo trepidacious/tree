@@ -36,6 +36,7 @@ lazy val circeVersion               = "0.7.0"   // -> 0.8.0
 lazy val catsVersion                = "0.9.0"   // -> 1.0.0
 lazy val scalajsReactVersion        = "1.1.1"
 lazy val shapelessVersion           = "2.3.3"
+lazy val monocleVersion             = "1.4.0"   // -> 1.5.0-cats
 
 lazy val root = project.in(file(".")).
   aggregate(treeJS, treeJVM).
@@ -49,7 +50,7 @@ lazy val tree = crossProject.in(file(".")).
     name := "tree",
     version := "0.1-SNAPSHOT",
     libraryDependencies ++= Seq(
-      "org.rebeam"                  %%% "lenses-codec"    % "0.1-SNAPSHOT",
+//      "org.rebeam"                  %%% "lenses-codec"    % "0.1-SNAPSHOT",
 
       "io.circe"                    %%% "circe-core"      % circeVersion,
       "io.circe"                    %%% "circe-generic"   % circeVersion,
@@ -58,6 +59,13 @@ lazy val tree = crossProject.in(file(".")).
       "org.typelevel"               %%% "cats"            % catsVersion,
       
       "com.chuusai"                 %%% "shapeless"       % shapelessVersion,
+
+      "com.github.julien-truffaut"  %%%  "monocle-core"    % monocleVersion,
+      "com.github.julien-truffaut"  %%%  "monocle-generic" % monocleVersion,
+      "com.github.julien-truffaut"  %%%  "monocle-macro"   % monocleVersion,
+      "com.github.julien-truffaut"  %%%  "monocle-state"   % monocleVersion,
+      "com.github.julien-truffaut"  %%%  "monocle-refined" % monocleVersion,
+      "com.github.julien-truffaut"  %%%  "monocle-law"     % monocleVersion % "test",
 
       "org.scalactic"               %%% "scalactic"       % "3.0.0"             % "test",
       "org.scalatest"               %%% "scalatest"       % "3.0.0"             % "test",

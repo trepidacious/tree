@@ -2,7 +2,6 @@ package org.rebeam.tree.view
 
 import japgolly.scalajs.react._
 import japgolly.scalajs.react.vdom.VdomElement
-
 import org.rebeam.tree._
 import org.rebeam.tree.sync.{ClientState, Guid, RefAdder, Ref => TreeRef}
 import org.rebeam.tree.sync.Sync._
@@ -13,6 +12,7 @@ import scala.util.{Failure, Success}
 import io.circe._
 import io.circe.parser._
 import io.circe.syntax._
+import org.rebeam.tree.DeltaCodecs.DeltaCodec
 import org.rebeam.tree.ref.{Mirror, MirrorAndId, MirrorCodec}
 
 object ServerRootComponent {
@@ -45,7 +45,7 @@ object ServerRootComponent {
       def cursorAt[A, L](ref: TreeRef[A], location: L)
                         (implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, L]] = {
         rootModel.mirror.apply(ref).map { data =>
-          val lensParent = LensNParent[MirrorAndId[M], Mirror](parent, lens)
+          val lensParent = LensParent[MirrorAndId[M], Mirror](parent, lens)
           Cursor[A, L](MirrorParent[A](lensParent, ref), data, location, this)
         }
       }
@@ -68,33 +68,43 @@ object ServerRootComponent {
   case class State[R](clientState: Option[ClientState[R]], ws: Option[WebSocket], tick: Option[SetIntervalHandle])
 
   class Backend[R, P](scope: BackendScope[Props[R, P], State[R]])
-    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) {
+    (implicit decoder: Decoder[R], deltaDecoder: DeltaCodec[R], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) {
 
     implicit val cme = clientMsgEncoder[R]
 
-    val deltaToCallback: (Delta[R], Json) => Callback =
-      (delta: Delta[R], deltaJs: Json) =>
-        for {
-          s <- scope.state
-          _ <- s.clientState match {
-            case None =>
-              // TODO implement
-              Callback{println("Delta before we have a clientState! Should queue deltas?")}
-            case Some(cs) => {
-              //SIDE-EFFECT: Note this is the point at which we generate the context
-              val (newCS, id) = cs.apply(delta, contextSource.getContext)
-              val dij = DeltaWithIJ(delta, id, deltaJs)
-              for {
-                _ <- scope.setState(s.copy(clientState = Some(newCS)))
-                // TODO should store up deltas if we don't have a websocket, and send when we do
-                _ <- Callback {
-                  val msg = dij.asJson.noSpaces
-                  s.ws.foreach(socket => socket.send(msg))
-                }
-              } yield {}
+    val deltaToCallback: Delta[R] => Callback =
+      (delta: Delta[R]) => for {
+        s <- scope.state
+        _ <- deltaDecoder.encoder(delta).fold(
+            Callback {
+              println(s"!!! Could not encode delta $delta")
             }
-          }
-        } yield {}
+          )(
+            deltaJs =>
+              s.clientState match {
+                case None =>
+                  // TODO implement
+                  Callback {
+                    println("!!! Delta before we have a clientState! Should queue deltas?")
+                  }
+                case Some(cs) => {
+                  //SIDE-EFFECT: Note this is the point at which we generate the context,
+                  //and so read the time
+                  val (newCS, id) = cs.apply(delta, contextSource.getContext)
+                  val dij = DeltaWithIJ(delta, id, deltaJs)
+                  for {
+                    _ <- scope.setState(s.copy(clientState = Some(newCS)))
+                    // TODO should store up deltas if we don't have a websocket, and send when we do
+                    _ <- Callback {
+                      val msg = dij.asJson.noSpaces
+                      s.ws.foreach(socket => socket.send(msg))
+                    }
+                  } yield {}
+                }
+              }
+        )
+      } yield {}
+
 
     val rootParent = RootParent[R](deltaToCallback)
 
@@ -202,8 +212,8 @@ object ServerRootComponent {
   def factory[R, P]
     (noData: VdomElement, wsUrl: String)
     (render: Cursor[R, P] => VdomElement)
-    (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) = {
-    val c = ctor[R, P](decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder, searchable)
+    (implicit decoder: Decoder[R], deltaCodec: DeltaCodec[R], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) = {
+    val c = ctor[R, P](decoder, deltaCodec, idGen, contextSource, rootSource, refAdder, searchable)
     (page: P) => c(Props[R, P](page, render, wsUrl, noData))
   }
 
@@ -211,15 +221,15 @@ object ServerRootComponent {
   def apply[R]
   (noData: VdomElement, wsUrl: String)
   (render: Cursor[R, Unit] => VdomElement)
-  (implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) = {
-    val c = ctor[R, Unit](decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder, searchable)
+  (implicit decoder: Decoder[R], deltaCodec: DeltaCodec[R], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) = {
+    val c = ctor[R, Unit](decoder, deltaCodec, idGen, contextSource, rootSource, refAdder, searchable)
     c(Props[R, Unit]((), render, wsUrl, noData))
   }
 
   //Just make the component constructor - props to be supplied later to make a component
-  def ctor[R, P](implicit decoder: Decoder[R], deltaDecoder: Decoder[Delta[R]], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) = ScalaComponent.builder[Props[R, P]]("ServerRootComponent")
+  def ctor[R, P](implicit decoder: Decoder[R], deltaCodec: DeltaCodec[R], idGen: ModelIdGen[R], contextSource: DeltaIOContextSource, rootSource: RootSource[R], refAdder: RefAdder[R], searchable: Searchable[R, Guid]) = ScalaComponent.builder[Props[R, P]]("ServerRootComponent")
     .initialState(State[R](None, None, None))
-    .backend(new Backend[R, P](_)(decoder, deltaDecoder, idGen, contextSource, rootSource, refAdder, searchable))
+    .backend(new Backend[R, P](_)(decoder, deltaCodec, idGen, contextSource, rootSource, refAdder, searchable))
     .render(s => s.backend.render(s.props, s.state))
     .componentDidMount(_.backend.start)
     .componentWillUnmount(_.backend.end)

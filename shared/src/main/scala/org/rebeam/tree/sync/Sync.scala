@@ -209,19 +209,19 @@ object Sync {
       }
     )
 
-  def remoteDeltaDecoder[A](implicit dd: Decoder[Delta[A]]): Decoder[UpdateDelta[A]] =
+  def remoteDeltaDecoder[A](implicit dd: DeltaCodec[A]): Decoder[UpdateDelta[A]] =
     Decoder.instance(
       c => {
         val o = c.downField("remote")
         for {
-          delta <- o.downField("delta").as[Delta[A]]
+          delta <- o.downField("delta").as[Delta[A]](dd.decoder)
           id <- o.downField("id").as[DeltaId]
           context <- o.downField("context").as[DeltaIOContext]
         } yield RemoteDelta(delta, id, context)
       }
     )
 
-  def updateDeltaDecoder[A](implicit dd: Decoder[Delta[A]]): Decoder[UpdateDelta[A]] =
+  def updateDeltaDecoder[A](implicit dd: DeltaCodec[A]): Decoder[UpdateDelta[A]] =
     localDeltaDecoder[A] or remoteDeltaDecoder[A]
 
   def fullUpdateDecoder[A](implicit d: Decoder[A]): Decoder[ModelUpdate[A]] =
@@ -234,7 +234,7 @@ object Sync {
       } yield ModelFullUpdate[A](clientId, ModelAndId(model, id))
     })
 
-  def incUpdateDecoder[A](implicit dd: Decoder[Delta[A]]): Decoder[ModelUpdate[A]] = {
+  def incUpdateDecoder[A](implicit dd: DeltaCodec[A]): Decoder[ModelUpdate[A]] = {
     implicit val udd = updateDeltaDecoder[A](dd)
     Decoder.instance(c => {
       val o = c.downField("inc")
@@ -246,18 +246,18 @@ object Sync {
     })
   }
 
-  def updateDecoder[A](implicit d: Decoder[A], dd: Decoder[Delta[A]]): Decoder[ModelUpdate[A]] =
+  def updateDecoder[A](implicit d: Decoder[A], dd: DeltaCodec[A]): Decoder[ModelUpdate[A]] =
     fullUpdateDecoder[A] or incUpdateDecoder[A]
 
   /**
     * Decode incoming messages from the client.
     * Expect incoming messages to be {"commit": {"delta": delta, "id": deltaId}}
     * where delta is Delta[T] to be decoded by deltaDecoder, and deltaId is a DeltaId[T]
-    * @param deltaDecoder Decoder for Delta[T]
+    * @param deltaCodec   Provides decoder for Delta[T]
     * @tparam A           The type of model
     * @return             A decoder of DeltaWithIJ[T]
     */
-  def clientMsgDecoder[A](implicit deltaDecoder: DeltaCodec[A]): Decoder[DeltaWithIJ[A]] = Decoder.instance(c => {
+  def clientMsgDecoder[A](implicit deltaCodec: DeltaCodec[A]): Decoder[DeltaWithIJ[A]] = Decoder.instance(c => {
 
     val o = c.downField("commit")
 
@@ -268,7 +268,7 @@ object Sync {
       .getOrElse(Left[DecodingFailure, Json](DecodingFailure("Expected a delta field in commit object", o.history)))
 
     for {
-      delta <- o.downField("delta").as[Delta[A]]
+      delta <- o.downField("delta").as[Delta[A]](deltaCodec.decoder)
       id <- o.downField("id").as[DeltaId]
       deltaJs <- d
     } yield DeltaWithIJ(delta, id, deltaJs)

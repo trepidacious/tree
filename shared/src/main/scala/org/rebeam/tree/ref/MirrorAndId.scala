@@ -1,9 +1,8 @@
 package org.rebeam.tree.ref
 
-import org.rebeam.lenses.macros.Lenses
+import monocle.macros.Lenses
 import org.rebeam.tree.DeltaCodecs._
 import org.rebeam.tree.Delta._
-import scala.language.higherKinds
 import io.circe._, io.circe.generic.semiauto._
 import org.rebeam.tree.sync._
 
@@ -14,7 +13,7 @@ object MirrorAndId {
   // Note There is no general Mirror codec (depends on the types in the mirror), so we need to have typeclasses for Mirror as implicit parameters, not a static import
 
   // Can only edit mirror in MirrorAndId - the id stays the same.
-  implicit def mirrorAndIdDeltaCodec[M](implicit mirrorDeltaCodec: DeltaCodec[Mirror]): DeltaCodec[MirrorAndId[M]] = lensN(MirrorAndId.mirror)
+  implicit def mirrorAndIdDeltaCodec[M](implicit mirrorDeltaCodec: DeltaCodec[Mirror]): DeltaCodec[MirrorAndId[M]] = lens("mirror", MirrorAndId.mirror)
   implicit def mirrorAndIdDecoder[M](implicit mirrorDecoder: Decoder[Mirror]): Decoder[MirrorAndId[M]] = deriveDecoder[MirrorAndId[M]]
   implicit def mirrorAndIdEncoder[M](implicit mirrorEncoder: Encoder[Mirror]): Encoder[MirrorAndId[M]] = deriveEncoder[MirrorAndId[M]]
 

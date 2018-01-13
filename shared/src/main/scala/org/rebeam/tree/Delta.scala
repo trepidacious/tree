@@ -3,7 +3,6 @@ package org.rebeam.tree
 import cats.free.Free
 import cats.free.Free.liftF
 import io.circe.generic.JsonCodec
-import org.rebeam.lenses._
 import monocle._
 import monocle.std.option
 import org.rebeam.tree.Delta._
@@ -210,10 +209,6 @@ case class OptionalDelta[A, B](optional: Optional[A, B], delta: Delta[B]) extend
     )  //optional.modify(delta.apply)(a)
 }
 
-case class LensNDelta[A, B](lensN: LensN[A, B], delta: Delta[B]) extends Delta[A] {
-  def apply(a: A): DeltaIO[A] = delta(lensN.get(a)).map(lensN.set(_)(a)) //lensN.modify(delta.apply)(a)
-}
-
 case class ValueDelta[A](v: A) extends Delta[A] {
   def apply(a: A): DeltaIO[A] = pure(v)  //v
 }
@@ -236,6 +231,15 @@ case class OptionalMatchDelta[A, F <: A => Boolean](optionalMatch: OptionalMatch
     )  //optionalMatch.modify(delta.apply)(l)
 }
 
+case class OptionalIdDelta[A <: Identified[A]](optionalId: OptionalId[A], delta: Delta[A]) extends Delta[List[A]] {
+  def apply(a: List[A]): DeltaIO[List[A]] =
+    optionalId.getOption(a).fold(
+      pure(a)
+    )(
+      delta(_).map(optionalId.set(_)(a))
+    )
+}
+
 case class OptionDelta[A](delta: Delta[A]) extends Delta[Option[A]] {
 //  private lazy val mod: Option[A] => Option[A] = option.some[A].modify(delta.apply)
   def apply(a: Option[A]): DeltaIO[Option[A]] = option.some[A].getOption(a).fold(
@@ -245,13 +249,13 @@ case class OptionDelta[A](delta: Delta[A]) extends Delta[Option[A]] {
   )  //mod(o)
 }
 
-case class PrismNDelta[S, A](prismN: PrismN[S, A], delta: Delta[A]) extends Delta[S] {
+case class PrismDelta[S, A](prism: Prism[S, A], delta: Delta[A]) extends Delta[S] {
   def apply(s: S): DeltaIO[S] =
-    prismN.getOption(s).fold(
+    prism.getOption(s).fold(
       pure(s)
     )(
-      a => delta(a).map(modifiedA => prismN.set(modifiedA)(s))
-    )  //optionalI.modify(delta.apply)(l)
+      a => delta(a).map(modifiedA => prism.set(modifiedA)(s))
+    )
 }
 
 case class MirrorDelta[A: MirrorCodec](ref: Ref[A], delta: Delta[A]) extends Delta[Mirror] {
