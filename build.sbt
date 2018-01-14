@@ -21,7 +21,15 @@ scalacOptions in ThisBuild ++= Seq(
   "-Xcheckinit",
   "-Xlint:-unused",
   "-Ywarn-unused:imports",
-  "-Ypartial-unification"
+  "-Ypartial-unification",
+  "-language:existentials",
+  "-language:higherKinds",
+  "-Yno-adapted-args",
+  "-Ywarn-dead-code",
+  "-Ywarn-numeric-widen",
+  "-Ywarn-value-discard",
+  "-Xfuture"
+  //"-Yno-predef" ?
 )
 
 testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-verbosity", "2")
@@ -30,6 +38,8 @@ resolvers ++= Seq(
   Resolver.sonatypeRepo("releases"),
   Resolver.sonatypeRepo("snapshots")
 )
+
+//addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.4")
 
 lazy val http4sVersion              = "0.15.5a" // -> 0.18.0-M7
 lazy val circeVersion               = "0.7.0"   // -> 0.8.0

@@ -78,7 +78,7 @@ object CRC32 {
     * @param bytes  The bytes
     * @return       The CRC32
     */
-  def apply(bytes: Seq[Byte]): CRC32 = bytes.foldLeft(CRC32.empty){case (c, b) => c.updateByte(b)}
+  def apply(bytes: Seq[Byte]): CRC32 = bytes.foldLeft(CRC32.empty){case (c, b) => c.updateByte(b.intValue())}
 
   private lazy val table: Array[Int] = Array.tabulate(256) { n =>
     var c = n

@@ -56,7 +56,7 @@ class ServerStore[A: ModelIdGen](initialModel: A) {
     o.observe(ServerStoreFullUpdate(m))
   }
 
-  def unobserve(o: Observer[ServerStoreUpdate[A]]): Unit = lock{
+  def unobserve(o: Observer[ServerStoreUpdate[A]]): Boolean = lock {
     observers.remove(o)
   }
 
