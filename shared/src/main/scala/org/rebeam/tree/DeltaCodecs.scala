@@ -31,7 +31,7 @@ object DeltaCodecs {
 
   def lens[A, B]
     (name: String, lens: Lens[A, B])
-    (implicit partialBCodec: DeltaCodec[B]): DeltaCodec[A] = new DeltaCodec[A] {
+    (implicit partialBCodec: DeltaCodec[ B]): DeltaCodec[A] = new DeltaCodec[A] {
 
     val encoder: PartialEncoder[Delta[A]] = {
       case LensDelta(l, d) if l == lens =>
@@ -45,7 +45,7 @@ object DeltaCodecs {
               )
             )
           )
-      case _ => None
+      case x => None
     }
 
     val decoder: Decoder[Delta[A]] = Decoder.instance {
@@ -259,8 +259,23 @@ object DeltaCodecs {
   // Codec[Mirror]
   def mirror[A](implicit mirrorCodecA: MirrorCodec[A]): DeltaCodec[Mirror] = new DeltaCodec[Mirror] {
 
-    //FIXME implement
-    val encoder: PartialEncoder[Delta[Mirror]] = m => None
+    val encoder: PartialEncoder[Delta[Mirror]] = {
+      case MirrorDelta(mirrorType, ref, delta) if mirrorType == mirrorCodecA.mirrorType =>
+        // We have checked that the MirrorDelta has the same mirrorType as our codec, so
+        // it's delta must have the same data type A
+        val deltaJs = mirrorCodecA.deltaCodec.encoder(delta.asInstanceOf[Delta[A]])
+        deltaJs.map(
+          djs => Json.obj(
+            "MirrorDelta" -> Json.obj(
+            mirrorCodecA.mirrorType.name -> Json.obj(
+              "ref" -> ref.asJson,
+              "delta" -> djs
+            )
+          )
+        )
+      )
+      case x => None
+    }
 
     val decoder: Decoder[Delta[Mirror]] = Decoder.instance(c => {
       // Note we require the json to contain the mirror codec's type name
@@ -268,7 +283,7 @@ object DeltaCodecs {
       for {
         ref <- o.downField("ref").as[Ref[A]]
         delta <- mirrorCodecA.deltaCodec.decoder.tryDecode(o.downField("delta"))
-      } yield MirrorDelta[A](ref, delta)
+      } yield MirrorDelta[A](mirrorCodecA.mirrorType, ref, delta)
     })
   }
 

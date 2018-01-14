@@ -267,7 +267,7 @@ case class PrismDelta[S, A](prism: Prism[S, A], delta: Delta[A]) extends Delta[S
     )
 }
 
-case class MirrorDelta[A: MirrorCodec](ref: Ref[A], delta: Delta[A]) extends Delta[Mirror] {
+case class MirrorDelta[A: MirrorCodec](mirrorType: MirrorType, ref: Ref[A], delta: Delta[A]) extends Delta[Mirror] {
   def apply(mirror: Mirror): DeltaIO[Mirror] =
     mirror(ref).fold(
       // Data is not in mirror, nothing to do
@@ -279,4 +279,9 @@ case class MirrorDelta[A: MirrorCodec](ref: Ref[A], delta: Delta[A]) extends Del
         updatedMirror <- mirror.updated(ref.id, modifiedA)
       } yield updatedMirror
     )
+}
+
+case class MirrorAndIdDelta[M](d: Delta[Mirror]) extends Delta[MirrorAndId[M]] {
+  def apply(m: MirrorAndId[M]): DeltaIO[MirrorAndId[M]] =
+    d(m.mirror).map(newMirror => m.copy(mirror = newMirror))
 }

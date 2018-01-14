@@ -39,14 +39,13 @@ object ServerRootComponent {
   implicit val mirrorRootSource: RootSource[Mirror] = new MirrorRootSource
 
   private class MirrorAndIdRootSource[M] extends RootSource[MirrorAndId[M]] {
-    // Keep the same lens instance - reduces changes in cursor data, reducing redraws
-    private val lens = MirrorAndId.mirror[M]
+
     def rootFor(rootModel: MirrorAndId[M], parent: Parent[MirrorAndId[M]]): Root = new Root {
       def cursorAt[A, L](ref: TreeRef[A], location: L)
                         (implicit mca: MirrorCodec[A], s: Searchable[A, Guid]): Option[Cursor[A, L]] = {
         rootModel.mirror.apply(ref).map { data =>
-          val lensParent = LensParent[MirrorAndId[M], Mirror](parent, lens)
-          Cursor[A, L](MirrorParent[A](lensParent, ref), data, location, this)
+          val mirrorAndIdParent = MirrorAndIdParent[M](parent)
+          Cursor[A, L](MirrorParent[A](mirrorAndIdParent, ref), data, location, this)
         }
       }
       def refRevisions(refGuids: Set[Guid]): Map[Guid, Guid] = {

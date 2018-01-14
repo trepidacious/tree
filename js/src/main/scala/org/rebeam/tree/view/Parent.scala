@@ -4,7 +4,7 @@ import japgolly.scalajs.react._
 import org.rebeam.tree._
 import io.circe._
 import monocle.{Lens, Prism}
-import org.rebeam.tree.ref.{Mirror, MirrorCodec}
+import org.rebeam.tree.ref.{Mirror, MirrorAndId, MirrorCodec}
 import org.rebeam.tree.sync.{Identified, Ref}
 
 /**
@@ -148,7 +148,7 @@ case class MirrorParent[A: MirrorCodec](parent: Parent[Mirror], ref: Ref[A]) ext
   def callback(delta: Delta[A]): Callback = {
     //Produce a MirrorDelta from the provided child delta, to make it into a delta
     //of the parent (i.e. convert child's Delta[A] to parent's Delta[Mirror]
-    val parentDelta = MirrorDelta(ref, delta)
+    val parentDelta = MirrorDelta(implicitly[MirrorCodec[A]].mirrorType, ref, delta)
 
     //Run using the parent's own parent
     parent.callback(parentDelta)
@@ -156,4 +156,19 @@ case class MirrorParent[A: MirrorCodec](parent: Parent[Mirror], ref: Ref[A]) ext
 }
 
 
+/**
+  * Produce a parent for the mirror in a MirrorAndId, from a parent for that MirrorAndId. This
+  * just moves to the MirrorAndId's mirror.
+  * @param parent The parent of the parent component
+  */
+case class MirrorAndIdParent[M](parent: Parent[MirrorAndId[M]]) extends Parent[Mirror] {
+  def callback(delta: Delta[Mirror]): Callback = {
+    //Produce a LensDelta from the provided child delta, to make it into a delta
+    //of the parent
+    val parentDelta = MirrorAndIdDelta[M](delta)
+
+    //Run using the parent's own parent
+    parent.callback(parentDelta)
+  }
+}
 
