@@ -41,17 +41,6 @@ object Sync {
   case class DeltaId(clientId: ClientId, clientDeltaId: ClientDeltaId)
 
   /**
-    * Find Ref instances by their id.
-    * Works with Cursor.zoomMatch and related methods to zoom to a particular element of a list of refs by id
-    * @param id   The id to find
-    * @tparam A   The type of item referenced by the Ref
-    */
-  @JsonCodec
-  case class FindRefById[A](id: Id[A]) extends (Ref[A] => Boolean) {
-    def apply(a: Ref[A]): Boolean = a.id == id
-  }
-
-  /**
     * A delta and its id
     * @param delta  The Delta
     * @param id     The DeltaId of the Delta
