@@ -40,18 +40,6 @@ object Sync {
   @JsonCodec
   case class DeltaId(clientId: ClientId, clientDeltaId: ClientDeltaId)
 
-
-  /**
-    * Find Identified instances by their Id.
-    * Works with Cursor.zoomMatch and related methods to zoom to a particular element of a list by id
-    * @param id   The id to find
-    * @tparam A   The type of item to find, must implement HasId[A]
-    */
-  @JsonCodec
-  case class FindById[A <: Identified[A]](id: Id[A]) extends (A => Boolean) {
-    def apply(a: A): Boolean = a.id == id
-  }
-
   /**
     * Find Ref instances by their id.
     * Works with Cursor.zoomMatch and related methods to zoom to a particular element of a list of refs by id

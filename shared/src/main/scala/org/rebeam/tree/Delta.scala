@@ -240,6 +240,15 @@ case class OptionalIdDelta[A <: Identified[A]](optionalId: OptionalId[A], delta:
     )
 }
 
+case class OptionalRefDelta[A](optionalRef: OptionalRef[A], delta: Delta[Ref[A]]) extends Delta[List[Ref[A]]] {
+  def apply(a: List[Ref[A]]): DeltaIO[List[Ref[A]]] =
+    optionalRef.getOption(a).fold(
+      pure(a)
+    )(
+      delta(_).map(optionalRef.set(_)(a))
+    )
+}
+
 case class OptionDelta[A](delta: Delta[A]) extends Delta[Option[A]] {
 //  private lazy val mod: Option[A] => Option[A] = option.some[A].modify(delta.apply)
   def apply(a: Option[A]): DeltaIO[Option[A]] = option.some[A].getOption(a).fold(

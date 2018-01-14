@@ -5,7 +5,7 @@ import org.rebeam.tree._
 import io.circe._
 import monocle.{Lens, Prism}
 import org.rebeam.tree.ref.{Mirror, MirrorCodec}
-import org.rebeam.tree.sync.Ref
+import org.rebeam.tree.sync.{Identified, Ref}
 
 /**
   * Interface provided by a parent component (view) to a child component,
@@ -96,6 +96,28 @@ case class OptionalMatchParent[A, F <: A => Boolean](parent: Parent[List[A]], op
     //Produce a LensDelta from the provided child delta, to make it into a delta
     //of the parent
     val parentDelta = OptionalMatchDelta[A, F](optionalMatch, delta)
+
+    //Run using the parent's own parent
+    parent.callback(parentDelta)
+  }
+}
+
+case class OptionalIdParent[A <: Identified[A]](parent: Parent[List[A]], optionalId: OptionalId[A]) extends Parent[A] {
+  def callback(delta: Delta[A]): Callback = {
+    //Produce a LensDelta from the provided child delta, to make it into a delta
+    //of the parent
+    val parentDelta = OptionalIdDelta[A](optionalId, delta)
+
+    //Run using the parent's own parent
+    parent.callback(parentDelta)
+  }
+}
+
+case class OptionalRefParent[A](parent: Parent[List[Ref[A]]], optionalRef: OptionalRef[A]) extends Parent[Ref[A]] {
+  def callback(delta: Delta[Ref[A]]): Callback = {
+    //Produce a LensDelta from the provided child delta, to make it into a delta
+    //of the parent
+    val parentDelta = OptionalRefDelta[A](optionalRef, delta)
 
     //Run using the parent's own parent
     parent.callback(parentDelta)

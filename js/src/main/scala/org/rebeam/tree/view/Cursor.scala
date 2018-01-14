@@ -5,7 +5,7 @@ import org.rebeam.tree._
 import io.circe._
 import japgolly.scalajs.react.extra.Reusability
 import org.rebeam.tree.ref.{Mirror, MirrorCodec}
-import org.rebeam.tree.sync.{Guid, Ref => TreeRef}
+import org.rebeam.tree.sync.{Guid, Id, Identified, Ref => TreeRef}
 import Searchable._
 import monocle.{Lens, Prism}
 
@@ -156,7 +156,6 @@ object Cursor {
   def apply[M, L](parent: Parent[M], model: M, location: L, root: Root)(implicit s: Searchable[M, Guid]): Cursor[M, L] =
     CursorBasic(parent, model, location, root, model.allRefGuids)
 
-  //FIXME add a ListIdCursor to provide for zooming by id
   implicit class ListCursor[C, L](cursor: Cursor[List[C], L]) {
     def zoomI(index: Int)(implicit s: Searchable[C, Guid]): Option[Cursor[C, L]] = {
       val optionalI: OptionalI[C] = OptionalI[C](index)
@@ -178,6 +177,30 @@ object Cursor {
 
     def zoomAllMatches[F <: C => Boolean](cToF: C => F)(implicit fEncoder: Encoder[F], s: Searchable[C, Guid]): List[Cursor[C, L]] =
       cursor.model.map(cToF).flatMap(zoomMatch(_))
+  }
+
+  implicit class IdentifiedListCursor[C <: Identified[C], L](cursor: Cursor[List[C], L]) {
+    def zoomId(id: Id[C])(implicit s: Searchable[C, Guid]): Option[Cursor[C, L]] = {
+      val optionalId: OptionalId[C] = OptionalId[C](id)
+      optionalId.getOption(cursor.model).map { c =>
+        Cursor[C, L](OptionalIdParent(cursor.parent, optionalId), c, cursor.location, cursor.root)
+      }
+    }
+
+    def zoomAllIds(implicit s: Searchable[C, Guid]): List[Cursor[C, L]] =
+      cursor.model.map(_.id).flatMap(zoomId(_))
+  }
+
+  implicit class RefListCursor[C, L](cursor: Cursor[List[TreeRef[C]], L]) {
+    def zoomRefById(id: Id[C]): Option[Cursor[TreeRef[C], L]] = {
+      val optionalRef: OptionalRef[C] = OptionalRef[C](id)
+      optionalRef.getOption(cursor.model).map { c =>
+        Cursor[TreeRef[C], L](OptionalRefParent(cursor.parent, optionalRef), c, cursor.location, cursor.root)
+      }
+    }
+
+    val zoomAllRefsById: List[Cursor[TreeRef[C], L]] =
+      cursor.model.map(_.id).flatMap(zoomRefById)
   }
 
   implicit class OptionCursor[C, L](cursor: Cursor[Option[C], L]) {
