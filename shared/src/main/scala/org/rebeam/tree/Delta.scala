@@ -267,6 +267,12 @@ case class PrismDelta[S, A](prism: Prism[S, A], delta: Delta[A]) extends Delta[S
     )
 }
 
+object PrismDelta {
+  def classTag[S, A <: S](implicit ct: ClassTag[A]): Prism[S, A] = narrow(ct.unapply)
+  def partialNarrow[S, A <: S](pf: PartialFunction[S, A]): Prism[S, A] = Prism(pf.lift)(a => a: S)
+  def narrow[S, A <: S](f: S => Option[A]): Prism[S, A] = Prism(f)(a => a: S)
+}
+
 case class MirrorDelta[A: MirrorCodec](mirrorType: MirrorType, ref: Ref[A], delta: Delta[A]) extends Delta[Mirror] {
   def apply(mirror: Mirror): DeltaIO[Mirror] =
     mirror(ref).fold(
