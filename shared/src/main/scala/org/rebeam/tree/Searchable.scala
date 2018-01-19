@@ -14,10 +14,11 @@ trait Searchable[A, Q] {
 }
 
 trait LowPrioritySearchable {
-  implicit def hlistLikeSearchable[A, L <: HList, Q](
+
+  implicit def genericSearchable[A, R, Q](
     implicit
-    gen: Generic.Aux[A, L],
-    s: Lazy[Searchable[L, Q]]
+    gen: Generic.Aux[A, R],
+    s: Lazy[Searchable[R, Q]]
   ): Searchable[A, Q] = new Searchable[A, Q] {
     def find(p: Q => Boolean)(a: A): Set[Q] = s.value.find(p)(gen to a)
   }
@@ -107,7 +108,6 @@ object Searchable extends LowPrioritySearchable {
       case Inl(h) => hs.value.find(p)(h)
       case Inr(t) => ts.find(p)(t)
     }
-
   }
 
   implicit def refSearchableForGuid[A]: Searchable[Ref[A], Guid] = new Searchable[Ref[A], Guid] {

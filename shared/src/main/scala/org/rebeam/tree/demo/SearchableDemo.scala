@@ -1,5 +1,6 @@
 package org.rebeam.tree.demo
 
+import io.circe.generic.JsonCodec
 import org.rebeam.tree.Searchable._
 
 object SearchableDemo extends App {
@@ -37,4 +38,22 @@ object SearchableDemo extends App {
 
   println(Set("fouro").deepFind(p))
 
+  // Sealed trait - Coproduct
+  @JsonCodec
+  sealed trait Animal{
+    def says: String
+  }
+  object Animal {
+    final case class Cat(name: String) extends Animal {
+      def says: String = "Meow!"
+    }
+    final case class Dog(name: String) extends Animal {
+      def says: String = "Moo!"
+    }
+  }
+
+  import Animal._
+
+  val catAnimal: Animal = Cat("Fluffo")
+  println(catAnimal.deepFind(p))
 }
