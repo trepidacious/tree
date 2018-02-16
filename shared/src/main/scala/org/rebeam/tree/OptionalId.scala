@@ -3,8 +3,8 @@ package org.rebeam.tree
 import monocle._
 import org.rebeam.tree.sync.{Id, Identified}
 
-import scala.language.higherKinds
-import scalaz.{Applicative, \/}
+import cats.Applicative
+import scala.{Either => \/}
 
 case class OptionalId[A <: Identified[A]](id: Id[A]) extends POptional[List[A], List[A], A, A] {
 

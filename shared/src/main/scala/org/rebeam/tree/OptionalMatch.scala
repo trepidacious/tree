@@ -2,8 +2,8 @@ package org.rebeam.tree
 
 import monocle._
 
-import scala.language.higherKinds
-import scalaz.{Applicative, \/}
+import cats.Applicative
+import scala.{Either => \/}
 
 case class OptionalMatch[A, F <: A => Boolean](f: F) extends POptional[List[A], List[A], A, A] {
   private val o = Optional[List[A], A](

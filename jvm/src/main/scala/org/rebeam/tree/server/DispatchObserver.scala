@@ -1,11 +1,10 @@
 package org.rebeam.tree.server
 
+import cats.effect.Effect
+import fs2.Stream
 import org.rebeam.tree.server.util.Lock
 
-import scalaz.concurrent.Task
-import scalaz.{\/, \/-}
-import scalaz.Scalaz.none
-import scalaz.stream.Process
+import scala.{Either => \/}
 
 /**
   * Uses an OutgoingDispatcher to provide Observer implementation.
@@ -27,7 +26,7 @@ import scalaz.stream.Process
   */
 private class DispatchObserver[D, I, O](d: Dispatcher[D, I, O]) extends Observer[D] {
 
-  var pendingPull = none[O => Unit]
+  var pendingPull: Option[O => Unit] = None
 
   val lock = Lock()
 
@@ -64,10 +63,11 @@ private class DispatchObserver[D, I, O](d: Dispatcher[D, I, O]) extends Observer
 
   //Process requires callback accepting Throwable \/ T, but we produce no Throwables, so provide
   //a wrapper that will always provide a T right value.
-  def pullEither(pullE: (Throwable \/ O) => Unit): Unit = pull((o: O) => pullE(\/-(o)))
+  def pullEither(pullE: (Throwable \/ O) => Unit): Unit = pull((o: O) => pullE(Right(o)))
 
-  //Produce a Process from this observer by wrapping the pullEither callback in the normal way.
-  val process: Process[Task, O] = Process.repeatEval(Task.async { (cb: Throwable \/ O => Unit) => pullEither(cb)})
+  //Produce a Stream from this observer by wrapping the pullEither callback in the normal way.
+  def stream[F[_]](implicit F: Effect[F]): Stream[F, O]
+    = Stream.repeatEval(F.async(pullEither))
 
   //Incoming side - just pass through to Dispatcher, using our lock
   def msgFromClient(msg: I): Unit = lock {

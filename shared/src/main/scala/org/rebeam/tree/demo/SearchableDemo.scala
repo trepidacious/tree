@@ -3,7 +3,7 @@ package org.rebeam.tree.demo
 import io.circe.generic.JsonCodec
 import org.rebeam.tree.Searchable._
 
-object SearchableDemo extends App {
+object SearchableDemo {
 
   // An example predicate:
   val p = (_: String) endsWith "o"

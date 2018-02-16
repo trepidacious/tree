@@ -2,9 +2,8 @@ package org.rebeam.tree
 
 import monocle._
 import org.rebeam.tree.sync.{Id, Ref}
-
-import scala.language.higherKinds
-import scalaz.{Applicative, \/}
+import cats.Applicative
+import scala.{Either => \/}
 
 case class OptionalRef[A](id: Id[A]) extends POptional[List[Ref[A]], List[Ref[A]], Ref[A], Ref[A]] {
 

@@ -8,15 +8,18 @@ import org.rebeam.tree.sync.Sync._
 import org.rebeam.tree.sync.RefAdder
 import DeltaIORun._
 
-import scalaz.Scalaz._
 import org.http4s.websocket.WebsocketBits.WebSocketFrame
 
-import scalaz.concurrent.Task
-import scalaz.stream.{Exchange, Process, Sink}
-import org.http4s.websocket.WebsocketBits._
 import io.circe._
 import io.circe.parser._
 import org.rebeam.tree.DeltaCodecs.DeltaCodec
+
+import cats.effect._
+import fs2._
+import org.http4s._
+import org.http4s.server.websocket._
+import org.http4s.websocket.WebsocketBits._
+
 
 /**
   * Stores a model, and allows that model to be updated (mutated) by
@@ -68,7 +71,7 @@ class ServerStore[A: ModelIdGen](initialModel: A) {
   */
 private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clientId: ClientId, contextSource: DeltaIOContextSource)(implicit encoder: Encoder[T], deltaDecoder: DeltaCodec[T], refAdder: RefAdder[T]) extends Dispatcher[ServerStoreUpdate[T], Json, Json] {
 
-  private var pendingUpdateToClient = none[ServerStoreUpdate[T]]
+  private var pendingUpdateToClient: Option[ServerStoreUpdate[T]] = None
 
   private val updateEncoder = serverStoreUpdateEncoder[T](clientId)
 
@@ -91,7 +94,7 @@ private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clien
 
   //Read the Js.Value as a delta, and apply it to the store
   override def msgFromClient(msg: Json): Unit = {
-    val empty = msg.asObject.exists(_.fields.isEmpty)
+    val empty = msg.asObject.exists(_.keys.isEmpty)
     if (empty) {
 //      println("Pong!")
     } else {
@@ -113,23 +116,31 @@ private class ServerStoreValueDispatcher[T](val store: ServerStore[T], val clien
 }
 
 object ServerStoreValueExchange {
-  def apply[M](store: ServerStore[M], clientId: ClientId, contextSource: DeltaIOContextSource)(implicit encoder: Encoder[M], deltaDecoder: DeltaCodec[M], refAdder: RefAdder[M]): Exchange[WebSocketFrame, WebSocketFrame] = {
+  def apply[F[_], M]
+  (store: ServerStore[M], clientId: ClientId, contextSource: DeltaIOContextSource)
+  (implicit
+   F: Effect[F],
+   encoder: Encoder[M],
+   deltaDecoder: DeltaCodec[M],
+   refAdder: RefAdder[M]
+  ): F[Response[F]] = {
 
     val dispatcher = new ServerStoreValueDispatcher(store, clientId, contextSource)
     val observer = new DispatchObserver(dispatcher)
     store.observe(observer)
 
     //Treat received text as JSON encoded deltas to data, if valid
-    val sink: Sink[Task, WebSocketFrame] = Process.constant {
-      case Text(t, _) => Task.delay( parse(t).toOption.foreach(msg => dispatcher.msgFromClient(msg)) )
-      // TODO error?
-      case _ => Task.delay(())
+    val fromClient: Sink[F, WebSocketFrame] = _.evalMap {
+      (ws: WebSocketFrame) => ws match {
+        case Text(t, _) => F.delay( parse(t).toOption.foreach(msg => dispatcher.msgFromClient(msg)) )
+        case o => F.delay(println(s"Unknown client message $o"))
+      }
     }
 
     //Get source of messages for client from the observer's process
-    val source = observer.process.map(js => Text(js.noSpaces))
+    val toClient = observer.stream[F].map(js => Text(js.noSpaces))
 
-    Exchange(source, sink)
+    WebSocketBuilder[F].build(toClient, fromClient)
   }
 }
 

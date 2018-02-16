@@ -39,14 +39,20 @@ resolvers ++= Seq(
   Resolver.sonatypeRepo("snapshots")
 )
 
+javaOptions in ThisBuild := Seq("-Dorg.slf4j.simpleLogger.logFile=System.out")
+
 //addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.4")
 
-lazy val http4sVersion              = "0.15.5a" // -> 0.18.0-M7
-lazy val circeVersion               = "0.7.0"   // -> 0.8.0
-lazy val catsVersion                = "0.9.0"   // -> 1.0.0
-lazy val scalajsReactVersion        = "1.1.1"
-lazy val shapelessVersion           = "2.3.3"
-lazy val monocleVersion             = "1.4.0"   // -> 1.5.0-cats
+lazy val http4sVersion              = "0.18.0"  //done
+lazy val circeVersion               = "0.9.1"   //done
+lazy val catsVersion                = "1.0.1"   //done
+lazy val scalajsReactVersion        = "1.1.1"   //done
+lazy val shapelessVersion           = "2.3.3"   //done
+lazy val monocleVersion             = "1.5.0-cats"   // or just 1.5.0 ?
+lazy val scalacticVersion           = "3.0.0"   //Needed?
+lazy val scalatestVersion           = "3.0.5"   //done
+lazy val scalacheckVersion          = "1.13.5"  //done
+lazy val slf4jVersion               = "1.7.25"
 
 lazy val root = project.in(file(".")).
   aggregate(treeJS, treeJVM).
@@ -60,26 +66,26 @@ lazy val tree = crossProject.in(file(".")).
     name := "tree",
     version := "0.1-SNAPSHOT",
     libraryDependencies ++= Seq(
-//      "org.rebeam"                  %%% "lenses-codec"    % "0.1-SNAPSHOT",
 
-      "io.circe"                    %%% "circe-core"      % circeVersion,
-      "io.circe"                    %%% "circe-generic"   % circeVersion,
-      "io.circe"                    %%% "circe-parser"    % circeVersion,
+      "io.circe"                    %%% "circe-core"        % circeVersion,
+      "io.circe"                    %%% "circe-generic"     % circeVersion,
+      "io.circe"                    %%% "circe-parser"      % circeVersion,
 
-      "org.typelevel"               %%% "cats"            % catsVersion,
+      "org.typelevel"               %%% "cats-free"         % catsVersion,
       
-      "com.chuusai"                 %%% "shapeless"       % shapelessVersion,
+      "com.chuusai"                 %%% "shapeless"         % shapelessVersion,
 
-      "com.github.julien-truffaut"  %%%  "monocle-core"    % monocleVersion,
-      "com.github.julien-truffaut"  %%%  "monocle-generic" % monocleVersion,
-      "com.github.julien-truffaut"  %%%  "monocle-macro"   % monocleVersion,
-      "com.github.julien-truffaut"  %%%  "monocle-state"   % monocleVersion,
-      "com.github.julien-truffaut"  %%%  "monocle-refined" % monocleVersion,
-      "com.github.julien-truffaut"  %%%  "monocle-law"     % monocleVersion % "test",
+      "com.github.julien-truffaut"  %%% "monocle-core"      % monocleVersion,
+      "com.github.julien-truffaut"  %%% "monocle-generic"   % monocleVersion,
+      "com.github.julien-truffaut"  %%% "monocle-macro"     % monocleVersion,
+      "com.github.julien-truffaut"  %%% "monocle-state"     % monocleVersion,
+      "com.github.julien-truffaut"  %%% "monocle-refined"   % monocleVersion,
+      "com.github.julien-truffaut"  %%% "monocle-law"       % monocleVersion      % "test",
 
-      "org.scalactic"               %%% "scalactic"       % "3.0.0"             % "test",
-      "org.scalatest"               %%% "scalatest"       % "3.0.0"             % "test",
-      "org.scalacheck"              %%% "scalacheck"      % "1.13.4"            % "test"
+      "org.scalactic"               %%% "scalactic"         % scalacticVersion    % "test",
+      "org.scalatest"               %%% "scalatest"         % scalatestVersion    % "test",
+      "org.scalacheck"              %%% "scalacheck"        % scalacheckVersion   % "test"
+
     ),
 
     //For @Lenses and Circe
@@ -89,7 +95,9 @@ lazy val tree = crossProject.in(file(".")).
     // Add JVM-specific settings here
     libraryDependencies ++= Seq(
       "org.http4s"  %% "http4s-blaze-server"  % http4sVersion,
-      "org.http4s"  %% "http4s-dsl"           % http4sVersion
+      "org.http4s"  %% "http4s-dsl"           % http4sVersion,
+
+      "org.slf4j"   % "slf4j-simple"          % slf4jVersion
     )
 
   ).jsSettings(

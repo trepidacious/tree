@@ -58,12 +58,12 @@ object Mirror {
   def decoder(codecs: MirrorCodec[_]*): Decoder[Mirror] = {
     val codecMap = codecs.toList.map(codec => (codec.mirrorType, codec)).toMap[MirrorType, MirrorCodec[_]]
     Decoder.instance[Mirror](
-      c => c.fields match {
+      c => c.keys match {
 
         case None => Left[DecodingFailure, Mirror](DecodingFailure("No fields in mirror Json", c.history))
 
-        case Some(fields) =>
-          val it = fields.iterator
+        case Some(keys) =>
+          val it = keys.iterator
           val entries = ArrayBuffer.empty[MirrorEntry]
           var failed: DecodingFailure = null
 
@@ -74,7 +74,7 @@ object Mirror {
             Guid.guidKeyDecoder(field) match {
 
               case Some(guid) =>
-                atH.fieldSet match {
+                atH.keys.map(_.toSet) match {
                   case Some(set) if set.size == 1 =>
                     val mirrorType = MirrorType(set.head)
                     val mirrorCodec = codecMap.get(mirrorType)
