@@ -37,16 +37,27 @@ object MaterialColor {
     def name: String
   }
 
+  sealed trait FamilyWithShades extends Family {
+    def apply(shade: Int): Color
+  }
+
+  sealed trait FamilyWithAccents extends FamilyWithShades {
+    val a100: Color
+    val a200: Color
+    val a400: Color
+    val a700: Color
+  }
+
   case class SingleFamily(name: String, color: Color) extends Family {
     def apply(): Color = color
   }
 
-  case class ShadedFamily(name: String, data: String*) extends Family {
+  case class ShadedFamily(name: String, data: String*) extends FamilyWithShades {
     def apply(): Color = apply(500)
     def apply(shade: Int): Color = applyShade(shade, data: _*)
   }
 
-  case class AccentedFamily(name: String, data: String*) extends Family {
+  case class AccentedFamily(name: String, data: String*) extends FamilyWithAccents {
     lazy val a100: Color = Color(data(10))
     lazy val a200: Color = Color(data(11))
     lazy val a400: Color = Color(data(12))
